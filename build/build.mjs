@@ -32,6 +32,21 @@ function copyDirectory(source, destination) {
   }
 }
 
+function renderManifest() {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const template = fs.readFileSync(path.join(ROOT, "src", "static", "module.json"), "utf8");
+  const rendered = template
+    .replaceAll("<%= id %>", packageJson.name)
+    .replaceAll("<%= version %>", packageJson.version);
+
+  try {
+    return JSON.parse(rendered);
+  } catch (error) {
+    console.error("Invalid module manifest template.");
+    throw error;
+  }
+}
+
 function compileTypescript() {
   const tscPath = path.join(ROOT, "node_modules", "typescript", "bin", "tsc");
   const result = spawnSync(process.execPath, [tscPath, "-p", "tsconfig.json"], {
@@ -44,22 +59,28 @@ function compileTypescript() {
   }
 }
 
-function buildPacks() {
+function buildPacks(manifest) {
   ensureDir(PACK_DIST);
 
-  const folders = fs
-    .readdirSync(PACK_SRC, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
+  const declaredPacks = Array.isArray(manifest.packs) ? manifest.packs : [];
 
-  for (const folder of folders) {
+  for (const pack of declaredPacks) {
+    const folder = `${pack.name}.db`;
     const folderPath = path.join(PACK_SRC, folder);
+    if (!fs.existsSync(folderPath)) {
+      throw new Error(`Missing source pack folder: src/packs/${folder}`);
+    }
+
     const documents = fs
       .readdirSync(folderPath)
       .filter((file) => file.endsWith(".json"))
       .map((file) => path.join(folderPath, file))
       .map((filePath) => JSON.parse(fs.readFileSync(filePath, "utf8")))
       .sort((left, right) => String(left._id ?? "").localeCompare(String(right._id ?? "")));
+
+    if (documents.length === 0) {
+      throw new Error(`Source pack folder is empty: src/packs/${folder}`);
+    }
 
     const dbContents =
       documents.length > 0 ? `${documents.map((document) => JSON.stringify(document)).join("\n")}\n` : "";
@@ -68,14 +89,8 @@ function buildPacks() {
   }
 }
 
-function buildManifest() {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-  const template = fs.readFileSync(path.join(ROOT, "src", "static", "module.json"), "utf8");
-  const output = template
-    .replaceAll("<%= id %>", packageJson.name)
-    .replaceAll("<%= version %>", packageJson.version);
-
-  fs.writeFileSync(path.join(DIST_DIR, "module.json"), `${output.trim()}\n`, "utf8");
+function buildManifest(manifest) {
+  fs.writeFileSync(path.join(DIST_DIR, "module.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 function main() {
@@ -86,11 +101,12 @@ function main() {
 
   clean();
   compileTypescript();
+  const manifest = renderManifest();
   copyDirectory(path.join(ROOT, "src", "assets"), path.join(DIST_DIR, "assets"));
   copyDirectory(path.join(ROOT, "src", "lang"), path.join(DIST_DIR, "lang"));
   copyDirectory(path.join(ROOT, "src", "styles"), path.join(DIST_DIR, "styles"));
-  buildPacks();
-  buildManifest();
+  buildPacks(manifest);
+  buildManifest(manifest);
 }
 
 main();
