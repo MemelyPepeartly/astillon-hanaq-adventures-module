@@ -14,6 +14,9 @@ on:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,27 +49,23 @@ jobs:
           zip -r ../module.zip ./*
 
       - name: Update latest release
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          name: Latest
-          draft: false
-          prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ./dist/module.json,./module.zip
-          tag: latest
-          commit: ${{ github.sha }}
-          body: ${{ github.event.inputs.release_notes }}
+        shell: bash
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest ./dist/module.json ./module.zip --clobber
+            gh release edit latest --title "Latest" --notes "$RELEASE_NOTES" --latest
+          else
+            gh release create latest ./dist/module.json ./module.zip --title "Latest" --notes "$RELEASE_NOTES" --target "$GITHUB_SHA" --latest
+          fi
 
       - name: Create version release
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          name: Release ${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ./dist/module.json,./module.zip
-          tag: ${{ steps.get_version.outputs.version }}
-          commit: ${{ github.sha }}
-          body: ${{ github.event.inputs.release_notes }}
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" ./dist/module.json ./module.zip --clobber
+            gh release edit "$VERSION" --title "Release $VERSION" --notes "$RELEASE_NOTES"
+          else
+            gh release create "$VERSION" ./dist/module.json ./module.zip --title "Release $VERSION" --notes "$RELEASE_NOTES" --target "$GITHUB_SHA" --latest=false
+          fi
