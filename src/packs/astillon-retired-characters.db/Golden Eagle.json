@@ -1,0 +1,4594 @@
+{
+  "_id": "kPfvykVuxG5rGqAM",
+  "name": "Golden Eagle",
+  "type": "character",
+  "img": "common/monsters/eagle.png",
+  "system": {
+    "attributes": {
+      "hp": {
+        "slug": "hp",
+        "_modifiers": [
+          {
+            "slug": "ancestry-hp",
+            "label": "Ancestry HP",
+            "domains": [],
+            "modifier": 4,
+            "type": "untyped",
+            "ability": null,
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "class-hp",
+            "label": "Class HP",
+            "domains": [],
+            "modifier": 78,
+            "type": "untyped",
+            "ability": null,
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "hp-con",
+            "label": "Constitution",
+            "domains": [],
+            "modifier": 39,
+            "type": "ability",
+            "ability": "con",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          }
+        ],
+        "breakdown": "Ancestry HP +4, Class HP +78, Constitution +39",
+        "totalModifier": 121,
+        "value": 112,
+        "temp": 0,
+        "negativeHealing": false,
+        "unrecoverable": 0,
+        "recoveryMultiplier": 1,
+        "recoveryAddend": 0,
+        "max": 121
+      },
+      "speed": {
+        "slug": "land-speed",
+        "_modifiers": [],
+        "breakdown": "Base Land Speed 10",
+        "totalModifier": 0,
+        "total": 10,
+        "value": 10,
+        "otherSpeeds": [
+          {
+            "slug": "fly-speed",
+            "_modifiers": [],
+            "breakdown": "Base Fly Speed 60",
+            "totalModifier": 0,
+            "type": "fly",
+            "label": "Fly",
+            "value": 60
+          }
+        ],
+        "type": "land",
+        "label": "Land Speed"
+      },
+      "flanking": {
+        "canFlank": true,
+        "canGangUp": [],
+        "flankable": true,
+        "offGuardable": true
+      },
+      "immunities": [],
+      "weaknesses": [],
+      "resistances": [],
+      "ac": {
+        "slug": "ac",
+        "label": "PF2E.ArmorClassLabel",
+        "value": 33,
+        "totalModifier": 23,
+        "dc": 33,
+        "attribute": "dex",
+        "breakdown": "Base DC 10, Dexterity +6, Expert +17",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "all",
+              "dex-based"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "all",
+              "dex-based"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "details": ""
+      },
+      "hardness": {
+        "value": 0
+      },
+      "reach": {
+        "base": 5,
+        "manipulate": 5
+      },
+      "shield": {
+        "itemId": null,
+        "name": "PF2E.ArmorTypeShield",
+        "ac": 0,
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "brokenThreshold": 0,
+        "hardness": 0,
+        "raised": false,
+        "broken": false,
+        "destroyed": false,
+        "icon": "systems/pf2e/icons/actions/raise-a-shield.webp"
+      },
+      "doomed": {
+        "value": 0,
+        "max": 4
+      },
+      "dying": {
+        "value": 0,
+        "max": 4,
+        "recoveryDC": 10
+      },
+      "wounded": {
+        "value": 0,
+        "max": 3
+      },
+      "polymorphed": false,
+      "battleForm": false,
+      "classDC": {
+        "label": "Animal Companion",
+        "rank": 1,
+        "attribute": "dex",
+        "primary": true,
+        "slug": "animal-companion",
+        "value": 31,
+        "totalModifier": 21,
+        "dc": 31,
+        "breakdown": "Base DC 10, Dexterity +6, Trained +15",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "class",
+              "animal-companion",
+              "all",
+              "dex-based"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [
+              "class",
+              "animal-companion",
+              "all",
+              "dex-based"
+            ],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ]
+      },
+      "spellDC": null,
+      "classOrSpellDC": {
+        "rank": 1,
+        "value": 31
+      },
+      "ancestryhp": 4,
+      "classhp": 6,
+      "familiarAbilities": {
+        "value": 0
+      },
+      "handsFree": 2,
+      "emitsSound": true
+    },
+    "initiative": {
+      "slug": "initiative",
+      "label": "Perception",
+      "value": 21,
+      "totalModifier": 21,
+      "dc": 31,
+      "attribute": "wis",
+      "breakdown": "Wisdom +4, Expert +17",
+      "modifiers": [
+        {
+          "slug": "wis",
+          "label": "Wisdom",
+          "domains": [
+            "perception",
+            "all",
+            "wis-based",
+            "initiative"
+          ],
+          "modifier": 4,
+          "type": "ability",
+          "ability": "wis",
+          "adjustments": [],
+          "force": false,
+          "enabled": true,
+          "ignored": false,
+          "source": null,
+          "custom": false,
+          "damageType": null,
+          "damageCategory": null,
+          "critical": null,
+          "traits": [],
+          "hideIfDisabled": false,
+          "kind": "modifier",
+          "predicate": []
+        },
+        {
+          "slug": "proficiency",
+          "label": "Expert",
+          "domains": [
+            "perception",
+            "all",
+            "wis-based",
+            "initiative"
+          ],
+          "modifier": 17,
+          "type": "proficiency",
+          "ability": null,
+          "adjustments": [],
+          "force": false,
+          "enabled": true,
+          "ignored": false,
+          "source": null,
+          "custom": false,
+          "damageType": null,
+          "damageCategory": null,
+          "critical": null,
+          "traits": [],
+          "hideIfDisabled": false,
+          "kind": "bonus",
+          "predicate": []
+        }
+      ],
+      "statistic": "perception",
+      "tiebreakPriority": 1
+    },
+    "details": {
+      "languages": {
+        "value": [],
+        "details": ""
+      },
+      "level": {
+        "value": 13
+      },
+      "biography": {
+        "appearance": "",
+        "backstory": "",
+        "birthPlace": "",
+        "attitude": "",
+        "beliefs": "",
+        "anathema": [],
+        "edicts": [],
+        "likes": "",
+        "dislikes": "",
+        "catchphrases": "",
+        "campaignNotes": "",
+        "allies": "",
+        "enemies": "",
+        "organizations": "",
+        "visibility": {
+          "appearance": true,
+          "backstory": false,
+          "personality": false,
+          "campaign": false
+        },
+        "value": "",
+        "public": ""
+      },
+      "keyability": {
+        "value": "dex"
+      },
+      "xp": {
+        "value": 0,
+        "min": 0,
+        "max": 1000,
+        "pct": 0
+      },
+      "age": {
+        "value": ""
+      },
+      "height": {
+        "value": ""
+      },
+      "weight": {
+        "value": ""
+      },
+      "gender": {
+        "value": ""
+      },
+      "ethnicity": {
+        "value": ""
+      },
+      "nationality": {
+        "value": ""
+      },
+      "deity": {
+        "value": "",
+        "image": "systems/pf2e/assets/sheet/deity.webp"
+      },
+      "heritage": null,
+      "ancestry": {
+        "name": "Bird",
+        "trait": "bird",
+        "adopted": null,
+        "versatile": null,
+        "countsAs": [
+          "bird"
+        ]
+      },
+      "class": {
+        "name": "Animal Companion",
+        "trait": "animal-companion"
+      },
+      "deities": {
+        "primary": null,
+        "secondary": null,
+        "domains": {}
+      },
+      "alliance": "opposition"
+    },
+    "resources": {
+      "heroPoints": {
+        "value": 0,
+        "max": 3
+      },
+      "focus": {
+        "value": 0,
+        "max": 0,
+        "cap": 3
+      },
+      "crafting": {
+        "infusedReagents": {
+          "value": 0,
+          "max": 0
+        }
+      },
+      "investiture": {
+        "value": 0,
+        "max": 10
+      }
+    },
+    "_migration": {
+      "version": 0.925,
+      "previous": {
+        "schema": 0.911,
+        "foundry": "11.315",
+        "system": "5.14.3"
+      }
+    },
+    "abilities": {
+      "str": {
+        "mod": 4,
+        "base": 0,
+        "label": "PF2E.AbilityStr",
+        "shortLabel": "PF2E.AbilityId.str"
+      },
+      "dex": {
+        "mod": 6,
+        "base": 0,
+        "label": "PF2E.AbilityDex",
+        "shortLabel": "PF2E.AbilityId.dex"
+      },
+      "con": {
+        "mod": 3,
+        "base": 0,
+        "label": "PF2E.AbilityCon",
+        "shortLabel": "PF2E.AbilityId.con"
+      },
+      "int": {
+        "mod": -4,
+        "base": 0,
+        "label": "PF2E.AbilityInt",
+        "shortLabel": "PF2E.AbilityId.int"
+      },
+      "wis": {
+        "mod": 4,
+        "base": 0,
+        "label": "PF2E.AbilityWis",
+        "shortLabel": "PF2E.AbilityId.wis"
+      },
+      "cha": {
+        "mod": 0,
+        "base": 0,
+        "label": "PF2E.AbilityCha",
+        "shortLabel": "PF2E.AbilityId.cha"
+      }
+    },
+    "skills": {
+      "acr": {
+        "slug": "acrobatics",
+        "label": "Acrobatics",
+        "value": 23,
+        "totalModifier": 23,
+        "dc": 33,
+        "attribute": "dex",
+        "breakdown": "Dexterity +6, Expert +17",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "acrobatics",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "acrobatics",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 2,
+        "armor": true
+      },
+      "arc": {
+        "slug": "arcana",
+        "label": "Arcana",
+        "value": -4,
+        "totalModifier": -4,
+        "dc": 6,
+        "attribute": "int",
+        "breakdown": "Intelligence -4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "int",
+            "label": "Intelligence",
+            "domains": [
+              "arcana",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": -4,
+            "type": "ability",
+            "ability": "int",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "arcana",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "ath": {
+        "slug": "athletics",
+        "label": "Athletics",
+        "value": 19,
+        "totalModifier": 19,
+        "dc": 29,
+        "attribute": "str",
+        "breakdown": "Strength +4, Trained +15",
+        "modifiers": [
+          {
+            "slug": "str",
+            "label": "Strength",
+            "domains": [
+              "athletics",
+              "str-based",
+              "skill-check",
+              "str-skill-check",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "str",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [
+              "athletics",
+              "str-based",
+              "skill-check",
+              "str-skill-check",
+              "all"
+            ],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          },
+          {
+            "slug": "no-crowbar",
+            "label": "No Crowbar",
+            "domains": [
+              "athletics",
+              "str-based",
+              "skill-check",
+              "str-skill-check",
+              "all"
+            ],
+            "modifier": -2,
+            "type": "item",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": false,
+            "ignored": true,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": true,
+            "kind": "penalty",
+            "predicate": [
+              "action:force-open",
+              "action:force-open:prying"
+            ]
+          }
+        ],
+        "rank": 1,
+        "armor": true
+      },
+      "cra": {
+        "slug": "crafting",
+        "label": "Crafting",
+        "value": -4,
+        "totalModifier": -4,
+        "dc": 6,
+        "attribute": "int",
+        "breakdown": "Intelligence -4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "int",
+            "label": "Intelligence",
+            "domains": [
+              "crafting",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": -4,
+            "type": "ability",
+            "ability": "int",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "crafting",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "dec": {
+        "slug": "deception",
+        "label": "Deception",
+        "value": 0,
+        "totalModifier": 0,
+        "dc": 10,
+        "attribute": "cha",
+        "breakdown": "Charisma +0, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "cha",
+            "label": "Charisma",
+            "domains": [
+              "deception",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "ability",
+            "ability": "cha",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "deception",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "dip": {
+        "slug": "diplomacy",
+        "label": "Diplomacy",
+        "value": 0,
+        "totalModifier": 0,
+        "dc": 10,
+        "attribute": "cha",
+        "breakdown": "Charisma +0, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "cha",
+            "label": "Charisma",
+            "domains": [
+              "diplomacy",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "ability",
+            "ability": "cha",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "diplomacy",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "itm": {
+        "slug": "intimidation",
+        "label": "Intimidation",
+        "value": 15,
+        "totalModifier": 15,
+        "dc": 25,
+        "attribute": "cha",
+        "breakdown": "Charisma +0, Trained +15",
+        "modifiers": [
+          {
+            "slug": "cha",
+            "label": "Charisma",
+            "domains": [
+              "intimidation",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "ability",
+            "ability": "cha",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [
+              "intimidation",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 1,
+        "armor": false
+      },
+      "med": {
+        "slug": "medicine",
+        "label": "Medicine",
+        "value": 4,
+        "totalModifier": 4,
+        "dc": 14,
+        "attribute": "wis",
+        "breakdown": "Wisdom +4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "wis",
+            "label": "Wisdom",
+            "domains": [
+              "medicine",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "wis",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "medicine",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "nat": {
+        "slug": "nature",
+        "label": "Nature",
+        "value": 4,
+        "totalModifier": 4,
+        "dc": 14,
+        "attribute": "wis",
+        "breakdown": "Wisdom +4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "wis",
+            "label": "Wisdom",
+            "domains": [
+              "nature",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "wis",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "nature",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "occ": {
+        "slug": "occultism",
+        "label": "Occultism",
+        "value": -4,
+        "totalModifier": -4,
+        "dc": 6,
+        "attribute": "int",
+        "breakdown": "Intelligence -4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "int",
+            "label": "Intelligence",
+            "domains": [
+              "occultism",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": -4,
+            "type": "ability",
+            "ability": "int",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "occultism",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "prf": {
+        "slug": "performance",
+        "label": "Performance",
+        "value": 0,
+        "totalModifier": 0,
+        "dc": 10,
+        "attribute": "cha",
+        "breakdown": "Charisma +0, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "cha",
+            "label": "Charisma",
+            "domains": [
+              "performance",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "ability",
+            "ability": "cha",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "performance",
+              "cha-based",
+              "skill-check",
+              "cha-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "rel": {
+        "slug": "religion",
+        "label": "Religion",
+        "value": 4,
+        "totalModifier": 4,
+        "dc": 14,
+        "attribute": "wis",
+        "breakdown": "Wisdom +4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "wis",
+            "label": "Wisdom",
+            "domains": [
+              "religion",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "wis",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "religion",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "soc": {
+        "slug": "society",
+        "label": "Society",
+        "value": -4,
+        "totalModifier": -4,
+        "dc": 6,
+        "attribute": "int",
+        "breakdown": "Intelligence -4, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "int",
+            "label": "Intelligence",
+            "domains": [
+              "society",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": -4,
+            "type": "ability",
+            "ability": "int",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "society",
+              "int-based",
+              "skill-check",
+              "int-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": false
+      },
+      "ste": {
+        "slug": "stealth",
+        "label": "Stealth",
+        "value": 23,
+        "totalModifier": 23,
+        "dc": 33,
+        "attribute": "dex",
+        "breakdown": "Dexterity +6, Expert +17",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "stealth",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "stealth",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 2,
+        "armor": true
+      },
+      "sur": {
+        "slug": "survival",
+        "label": "Survival",
+        "value": 19,
+        "totalModifier": 19,
+        "dc": 29,
+        "attribute": "wis",
+        "breakdown": "Wisdom +4, Trained +15",
+        "modifiers": [
+          {
+            "slug": "wis",
+            "label": "Wisdom",
+            "domains": [
+              "survival",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "wis",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [
+              "survival",
+              "wis-based",
+              "skill-check",
+              "wis-skill-check",
+              "all"
+            ],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 1,
+        "armor": false
+      },
+      "thi": {
+        "slug": "thievery",
+        "label": "Thievery",
+        "value": 6,
+        "totalModifier": 6,
+        "dc": 16,
+        "attribute": "dex",
+        "breakdown": "Dexterity +6, Untrained +0",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "thievery",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Untrained",
+            "domains": [
+              "thievery",
+              "dex-based",
+              "skill-check",
+              "dex-skill-check",
+              "all"
+            ],
+            "modifier": 0,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ],
+        "rank": 0,
+        "armor": true
+      }
+    },
+    "pfs": {
+      "playerNumber": "",
+      "characterNumber": "",
+      "levelBump": false,
+      "currentFaction": "EA",
+      "school": "none",
+      "reputation": {
+        "EA": 0,
+        "GA": 0,
+        "HH": 0,
+        "VS": 0,
+        "RO": 0,
+        "VW": 0
+      },
+      "fame": 0
+    },
+    "exploration": [],
+    "saves": {
+      "fortitude": {
+        "rank": 2,
+        "attribute": "con",
+        "slug": "fortitude",
+        "label": "Fortitude",
+        "value": 20,
+        "totalModifier": 20,
+        "dc": 30,
+        "breakdown": "Constitution +3, Expert +17",
+        "modifiers": [
+          {
+            "slug": "con",
+            "label": "Constitution",
+            "domains": [
+              "fortitude",
+              "con-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 3,
+            "type": "ability",
+            "ability": "con",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "fortitude",
+              "con-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ]
+      },
+      "reflex": {
+        "rank": 2,
+        "attribute": "dex",
+        "slug": "reflex",
+        "label": "Reflex",
+        "value": 23,
+        "totalModifier": 23,
+        "dc": 33,
+        "breakdown": "Dexterity +6, Expert +17",
+        "modifiers": [
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [
+              "reflex",
+              "dex-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "reflex",
+              "dex-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ]
+      },
+      "will": {
+        "rank": 2,
+        "attribute": "wis",
+        "slug": "will",
+        "label": "Will",
+        "value": 21,
+        "totalModifier": 21,
+        "dc": 31,
+        "breakdown": "Wisdom +4, Expert +17",
+        "modifiers": [
+          {
+            "slug": "wis",
+            "label": "Wisdom",
+            "domains": [
+              "will",
+              "wis-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "wis",
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier",
+            "predicate": []
+          },
+          {
+            "slug": "proficiency",
+            "label": "Expert",
+            "domains": [
+              "will",
+              "wis-based",
+              "saving-throw",
+              "all"
+            ],
+            "modifier": 17,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus",
+            "predicate": []
+          }
+        ]
+      }
+    },
+    "crafting": {
+      "formulas": [],
+      "entries": {}
+    },
+    "customModifiers": {},
+    "autoChanges": {
+      "system.perception.rank": [
+        {
+          "mode": "upgrade",
+          "level": null,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 4,
+          "value": 2,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.proficiencies.classDCs.animal-companion.rank": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        }
+      ],
+      "system.proficiencies.attacks.unarmed.rank": [
+        {
+          "mode": "upgrade",
+          "level": null,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        }
+      ],
+      "system.proficiencies.defenses.unarmored.rank": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "add",
+          "level": 8,
+          "value": 1,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "system.saves.fortitude.rank": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 4,
+          "value": 2,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.saves.reflex.rank": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 4,
+          "value": 2,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.saves.will.rank": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 1,
+          "source": "Animal Companion"
+        },
+        {
+          "mode": "upgrade",
+          "level": 4,
+          "value": 2,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.attributes.ancestryhp": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": 4,
+          "source": "Bird"
+        }
+      ],
+      "system.traits.size.value": [
+        {
+          "mode": "upgrade",
+          "level": 1,
+          "value": "sm",
+          "source": "Bird"
+        }
+      ],
+      "flags.pf2e.disableABP": [
+        {
+          "mode": "override",
+          "level": null,
+          "value": true,
+          "source": "Animal Companion"
+        }
+      ],
+      "system.abilities.str.mod": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": 2,
+          "source": "Bird"
+        },
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        },
+        {
+          "mode": "add",
+          "level": 8,
+          "value": 1,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "system.abilities.dex.mod": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": 3,
+          "source": "Bird"
+        },
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        },
+        {
+          "mode": "add",
+          "level": 8,
+          "value": 2,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "system.abilities.con.mod": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": 1,
+          "source": "Bird"
+        },
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        },
+        {
+          "mode": "add",
+          "level": 8,
+          "value": 1,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "system.abilities.wis.mod": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": 2,
+          "source": "Bird"
+        },
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        },
+        {
+          "mode": "add",
+          "level": 8,
+          "value": 1,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "system.skills.ste.rank": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": 1,
+          "source": "Bird"
+        },
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.abilities.int.mod": [
+        {
+          "mode": "add",
+          "level": null,
+          "value": -4,
+          "source": "Animal Companion"
+        }
+      ],
+      "system.skills.itm.rank": [
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.skills.sur.rank": [
+        {
+          "mode": "add",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "flags.pf2e.rollOptions.all.mature": [
+        {
+          "mode": "upgrade",
+          "level": 4,
+          "value": 1,
+          "source": "Mature Animal Companion"
+        }
+      ],
+      "system.skills.acr.rank": [
+        {
+          "mode": "upgrade",
+          "level": 8,
+          "value": 2,
+          "source": "Nimble Animal Companion"
+        }
+      ],
+      "flags.pf2e.rollOptions.all.nimble": [
+        {
+          "mode": "upgrade",
+          "level": 8,
+          "value": 1,
+          "source": "Nimble Animal Companion"
+        }
+      ]
+    },
+    "perception": {
+      "slug": "perception",
+      "label": "Perception",
+      "value": 21,
+      "totalModifier": 21,
+      "dc": 31,
+      "attribute": "wis",
+      "breakdown": "Wisdom +4, Expert +17",
+      "modifiers": [
+        {
+          "slug": "wis",
+          "label": "Wisdom",
+          "domains": [
+            "perception",
+            "all",
+            "wis-based"
+          ],
+          "modifier": 4,
+          "type": "ability",
+          "ability": "wis",
+          "adjustments": [],
+          "force": false,
+          "enabled": true,
+          "ignored": false,
+          "source": null,
+          "custom": false,
+          "damageType": null,
+          "damageCategory": null,
+          "critical": null,
+          "traits": [],
+          "hideIfDisabled": false,
+          "kind": "modifier",
+          "predicate": []
+        },
+        {
+          "slug": "proficiency",
+          "label": "Expert",
+          "domains": [
+            "perception",
+            "all",
+            "wis-based"
+          ],
+          "modifier": 17,
+          "type": "proficiency",
+          "ability": null,
+          "adjustments": [],
+          "force": false,
+          "enabled": true,
+          "ignored": false,
+          "source": null,
+          "custom": false,
+          "damageType": null,
+          "damageCategory": null,
+          "critical": null,
+          "traits": [],
+          "hideIfDisabled": false,
+          "kind": "bonus",
+          "predicate": []
+        }
+      ],
+      "senses": [
+        {
+          "type": "low-light-vision",
+          "acuity": "precise",
+          "range": null,
+          "source": "Bird",
+          "label": "Low-Light Vision",
+          "emphasizeLabel": false
+        }
+      ],
+      "vision": true,
+      "details": "",
+      "rank": 2
+    },
+    "traits": {
+      "value": [],
+      "rarity": "unique",
+      "size": {
+        "value": "med",
+        "length": 5,
+        "width": 5
+      }
+    },
+    "build": {
+      "attributes": {
+        "manual": true,
+        "keyOptions": [],
+        "boosts": {
+          "1": [],
+          "5": [],
+          "10": [],
+          "15": [],
+          "20": [],
+          "ancestry": [],
+          "background": [],
+          "class": null
+        },
+        "allowedBoosts": {
+          "1": 4,
+          "5": 4,
+          "10": 4,
+          "15": 0,
+          "20": 0
+        },
+        "flaws": {
+          "ancestry": []
+        },
+        "apex": null
+      },
+      "languages": {
+        "value": 0,
+        "max": 0,
+        "granted": []
+      }
+    },
+    "proficiencies": {
+      "classDCs": {
+        "animal-companion": {
+          "label": "Animal Companion",
+          "rank": 1,
+          "attribute": "dex",
+          "primary": true,
+          "slug": "animal-companion",
+          "value": 31,
+          "totalModifier": 21,
+          "dc": 31,
+          "breakdown": "Base DC 10, Dexterity +6, Trained +15",
+          "modifiers": [
+            {
+              "slug": "dex",
+              "label": "Dexterity",
+              "domains": [
+                "class",
+                "animal-companion",
+                "all",
+                "dex-based"
+              ],
+              "modifier": 6,
+              "type": "ability",
+              "ability": "dex",
+              "adjustments": [],
+              "force": false,
+              "enabled": true,
+              "ignored": false,
+              "source": null,
+              "custom": false,
+              "damageType": null,
+              "damageCategory": null,
+              "critical": null,
+              "traits": [],
+              "hideIfDisabled": false,
+              "kind": "modifier",
+              "predicate": []
+            },
+            {
+              "slug": "proficiency",
+              "label": "Trained",
+              "domains": [
+                "class",
+                "animal-companion",
+                "all",
+                "dex-based"
+              ],
+              "modifier": 15,
+              "type": "proficiency",
+              "ability": null,
+              "adjustments": [],
+              "force": false,
+              "enabled": true,
+              "ignored": false,
+              "source": null,
+              "custom": false,
+              "damageType": null,
+              "damageCategory": null,
+              "critical": null,
+              "traits": [],
+              "hideIfDisabled": false,
+              "kind": "bonus",
+              "predicate": []
+            }
+          ]
+        }
+      },
+      "spellcasting": {
+        "rank": 0
+      },
+      "attacks": {
+        "simple": {
+          "rank": 0,
+          "custom": false,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "martial": {
+          "rank": 0,
+          "custom": false,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "advanced": {
+          "rank": 0,
+          "custom": false,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "unarmed": {
+          "rank": 1,
+          "custom": false,
+          "value": 15,
+          "breakdown": "Trained +15"
+        }
+      },
+      "defenses": {
+        "unarmored": {
+          "rank": 2,
+          "value": 17,
+          "breakdown": "Expert +17"
+        },
+        "light": {
+          "rank": 0,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "medium": {
+          "rank": 0,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "heavy": {
+          "rank": 0,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "light-barding": {
+          "rank": 0,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        },
+        "heavy-barding": {
+          "rank": 0,
+          "value": 0,
+          "breakdown": "Untrained +0"
+        }
+      }
+    },
+    "actions": [
+      {
+        "slug": "jaws",
+        "_modifiers": [
+          {
+            "slug": "str",
+            "label": "Strength",
+            "domains": [],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "str",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": false,
+            "ignored": true,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus"
+          }
+        ],
+        "breakdown": "Dexterity +6, Trained +15",
+        "totalModifier": 21,
+        "label": "Jaws",
+        "quantity": 1,
+        "ready": true,
+        "domains": [
+          "brawling-group-attack-roll",
+          "l46kssoia1gphhjo-attack",
+          "jaws-attack",
+          "jaws-attack-roll",
+          "unarmed-attack-roll",
+          "melee-attack-roll",
+          "melee-strike-attack-roll",
+          "strike-attack-roll",
+          "attack-roll",
+          "attack",
+          "check",
+          "all",
+          "trained-attack",
+          "dex-attack",
+          "dex-based"
+        ],
+        "visible": true,
+        "glyph": "A",
+        "item": {
+          "_id": "l46kssoia1gphhjo",
+          "name": "Jaws",
+          "type": "weapon",
+          "img": "systems/pf2e/icons/features/classes/animal.webp",
+          "flags": {
+            "pf2e": {
+              "battleForm": false,
+              "fixedAttack": null
+            }
+          },
+          "system": {
+            "description": {
+              "gm": "",
+              "value": ""
+            },
+            "rules": [],
+            "slug": "jaws",
+            "_migration": {
+              "version": null,
+              "lastMigration": null
+            },
+            "traits": {
+              "otherTags": [],
+              "value": [
+                "unarmed",
+                "finesse"
+              ],
+              "rarity": "common",
+              "toggles": {
+                "modular": {
+                  "selected": null
+                },
+                "versatile": {
+                  "selected": null
+                }
+              }
+            },
+            "publication": {
+              "title": "",
+              "authors": "",
+              "license": "OGL",
+              "remaster": false
+            },
+            "level": {
+              "value": 0
+            },
+            "quantity": 1,
+            "baseItem": null,
+            "bulk": {
+              "value": 0.1
+            },
+            "hp": {
+              "value": 0,
+              "max": 0
+            },
+            "hardness": 0,
+            "price": {
+              "value": {}
+            },
+            "equipped": {
+              "carryType": "held",
+              "invested": null,
+              "handsHeld": 1
+            },
+            "containerId": null,
+            "size": "med",
+            "material": {
+              "type": null,
+              "grade": null
+            },
+            "identification": {
+              "status": "identified",
+              "unidentified": {
+                "name": "",
+                "img": "",
+                "data": {
+                  "description": {
+                    "value": ""
+                  }
+                }
+              },
+              "misidentified": {}
+            },
+            "usage": {
+              "value": "held-in-one-hand"
+            },
+            "category": "unarmed",
+            "group": "brawling",
+            "bonus": {
+              "value": 0
+            },
+            "damage": {
+              "dice": 1,
+              "die": "d6",
+              "damageType": "piercing",
+              "persistent": null,
+              "modifier": 0
+            },
+            "bonusDamage": {
+              "value": 0
+            },
+            "splashDamage": {
+              "value": 0
+            },
+            "range": null,
+            "reload": {
+              "value": null
+            },
+            "runes": {
+              "potency": 0,
+              "striking": 0,
+              "property": []
+            },
+            "specific": null,
+            "subitems": [],
+            "property1": {
+              "value": "",
+              "dice": 0,
+              "die": "",
+              "damageType": "",
+              "critDice": 0,
+              "critDie": "",
+              "critDamage": "",
+              "critDamageType": ""
+            },
+            "attribute": null,
+            "maxRange": null,
+            "options": {
+              "value": []
+            },
+            "graspingAppendage": false
+          },
+          "effects": [],
+          "folder": null,
+          "sort": 0,
+          "ownership": {
+            "default": 0
+          },
+          "_stats": {
+            "systemId": null,
+            "systemVersion": null,
+            "coreVersion": null,
+            "createdTime": null,
+            "modifiedTime": null,
+            "lastModifiedBy": null
+          }
+        },
+        "type": "strike",
+        "description": "PF2E.Strike.Unarmed.Description",
+        "criticalSuccess": "PF2E.Strike.Default.CriticalSuccess",
+        "success": "PF2E.Strike.Unarmed.Success",
+        "options": [
+          "action:strike",
+          "self:action:slug:strike",
+          "item:proficiency:rank:1",
+          "proficiency:trained",
+          "finesse",
+          "unarmed",
+          "melee"
+        ],
+        "traits": [
+          {
+            "name": "attack",
+            "label": "Attack",
+            "description": "PF2E.TraitDescriptionAttack"
+          }
+        ],
+        "handsAvailable": true,
+        "weaponTraits": [
+          {
+            "name": "finesse",
+            "label": "Finesse",
+            "description": "PF2E.TraitDescriptionFinesse"
+          },
+          {
+            "name": "unarmed",
+            "label": "Unarmed",
+            "description": "PF2E.TraitDescriptionUnarmed"
+          }
+        ],
+        "variants": [
+          {
+            "label": "+21"
+          },
+          {
+            "label": "+16 (MAP -5)"
+          },
+          {
+            "label": "+11 (MAP -10)"
+          }
+        ],
+        "selectedAmmoId": null,
+        "canStrike": true,
+        "altUsages": [],
+        "auxiliaryActions": [],
+        "doubleBarrel": null,
+        "versatileOptions": []
+      },
+      {
+        "slug": "talon",
+        "_modifiers": [
+          {
+            "slug": "str",
+            "label": "Strength",
+            "domains": [],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "str",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": false,
+            "ignored": true,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus"
+          }
+        ],
+        "breakdown": "Dexterity +6, Trained +15",
+        "totalModifier": 21,
+        "label": "Talon",
+        "quantity": 1,
+        "ready": true,
+        "domains": [
+          "brawling-group-attack-roll",
+          "y3ct9x31ar0l4ddh-attack",
+          "talon-attack",
+          "talon-attack-roll",
+          "unarmed-attack-roll",
+          "melee-attack-roll",
+          "melee-strike-attack-roll",
+          "strike-attack-roll",
+          "attack-roll",
+          "attack",
+          "check",
+          "all",
+          "trained-attack",
+          "dex-attack",
+          "dex-based"
+        ],
+        "visible": true,
+        "glyph": "A",
+        "item": {
+          "_id": "y3ct9x31ar0l4ddh",
+          "name": "Talon",
+          "type": "weapon",
+          "img": "systems/pf2e/icons/features/ancestry/claws.webp",
+          "flags": {
+            "pf2e": {
+              "battleForm": false,
+              "fixedAttack": null
+            }
+          },
+          "system": {
+            "description": {
+              "gm": "",
+              "value": ""
+            },
+            "rules": [],
+            "slug": "talon",
+            "_migration": {
+              "version": null,
+              "lastMigration": null
+            },
+            "traits": {
+              "otherTags": [],
+              "value": [
+                "unarmed",
+                "finesse",
+                "agile"
+              ],
+              "rarity": "common",
+              "toggles": {
+                "modular": {
+                  "selected": null
+                },
+                "versatile": {
+                  "selected": null
+                }
+              }
+            },
+            "publication": {
+              "title": "",
+              "authors": "",
+              "license": "OGL",
+              "remaster": false
+            },
+            "level": {
+              "value": 0
+            },
+            "quantity": 1,
+            "baseItem": null,
+            "bulk": {
+              "value": 0.1
+            },
+            "hp": {
+              "value": 0,
+              "max": 0
+            },
+            "hardness": 0,
+            "price": {
+              "value": {}
+            },
+            "equipped": {
+              "carryType": "held",
+              "invested": null,
+              "handsHeld": 1
+            },
+            "containerId": null,
+            "size": "med",
+            "material": {
+              "type": null,
+              "grade": null
+            },
+            "identification": {
+              "status": "identified",
+              "unidentified": {
+                "name": "",
+                "img": "",
+                "data": {
+                  "description": {
+                    "value": ""
+                  }
+                }
+              },
+              "misidentified": {}
+            },
+            "usage": {
+              "value": "held-in-one-hand"
+            },
+            "category": "unarmed",
+            "group": "brawling",
+            "bonus": {
+              "value": 0
+            },
+            "damage": {
+              "dice": 1,
+              "die": "d4",
+              "damageType": "slashing",
+              "persistent": null,
+              "modifier": 0
+            },
+            "bonusDamage": {
+              "value": 0
+            },
+            "splashDamage": {
+              "value": 0
+            },
+            "range": null,
+            "reload": {
+              "value": null
+            },
+            "runes": {
+              "potency": 0,
+              "striking": 0,
+              "property": []
+            },
+            "specific": null,
+            "subitems": [],
+            "property1": {
+              "value": "",
+              "dice": 0,
+              "die": "",
+              "damageType": "",
+              "critDice": 0,
+              "critDie": "",
+              "critDamage": "",
+              "critDamageType": ""
+            },
+            "attribute": null,
+            "maxRange": null,
+            "options": {
+              "value": []
+            },
+            "graspingAppendage": false
+          },
+          "effects": [],
+          "folder": null,
+          "sort": 0,
+          "ownership": {
+            "default": 0
+          },
+          "_stats": {
+            "systemId": null,
+            "systemVersion": null,
+            "coreVersion": null,
+            "createdTime": null,
+            "modifiedTime": null,
+            "lastModifiedBy": null
+          }
+        },
+        "type": "strike",
+        "description": "PF2E.Strike.Unarmed.Description",
+        "criticalSuccess": "PF2E.Strike.Default.CriticalSuccess",
+        "success": "PF2E.Strike.Unarmed.Success",
+        "options": [
+          "action:strike",
+          "self:action:slug:strike",
+          "item:proficiency:rank:1",
+          "proficiency:trained",
+          "agile",
+          "finesse",
+          "unarmed",
+          "melee"
+        ],
+        "traits": [
+          {
+            "name": "attack",
+            "label": "Attack",
+            "description": "PF2E.TraitDescriptionAttack"
+          }
+        ],
+        "handsAvailable": true,
+        "weaponTraits": [
+          {
+            "name": "agile",
+            "label": "Agile",
+            "description": "PF2E.TraitDescriptionAgile"
+          },
+          {
+            "name": "finesse",
+            "label": "Finesse",
+            "description": "PF2E.TraitDescriptionFinesse"
+          },
+          {
+            "name": "unarmed",
+            "label": "Unarmed",
+            "description": "PF2E.TraitDescriptionUnarmed"
+          }
+        ],
+        "variants": [
+          {
+            "label": "+21"
+          },
+          {
+            "label": "+17 (MAP -4)"
+          },
+          {
+            "label": "+13 (MAP -8)"
+          }
+        ],
+        "selectedAmmoId": null,
+        "canStrike": true,
+        "altUsages": [],
+        "auxiliaryActions": [],
+        "doubleBarrel": null,
+        "versatileOptions": []
+      },
+      {
+        "slug": "basic-unarmed",
+        "_modifiers": [
+          {
+            "slug": "str",
+            "label": "Strength",
+            "domains": [],
+            "modifier": 4,
+            "type": "ability",
+            "ability": "str",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": false,
+            "ignored": true,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "dex",
+            "label": "Dexterity",
+            "domains": [],
+            "modifier": 6,
+            "type": "ability",
+            "ability": "dex",
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "modifier"
+          },
+          {
+            "slug": "proficiency",
+            "label": "Trained",
+            "domains": [],
+            "modifier": 15,
+            "type": "proficiency",
+            "ability": null,
+            "adjustments": [],
+            "alterations": [],
+            "force": false,
+            "enabled": true,
+            "ignored": false,
+            "source": null,
+            "custom": false,
+            "damageType": null,
+            "damageCategory": null,
+            "predicate": [],
+            "critical": null,
+            "traits": [],
+            "hideIfDisabled": false,
+            "kind": "bonus"
+          }
+        ],
+        "breakdown": "Dexterity +6, Trained +15",
+        "totalModifier": 21,
+        "label": "Unarmed Attack",
+        "quantity": 1,
+        "ready": true,
+        "domains": [
+          "brawling-group-attack-roll",
+          "xxPF2ExUNARMEDxx-attack",
+          "basic-unarmed-attack",
+          "basic-unarmed-attack-roll",
+          "unarmed-attack-roll",
+          "melee-attack-roll",
+          "melee-strike-attack-roll",
+          "strike-attack-roll",
+          "attack-roll",
+          "attack",
+          "check",
+          "all",
+          "trained-attack",
+          "dex-attack",
+          "dex-based"
+        ],
+        "visible": true,
+        "glyph": "A",
+        "item": {
+          "_id": "xxPF2ExUNARMEDxx",
+          "name": "Unarmed Attack",
+          "type": "weapon",
+          "img": "icons/skills/melee/unarmed-punch-fist.webp",
+          "system": {
+            "description": {
+              "gm": "",
+              "value": ""
+            },
+            "rules": [],
+            "slug": "basic-unarmed",
+            "_migration": {
+              "version": null,
+              "lastMigration": null
+            },
+            "traits": {
+              "otherTags": [],
+              "value": [
+                "agile",
+                "finesse",
+                "nonlethal",
+                "unarmed"
+              ],
+              "rarity": "common"
+            },
+            "publication": {
+              "title": "",
+              "authors": "",
+              "license": "OGL",
+              "remaster": false
+            },
+            "level": {
+              "value": 0
+            },
+            "quantity": 1,
+            "baseItem": null,
+            "bulk": {
+              "value": 0.1
+            },
+            "hp": {
+              "value": 0,
+              "max": 0
+            },
+            "hardness": 0,
+            "price": {
+              "value": {}
+            },
+            "equipped": {
+              "carryType": "worn",
+              "invested": null,
+              "handsHeld": 0,
+              "inSlot": true
+            },
+            "containerId": null,
+            "size": "med",
+            "material": {
+              "type": null,
+              "grade": null
+            },
+            "identification": {
+              "status": "identified",
+              "unidentified": {
+                "name": "",
+                "img": "",
+                "data": {
+                  "description": {
+                    "value": ""
+                  }
+                }
+              },
+              "misidentified": {}
+            },
+            "usage": {
+              "value": "worngloves"
+            },
+            "category": "unarmed",
+            "group": "brawling",
+            "bonus": {
+              "value": 0
+            },
+            "damage": {
+              "dice": 1,
+              "die": "d4",
+              "damageType": "bludgeoning",
+              "persistent": null
+            },
+            "bonusDamage": {
+              "value": 0
+            },
+            "splashDamage": {
+              "value": 0
+            },
+            "range": null,
+            "reload": {
+              "value": null
+            },
+            "runes": {
+              "potency": 0,
+              "striking": 0,
+              "property": []
+            },
+            "specific": null,
+            "subitems": [],
+            "property1": {
+              "value": "",
+              "dice": 0,
+              "die": "",
+              "damageType": "",
+              "critDice": 0,
+              "critDie": "",
+              "critDamage": "",
+              "critDamageType": ""
+            }
+          },
+          "effects": [],
+          "folder": null,
+          "sort": 0,
+          "ownership": {
+            "default": 0
+          },
+          "flags": {},
+          "_stats": {
+            "systemId": null,
+            "systemVersion": null,
+            "coreVersion": null,
+            "createdTime": null,
+            "modifiedTime": null,
+            "lastModifiedBy": null
+          }
+        },
+        "type": "strike",
+        "description": "PF2E.Strike.Unarmed.Description",
+        "criticalSuccess": "PF2E.Strike.Default.CriticalSuccess",
+        "success": "PF2E.Strike.Unarmed.Success",
+        "options": [
+          "action:strike",
+          "self:action:slug:strike",
+          "item:proficiency:rank:1",
+          "proficiency:trained",
+          "agile",
+          "finesse",
+          "nonlethal",
+          "unarmed",
+          "melee"
+        ],
+        "traits": [
+          {
+            "name": "attack",
+            "label": "Attack",
+            "description": "PF2E.TraitDescriptionAttack"
+          }
+        ],
+        "handsAvailable": true,
+        "weaponTraits": [
+          {
+            "name": "agile",
+            "label": "Agile",
+            "description": "PF2E.TraitDescriptionAgile"
+          },
+          {
+            "name": "finesse",
+            "label": "Finesse",
+            "description": "PF2E.TraitDescriptionFinesse"
+          },
+          {
+            "name": "nonlethal",
+            "label": "Nonlethal",
+            "description": "PF2E.TraitDescriptionNonlethal"
+          },
+          {
+            "name": "unarmed",
+            "label": "Unarmed",
+            "description": "PF2E.TraitDescriptionUnarmed"
+          }
+        ],
+        "variants": [
+          {
+            "label": "+21"
+          },
+          {
+            "label": "+17 (MAP -4)"
+          },
+          {
+            "label": "+13 (MAP -8)"
+          }
+        ],
+        "selectedAmmoId": null,
+        "canStrike": true,
+        "altUsages": [],
+        "auxiliaryActions": [],
+        "doubleBarrel": null,
+        "versatileOptions": []
+      }
+    ]
+  },
+  "prototypeToken": {
+    "name": "Eagle",
+    "displayName": 20,
+    "actorLink": true,
+    "appendNumber": false,
+    "prependAdjective": false,
+    "texture": {
+      "src": "common/monsters/eagle.png",
+      "scaleX": 1,
+      "scaleY": 1,
+      "offsetX": 0,
+      "offsetY": 0,
+      "rotation": 0,
+      "tint": null
+    },
+    "width": 1,
+    "height": 1,
+    "lockRotation": false,
+    "rotation": 0,
+    "alpha": 1,
+    "disposition": 1,
+    "displayBars": 20,
+    "bar1": {
+      "attribute": "attributes.hp"
+    },
+    "bar2": {
+      "attribute": null
+    },
+    "light": {
+      "alpha": 0.25,
+      "angle": 360,
+      "bright": 0,
+      "color": null,
+      "coloration": 1,
+      "dim": 0,
+      "attenuation": 0.5,
+      "luminosity": 0.5,
+      "saturation": 0,
+      "contrast": 0,
+      "shadows": 0,
+      "animation": {
+        "type": null,
+        "speed": 5,
+        "intensity": 5,
+        "reverse": false
+      },
+      "darkness": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    "sight": {
+      "enabled": true,
+      "range": 0,
+      "angle": 360,
+      "visionMode": "basic",
+      "attenuation": 0.1,
+      "brightness": 0,
+      "saturation": 0,
+      "contrast": 0
+    },
+    "detectionModes": [],
+    "flags": {
+      "pf2e": {
+        "linkToActorSize": true,
+        "autoscale": false
+      }
+    },
+    "randomImg": false
+  },
+  "items": [
+    {
+      "_id": "89gqyzz8o87opxmr",
+      "name": "Animal Companion",
+      "type": "class",
+      "img": "systems/pf2e/icons/default-icons/class.svg",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "upgrade",
+            "path": "system.perception.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "upgrade",
+            "path": "system.proficiencies.attacks.unarmed.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": -4,
+            "mode": "add",
+            "path": "system.abilities.int.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "mode": "override",
+            "path": "flags.pf2e.disableABP",
+            "value": true,
+            "priority": 10,
+            "slug": null,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "keyAbility": {
+          "value": [],
+          "selected": null
+        },
+        "items": {},
+        "hp": 6,
+        "trainedSkills": {
+          "value": [
+            "acr",
+            "ath"
+          ],
+          "additional": 0
+        },
+        "perception": 1,
+        "savingThrows": {
+          "fortitude": 1,
+          "reflex": 1,
+          "will": 1
+        },
+        "attacks": {
+          "simple": 0,
+          "martial": 0,
+          "advanced": 0,
+          "unarmed": 1,
+          "other": {
+            "name": "",
+            "rank": 0
+          }
+        },
+        "defenses": {
+          "unarmored": 1,
+          "light": 0,
+          "medium": 0,
+          "heavy": 0
+        },
+        "spellcasting": 0,
+        "ancestryFeatLevels": {
+          "value": []
+        },
+        "classFeatLevels": {
+          "value": []
+        },
+        "generalFeatLevels": {
+          "value": []
+        },
+        "skillFeatLevels": {
+          "value": []
+        },
+        "skillIncreaseLevels": {
+          "value": []
+        },
+        "rarity": {
+          "value": "common"
+        }
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "rDxs69lNqIFN75Bl": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "core": {
+          "sourceId": "Compendium.pf2e-animal-companions.AC-Ancestries-and-Class.Item.h6Ybhv5URar01WPk"
+        },
+        "exportSource": {
+          "world": "ac",
+          "system": "pf2e",
+          "coreVersion": "0.8.8",
+          "systemVersion": "2.6.0.6437"
+        },
+        "pf2e": {
+          "insertedClassFeaturesLevel": 1,
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "675d5ek9sr5umbiw",
+      "name": "Bird",
+      "type": "ancestry",
+      "img": "systems/pf2e/icons/default-icons/ancestry.svg",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>Your companion is a bird of prey, such as an eagle, hawk, or owl.</p>\n<p><strong>Size</strong> Small</p>\n<p><strong>Melee</strong> <span class=\"pf2-icon\">a</span>&nbsp;jaws (finesse), <strong>Damage</strong> 1d6 piercing</p>\n<p><strong>Melee</strong>&nbsp;<span style=\"font-family: Pathfinder2eActions; font-size: 16.8px; color: var(--body);\">a</span><span style=\"color: var(--body);\">&nbsp;talon (agile, finesse), </span><strong style=\"color: var(--body);\">Damage</strong><span style=\"color: var(--body);\"> 1d4 slashing</span></p>\n<p><strong>Str</strong> +2, <strong>Dex</strong> +3, <strong>Con</strong> +1, <strong>Int</strong> -4, <strong>Wis</strong> +2, <strong>Cha</strong> +0</p>\n<p><strong>Hit Points</strong> 4</p>\n<p><strong>Skill</strong> Stealth</p>\n<p><strong>Senses</strong> low-light vision</p>\n<p><strong>Speed</strong> 10 feet, fly 60 feet</p>\n<p><strong>Support Benefit</strong> The bird pecks at your foes&rsquo; eyes when you create an opening. Until the start of your next turn, your Strikes that damage a creature that your bird threatens also deal 1d4 persistent bleed damage, and the target is dazzled until it removes the bleed damage. If your bird is nimble or savage, the persistent bleed damage increases to 2d4.</p>\n<hr />\n<p><strong>Advanced Maneuver</strong> Flyby Attack&nbsp;<span class=\"pf2-icon\">d</span></p>\n<p>The bird Flies and makes a talon Strike at any point along the way.</p>",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "add",
+            "path": "system.abilities.str.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 3,
+            "mode": "add",
+            "path": "system.abilities.dex.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.con.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "add",
+            "path": "system.abilities.wis.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.skills.ste.rank",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common"
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "hp": 4,
+        "size": "sm",
+        "reach": 5,
+        "speed": 10,
+        "boosts": {
+          "0": {
+            "value": []
+          },
+          "1": {
+            "value": []
+          },
+          "2": {
+            "value": [
+              "str",
+              "dex",
+              "con",
+              "int",
+              "wis",
+              "cha"
+            ]
+          }
+        },
+        "flaws": {
+          "0": {
+            "value": []
+          }
+        },
+        "languages": {
+          "value": [],
+          "custom": ""
+        },
+        "additionalLanguages": {
+          "count": 0,
+          "value": [],
+          "custom": ""
+        },
+        "items": {
+          "jvyvb": {
+            "img": "systems/pf2e/icons/default-icons/feat.svg",
+            "name": "Jaws - D6 - Finesse",
+            "level": 0,
+            "uuid": "Compendium.pf2e-animal-companions.AC-Features.Item.ajT3mL74kQ1QGJbq"
+          },
+          "s5yjl": {
+            "img": "systems/pf2e/icons/default-icons/feat.svg",
+            "name": "Talon - D4",
+            "level": 0,
+            "uuid": "Compendium.pf2e-animal-companions.AC-Features.Item.aOrFY3dDCw8zfgOB"
+          }
+        },
+        "vision": "low-light-vision",
+        "voluntaryBoosts": {},
+        "voluntaryFlaws": {},
+        "rarity": {
+          "value": "common"
+        }
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "rDxs69lNqIFN75Bl": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "core": {
+          "sourceId": "Compendium.pf2e-animal-companions.AC-Ancestries-and-Class.Item.5mO4H9Etz6OZDXDp"
+        },
+        "exportSource": {
+          "world": "ac",
+          "system": "pf2e",
+          "coreVersion": "0.8.8",
+          "systemVersion": "2.6.0.6437"
+        },
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "l46kssoia1gphhjo",
+      "name": "Jaws - D6 - Finesse",
+      "type": "feat",
+      "img": "systems/pf2e/icons/features/classes/animal.webp",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "category": "unarmed",
+            "damage": {
+              "base": {
+                "damageType": "piercing",
+                "dice": 1,
+                "die": "d6",
+                "modifier": 0
+              }
+            },
+            "group": "brawling",
+            "key": "Strike",
+            "label": "Jaws",
+            "range": null,
+            "traits": [
+              "unarmed",
+              "finesse"
+            ],
+            "slug": null,
+            "priority": 100,
+            "ignored": false,
+            "predicate": [],
+            "baseType": null,
+            "traitToggles": {
+              "modular": null,
+              "versatile": null
+            },
+            "otherTags": [],
+            "img": "systems/pf2e/icons/default-icons/melee.svg",
+            "attackModifier": null,
+            "ability": null,
+            "fist": false
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "level": {
+          "value": 0,
+          "taken": null
+        },
+        "category": "ancestryfeature",
+        "onlyLevel1": false,
+        "maxTakable": 1,
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "prerequisites": {
+          "value": []
+        },
+        "location": "675d5ek9sr5umbiw",
+        "rarity": {
+          "value": "common"
+        },
+        "subfeatures": {
+          "keyOptions": [],
+          "languages": {
+            "granted": [],
+            "slots": 0
+          },
+          "proficiencies": {},
+          "senses": {}
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "L46TYcXAUKb2dhwY": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "y3ct9x31ar0l4ddh",
+      "name": "Talon - D4",
+      "type": "feat",
+      "img": "systems/pf2e/icons/features/ancestry/claws.webp",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "category": "unarmed",
+            "damage": {
+              "base": {
+                "damageType": "slashing",
+                "dice": 1,
+                "die": "d4",
+                "modifier": 0
+              }
+            },
+            "group": "brawling",
+            "key": "Strike",
+            "label": "Talon",
+            "range": null,
+            "traits": [
+              "unarmed",
+              "finesse",
+              "agile"
+            ],
+            "slug": null,
+            "priority": 100,
+            "ignored": false,
+            "predicate": [],
+            "baseType": null,
+            "traitToggles": {
+              "modular": null,
+              "versatile": null
+            },
+            "otherTags": [],
+            "img": "systems/pf2e/icons/default-icons/melee.svg",
+            "attackModifier": null,
+            "ability": null,
+            "fist": false
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "level": {
+          "value": 0,
+          "taken": null
+        },
+        "category": "ancestryfeature",
+        "onlyLevel1": false,
+        "maxTakable": 1,
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "prerequisites": {
+          "value": []
+        },
+        "location": "675d5ek9sr5umbiw",
+        "rarity": {
+          "value": "common"
+        },
+        "subfeatures": {
+          "keyOptions": [],
+          "languages": {
+            "granted": [],
+            "slots": 0
+          },
+          "proficiencies": {},
+          "senses": {}
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "L46TYcXAUKb2dhwY": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "SpKMFDRTdKUrLLLV",
+      "name": "Mature Animal Companion",
+      "type": "feat",
+      "img": "systems/pf2e/icons/default-icons/feat.svg",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>This feat adds the additional damage dice from Mature Animal Companion and makes the companion token medium.</p>",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.str.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.dex.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.con.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.wis.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.skills.itm.rank",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.skills.ste.rank",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.skills.sur.rank",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "upgrade",
+            "path": "system.perception.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "upgrade",
+            "path": "system.saves.fortitude.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "upgrade",
+            "path": "system.saves.will.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "upgrade",
+            "path": "system.saves.reflex.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "Striking",
+            "predicate": [
+              "unarmed"
+            ],
+            "selector": "strike-damage",
+            "value": 1,
+            "slug": null,
+            "priority": 100,
+            "ignored": false
+          },
+          {
+            "key": "CreatureSize",
+            "value": "medium",
+            "slug": null,
+            "priority": 100,
+            "ignored": false,
+            "predicate": []
+          },
+          {
+            "key": "ActiveEffectLike",
+            "path": "flags.pf2e.rollOptions.all.mature",
+            "value": 1,
+            "mode": "upgrade",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "level": {
+          "value": 4,
+          "taken": null
+        },
+        "category": "class",
+        "onlyLevel1": false,
+        "maxTakable": 1,
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "prerequisites": {
+          "value": []
+        },
+        "location": null,
+        "rarity": {
+          "value": "common"
+        },
+        "subfeatures": {
+          "keyOptions": [],
+          "languages": {
+            "granted": [],
+            "slots": 0
+          },
+          "proficiencies": {},
+          "senses": {}
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "L46TYcXAUKb2dhwY": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "core": {
+          "sourceId": "Compendium.pf2e-animal-companions.AC-Feats.Item.K3c8ztEUX27RHeZe"
+        },
+        "exportSource": {
+          "world": "ac",
+          "system": "pf2e",
+          "coreVersion": "0.8.8",
+          "systemVersion": "2.6.0.6437"
+        },
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "KkbLThbMO4zYMON3",
+      "name": "Nimble Animal Companion",
+      "type": "feat",
+      "img": "systems/pf2e/icons/default-icons/feat.svg",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.str.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "add",
+            "path": "system.abilities.dex.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.con.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.abilities.wis.mod",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 2,
+            "mode": "upgrade",
+            "path": "system.skills.acr.rank",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "ActiveEffectLike",
+            "value": 1,
+            "mode": "add",
+            "path": "system.proficiencies.defenses.unarmored.rank",
+            "slug": null,
+            "priority": 20,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          },
+          {
+            "key": "FlatModifier",
+            "label": "Nimble",
+            "selector": [
+              "strike-damage"
+            ],
+            "value": 2,
+            "slug": null,
+            "priority": 100,
+            "ignored": false,
+            "predicate": [],
+            "type": "untyped",
+            "force": false,
+            "hideIfDisabled": false,
+            "fromEquipment": true,
+            "critical": null,
+            "removeAfterRoll": false
+          },
+          {
+            "key": "ActiveEffectLike",
+            "path": "flags.pf2e.rollOptions.all.nimble",
+            "value": 1,
+            "mode": "upgrade",
+            "slug": null,
+            "priority": 40,
+            "ignored": false,
+            "predicate": [],
+            "phase": "applyAEs"
+          }
+        ],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "level": {
+          "value": 8,
+          "taken": null
+        },
+        "category": "class",
+        "onlyLevel1": false,
+        "maxTakable": 1,
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "prerequisites": {
+          "value": []
+        },
+        "location": null,
+        "rarity": {
+          "value": "common"
+        },
+        "subfeatures": {
+          "keyOptions": [],
+          "languages": {
+            "granted": [],
+            "slots": 0
+          },
+          "proficiencies": {},
+          "senses": {}
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "L46TYcXAUKb2dhwY": 3,
+        "tstGJ3x0JRVfhi4Q": 3
+      },
+      "flags": {
+        "core": {
+          "sourceId": "Compendium.pf2e-animal-companions.AC-Feats.Item.89eT819I4MYWndcu"
+        },
+        "exportSource": {
+          "world": "ac",
+          "system": "pf2e",
+          "coreVersion": "0.8.8",
+          "systemVersion": "2.6.0.6437"
+        },
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "OqPDk2BQoDnpkUoJ",
+      "name": "Flyby Attack",
+      "type": "action",
+      "img": "systems/pf2e/icons/actions/OneAction.webp",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p>The bird Flies and makes a talon Strike at any point along the way.</p>",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "category": null,
+        "actions": {
+          "value": null
+        },
+        "deathNote": false,
+        "requirements": {
+          "value": ""
+        },
+        "trigger": {
+          "value": ""
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "9vgAlwOmZXMWlRtD": 3
+      },
+      "flags": {
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "_id": "ALl8TpK3Z3VhSZna",
+      "name": "Support",
+      "type": "action",
+      "img": "systems/pf2e/icons/actions/OneAction.webp",
+      "system": {
+        "description": {
+          "gm": "",
+          "value": "<p><strong>Requirements</strong>&nbsp;The creature is an animal companion.</p>\n<hr />\n<p>Your animal companion supports you. You gain the benefits listed in the companion type&rsquo;s Support Benefit entry. If the animal uses the Support action, the only other actions it can use on this turn are basic move actions to get into position to take advantage of the Support benefits; if it has already used any other action this turn, it can&rsquo;t Support you.</p>\n<hr style=\"border-right-style: solid; border-left-style: solid; color: #ffffff; font-family: 'Century Gothic', CenturyGothic, AppleGothic, sans-serif; font-size: 15px; background-color: #0f0f0f;\" />\n<p><strong>Support Benefit</strong> The bird pecks at your foes&rsquo; eyes when you create an opening. Until the start of your next turn, your Strikes that damage a creature that your bird threatens also deal 1d4&nbsp;persistent&nbsp;bleed damage, and the target is&nbsp;dazzled until it removes the bleed damage. If your bird is nimble or savage, the persistent bleed damage increases to 2d4.</p>",
+          "addenda": [],
+          "override": null
+        },
+        "rules": [],
+        "slug": null,
+        "_migration": {
+          "version": 0.925,
+          "lastMigration": null,
+          "previous": {
+            "schema": 0.911,
+            "foundry": "11.315",
+            "system": "5.14.3"
+          }
+        },
+        "traits": {
+          "otherTags": [],
+          "value": [],
+          "rarity": "common",
+          "toggles": {
+            "mindshift": null
+          }
+        },
+        "publication": {
+          "title": "",
+          "authors": "",
+          "license": "OGL",
+          "remaster": false
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "category": null,
+        "actions": {
+          "value": null
+        },
+        "deathNote": false,
+        "requirements": {
+          "value": ""
+        },
+        "trigger": {
+          "value": ""
+        },
+        "selfEffect": null
+      },
+      "effects": [],
+      "folder": null,
+      "sort": 0,
+      "ownership": {
+        "default": 0,
+        "9vgAlwOmZXMWlRtD": 3
+      },
+      "flags": {
+        "pf2e": {
+          "rulesSelections": {},
+          "itemGrants": {}
+        }
+      },
+      "_stats": {
+        "systemId": null,
+        "systemVersion": null,
+        "coreVersion": null,
+        "createdTime": null,
+        "modifiedTime": null,
+        "lastModifiedBy": null
+      }
+    }
+  ],
+  "effects": [],
+  "folder": "cd7gCdWJRGtd1cyF",
+  "sort": 0,
+  "ownership": {
+    "default": 1,
+    "tstGJ3x0JRVfhi4Q": 3
+  },
+  "flags": {
+    "pf2e": {
+      "freeCrafting": false,
+      "rollOptions": {
+        "all": {
+          "self:type:character": true,
+          "self:signature:9f175f23-b67b-57a6-9773-7aae9a450eb7": true,
+          "self:creature": true,
+          "self:level:13": true,
+          "class:animal-companion": true,
+          "self:ancestry:bird": true,
+          "feature:jaws-d6-finesse": true,
+          "feature:talon-d4": true,
+          "feat:mature-animal-companion": true,
+          "feat:nimble-animal-companion": true,
+          "mature": 1,
+          "nimble": 1,
+          "self:mode:living": true,
+          "perception:rank:2": true,
+          "attribute:str:mod:4": true,
+          "attribute:dex:mod:6": true,
+          "attribute:con:mod:3": true,
+          "attribute:int:mod:-4": true,
+          "attribute:wis:mod:4": true,
+          "attribute:cha:mod:0": true,
+          "skill:acr:rank:2": true,
+          "skill:arc:rank:0": true,
+          "skill:ath:rank:1": true,
+          "skill:cra:rank:0": true,
+          "skill:dec:rank:0": true,
+          "skill:dip:rank:0": true,
+          "skill:itm:rank:1": true,
+          "skill:med:rank:0": true,
+          "skill:nat:rank:0": true,
+          "skill:occ:rank:0": true,
+          "skill:prf:rank:0": true,
+          "skill:rel:rank:0": true,
+          "skill:soc:rank:0": true,
+          "skill:ste:rank:2": true,
+          "skill:sur:rank:1": true,
+          "skill:thi:rank:0": true,
+          "attack:simple:rank:0": true,
+          "attack:martial:rank:0": true,
+          "attack:advanced:rank:0": true,
+          "attack:unarmed:rank:1": true,
+          "defense:unarmored:rank:2": true,
+          "defense:light:rank:0": true,
+          "defense:medium:rank:0": true,
+          "defense:heavy:rank:0": true,
+          "defense:light-barding:rank:0": true,
+          "defense:heavy-barding:rank:0": true,
+          "save:fortitude:rank:2": true,
+          "save:reflex:rank:2": true,
+          "save:will:rank:2": true,
+          "hands-free:2": true,
+          "hands-free:but-really:2": true,
+          "self:armored": false,
+          "self:size:2": true,
+          "self:size:medium": true,
+          "hp-remaining:112": true,
+          "hp-percent:92": true,
+          "speed:land": true,
+          "speed:fly": true
+        },
+        "sense": {
+          "self:low-light-vision:from-ancestry": true
+        }
+      },
+      "trackedItems": {},
+      "favoredWeaponRank": 0,
+      "quickAlchemy": false,
+      "sheetTabs": {
+        "character": true,
+        "actions": true,
+        "inventory": true,
+        "spellcasting": true,
+        "crafting": true,
+        "proficiencies": true,
+        "feats": true,
+        "effects": true,
+        "biography": true,
+        "pfs": true
+      },
+      "showBasicUnarmed": true,
+      "disableABP": true,
+      "highestWeaponDamageDice": 1
+    }
+  },
+  "_stats": {
+    "systemId": "pf2e",
+    "systemVersion": "5.11.5",
+    "coreVersion": "11.315",
+    "createdTime": 1704387650315,
+    "modifiedTime": 1704387650315,
+    "lastModifiedBy": "tstGJ3x0JRVfhi4Q"
+  }
+}

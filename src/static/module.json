@@ -62,18 +62,6 @@
           },
           "folders": [
             {
-              "name": "Kirin",
-              "sorting": "m",
-              "ownership": {
-                "PLAYER": "OBSERVER",
-                "ASSISTANT": "OWNER"
-              },
-              "packs": [
-                "ponyfinder-kirin-ancestries-and-heritages",
-                "ponyfinder-kirin-feats"
-              ]
-            },
-            {
               "name": "Racing System",
               "sorting": "m",
               "ownership": {
@@ -87,9 +75,7 @@
             }
           ],
           "packs": [
-            "astillon-ancestry-feats",
-            "astillon-ancestries",
-            "astillon-retired-characters"
+            "astillon-ancestry-feats"
           ]
         }
       ],
@@ -101,39 +87,6 @@
       "name": "astillon-ancestry-feats",
       "label": "Astillon Ancestry Feats",
       "path": "packs/astillon-ancestry-feats",
-      "type": "Item",
-      "system": "pf2e",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "astillon-ancestries",
-      "label": "Astillon Ancestries",
-      "path": "packs/astillon-ancestries",
-      "type": "Item",
-      "system": "pf2e",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "ponyfinder-kirin-ancestries-and-heritages",
-      "label": "Ponyfinder Kirin Ancestries and Heritages",
-      "path": "packs/ponyfinder-kirin-ancestries-and-heritages",
-      "type": "Item",
-      "system": "pf2e",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "ponyfinder-kirin-feats",
-      "label": "Ponyfinder Kirin Feats",
-      "path": "packs/ponyfinder-kirin-feats",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -163,16 +116,6 @@
         "ASSISTANT": "OWNER"
       }
     },
-    {
-      "name": "astillon-retired-characters",
-      "label": "Astillon Retired Characters",
-      "path": "packs/astillon-retired-characters",
-      "type": "Actor",
-      "system": "pf2e",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
     }
   ],
   "flags": {

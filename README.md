@@ -1,21 +1,25 @@
-![](https://img.shields.io/badge/Foundry-v10.290-informational)
-<!--- Downloads @ Latest Badge -->
-<!--- replace <user>/<repo> with your username/repository -->
-<!--- ![Latest Release Download Count](https://img.shields.io/github/downloads/<user>/<repo>/latest/module.zip) -->
+![](https://img.shields.io/badge/Foundry-v13-informational)
 
-<!--- Forge Bazaar Install % Badge -->
-<!--- replace <your-module-name> with the `name` in your manifest -->
-<!--- ![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2F<your-module-name>&colorB=4aa94a) -->
+# Astillon Hanaq Adventures
 
-# Changelog
+Foundry VTT module content for Pathfinder 2e, including Astillon/Hanaq compendia and module-loaded utilities.
 
-# Description
+## Development
 
-## Manifest Plus
+`npm run build` builds the module into `dist/`.
 
+`npm run test:local` builds and copies the module into `%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\astillon-hanaq-adventures-module`.
 
-## Versioned Releases
+## Sarsaparilla Surprise
 
+The Sarsaparilla feature now lives in module runtime code, so its chat interactivity and socket-driven animations load for every connected client while the module is active.
 
-# License
-MIT License. Do what you will. PRs welcome. 
+Create a hotbar macro with:
+
+```js
+game.astillonHanaqAdventures?.sarsaparilla.run();
+```
+
+## License
+
+MIT License. Do what you will. PRs welcome.
