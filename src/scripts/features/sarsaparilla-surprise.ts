@@ -123,10 +123,10 @@ function drawCard(): DrawnCard {
 }
 
 function suitEntity(suit: string) {
-  if (suit === "\u2660") return "&spades;";
-  if (suit === "\u2665") return "&hearts;";
-  if (suit === "\u2666") return "&diams;";
-  return "&clubs;";
+  if (suit === "\u2660") return "\u2660";
+  if (suit === "\u2665") return "\u2665";
+  if (suit === "\u2666") return "\u2666";
+  return "\u2663";
 }
 
 function suitName(suit: string) {
@@ -153,7 +153,7 @@ function cardChip(card: DrawnCard, { large = false } = {}) {
   const height = large ? "76px" : "62px";
   const rankSize = large ? "1.35em" : "1.08em";
   const suitSize = large ? "1.05em" : "0.88em";
-  return `<div style="display:flex;flex:0 0 auto;flex-direction:column;justify-content:center;align-items:center;gap:4px;width:${width};height:${height};box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid #b9b2a2;background:${CARD_BACKDROP};box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 1px 4px rgba(0,0,0,0.12);color:${card.color};font-family:'Modesto Condensed','Palatino Linotype',serif;overflow:hidden;text-align:center;">
+  return `<div style="display:flex;flex:0 0 auto;flex-direction:column;justify-content:center;align-items:center;gap:4px;width:${width};height:${height};box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid #b9b2a2;background:${CARD_BACKDROP};box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),0 1px 4px rgba(0,0,0,0.12);color:${card.color};font-family:'Modesto Condensed','Palatino Linotype',serif;font-size:16px;line-height:1;overflow:hidden;text-align:center;">
     <div style="font-size:${rankSize};font-weight:700;line-height:1;">${card.rank.display}</div>
     <div style="font-size:${suitSize};line-height:1;">${suitEntity(card.suit)}</div>
   </div>`;
