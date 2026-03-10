@@ -15,24 +15,8 @@
     "node": ">=20.15.0"
   },
   "devDependencies": {
-    "@league-of-foundry-developers/foundry-vtt-types": "^9.268.0",
-    "@types/node": "^18.11.16",
-    "cb": "^0.1.1",
-    "esno": "^0.17.0",
-    "fs": "^0.0.1-security",
-    "gulp": "^4.0.2",
-    "gulp-typescript": "^6.0.0-alpha.1",
-    "js-yaml": "^4.1.0",
-    "merge-stream": "^2.0.0",
-    "nedb": "^1.8.0",
-    "os": "^0.1.2",
-    "path": "^0.12.7",
-    "readable-stream": "^4.2.0",
-    "through2": "^4.0.2",
-    "ts-node": "^10.9.1",
-    "ts-register": "^0.1.0"
-  },
-  "dependencies": {
-    "typescript": "^4.0.2"
+    "@league-of-foundry-developers/foundry-vtt-types": "13.345.1",
+    "@types/node": "^24.7.1",
+    "typescript": "^5.9.3"
   }
 }
