@@ -48,16 +48,6 @@ jobs:
           cd dist
           zip -r ../module.zip ./*
 
-      - name: Update latest release
-        shell: bash
-        run: |
-          if gh release view latest >/dev/null 2>&1; then
-            gh release upload latest ./dist/module.json ./module.zip --clobber
-            gh release edit latest --title "Latest" --notes "$RELEASE_NOTES" --latest
-          else
-            gh release create latest ./dist/module.json ./module.zip --title "Latest" --notes "$RELEASE_NOTES" --target "$GITHUB_SHA" --latest
-          fi
-
       - name: Create version release
         shell: bash
         run: |
@@ -68,7 +58,7 @@ jobs:
 
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release upload "$VERSION" ./dist/module.json ./module.zip --clobber
-            gh release edit "$VERSION" --title "Release $VERSION" --notes "$RELEASE_NOTES"
+            gh release edit "$VERSION" --title "Release $VERSION" --notes "$RELEASE_NOTES" --latest
           else
-            gh release create "$VERSION" ./dist/module.json ./module.zip --title "Release $VERSION" --notes "$RELEASE_NOTES" --target "$GITHUB_SHA" --latest=false
+            gh release create "$VERSION" ./dist/module.json ./module.zip --title "Release $VERSION" --notes "$RELEASE_NOTES" --target "$GITHUB_SHA" --latest
           fi
