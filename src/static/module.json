@@ -75,7 +75,8 @@
             }
           ],
           "packs": [
-            "astillon-ancestry-feats"
+            "astillon-ancestry-feats",
+            "astillon-retired-characters"
           ]
         }
       ],
@@ -116,6 +117,16 @@
         "ASSISTANT": "OWNER"
       }
     },
+    {
+      "name": "astillon-retired-characters",
+      "label": "Astillon Retired Characters",
+      "path": "packs/astillon-retired-characters",
+      "type": "Actor",
+      "system": "pf2e",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     }
   ],
   "flags": {

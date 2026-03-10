@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node ./build/build.mjs",
     "clean": "node ./build/build.mjs --clean",
+    "typecheck": "tsc --noEmit",
     "test:local": "node ./build/build.mjs && xcopy /s /e /y /i dist \"%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\astillon-hanaq-adventures-module\\\""
   },
   "author": "Memely",
