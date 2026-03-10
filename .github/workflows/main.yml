@@ -1,48 +1,70 @@
-name: Simplified Module CI/CD
-
-on:
-  push:
-    branches:
-      - main
+name: Build and Release
 
 permissions:
   contents: write
-  pull-requests: write
 
-jobs: 
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: Optional notes for the release
+        required: false
+        default: ""
+
+jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # Setup Node.js environment
-    - uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
-    # Install dependencies and run build script
-    - run: npm install
-    - run: npm run build
+      - name: Install dependencies
+        run: npm ci
 
-    # Zip the contents of the dist directory
-    - name: Zip dist directory
-      run: |
-        cd dist
-        zip -r ../module.zip .
-        cd ..
+      - name: Typecheck
+        run: npm run typecheck
 
-    # Extract version for release
-    - name: Extract version for release
-      run: echo "RELEASE_VERSION=$(node -p "require('./src/module.json').version")" >> $GITHUB_ENV
-  
-    # Create Release
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ env.RELEASE_VERSION }}
-        files: |
-          module.zip
-          dist/module.json
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build module
+        run: npm run build
+
+      - name: Get version from package.json
+        id: get_version
+        shell: bash
+        run: |
+          echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Zip dist directory
+        shell: bash
+        run: |
+          cd dist
+          zip -r ../module.zip ./*
+
+      - name: Update latest release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          name: Latest
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ./dist/module.json,./module.zip
+          tag: latest
+          body: ${{ github.event.inputs.release_notes }}
+
+      - name: Create version release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ./dist/module.json,./module.zip
+          tag: ${{ steps.get_version.outputs.version }}
+          body: ${{ github.event.inputs.release_notes }}
