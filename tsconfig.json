@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
+    "rootDir": "./src/scripts",
+    "outDir": "./dist/scripts",
+    "target": "ES2020",
+    "module": "ES2020",
     "moduleResolution": "node",
-    "target": "ES6",
-    "lib": ["DOM", "ES6", "ES2017", "ES2018"],
-    "types": ["foundry-pc-types", "node"],
-    "allowUmdGlobalAccess": true
+    "lib": ["DOM", "ES2020"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "types": ["node"]
   },
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src/scripts/**/*", "src/types/**/*"]
 }

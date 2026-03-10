@@ -1,12 +1,19 @@
 {
   "name": "astillon-hanaq-adventures-module",
+  "version": "0.5.0",
   "description": "A collection of FoundryVTT Pathfinder 2e Content for Astillon and Hanaq",
   "type": "module",
+  "private": true,
   "scripts": {
-    "build": "gulp"
+    "build": "node ./build/build.mjs",
+    "clean": "node ./build/build.mjs --clean",
+    "test:local": "node ./build/build.mjs && xcopy /s /e /y /i dist \"%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\astillon-hanaq-adventures-module\\\""
   },
   "author": "Memely",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.15.0"
+  },
   "devDependencies": {
     "@league-of-foundry-developers/foundry-vtt-types": "^9.268.0",
     "@types/node": "^18.11.16",
