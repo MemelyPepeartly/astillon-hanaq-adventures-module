@@ -120,7 +120,7 @@
     {
       "name": "astillon-retired-characters",
       "label": "Astillon Retired Characters",
-      "path": "packs/astillon-retired-characters",
+      "path": "packs/astillon-retired-characters-v2",
       "type": "Actor",
       "system": "pf2e",
       "ownership": {

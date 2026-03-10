@@ -59,16 +59,49 @@ function compileTypescript() {
   }
 }
 
+function sanitizePackDocument(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePackDocument(entry));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const clone = {};
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key.includes(".")) {
+      continue;
+    }
+
+    clone[key] = sanitizePackDocument(child);
+  }
+
+  if (clone.system && typeof clone.system === "object" && !Array.isArray(clone.system)) {
+    delete clone.system.autoChanges;
+  }
+
+  return clone;
+}
+
+function getPackOutputBase(pack) {
+  const packPath = typeof pack.path === "string" ? pack.path : "";
+  const base = path.basename(packPath);
+  return base || pack.name;
+}
+
 function buildPacks(manifest) {
   ensureDir(PACK_DIST);
 
   const declaredPacks = Array.isArray(manifest.packs) ? manifest.packs : [];
 
   for (const pack of declaredPacks) {
-    const folder = `${pack.name}.db`;
-    const folderPath = path.join(PACK_SRC, folder);
+    const sourceFolder = `${pack.name}.db`;
+    const outputFile = `${getPackOutputBase(pack)}.db`;
+    const folderPath = path.join(PACK_SRC, sourceFolder);
     if (!fs.existsSync(folderPath)) {
-      throw new Error(`Missing source pack folder: src/packs/${folder}`);
+      throw new Error(`Missing source pack folder: src/packs/${sourceFolder}`);
     }
 
     const documents = fs
@@ -76,16 +109,17 @@ function buildPacks(manifest) {
       .filter((file) => file.endsWith(".json"))
       .map((file) => path.join(folderPath, file))
       .map((filePath) => JSON.parse(fs.readFileSync(filePath, "utf8")))
+      .map((document) => sanitizePackDocument(document))
       .sort((left, right) => String(left._id ?? "").localeCompare(String(right._id ?? "")));
 
     if (documents.length === 0) {
-      throw new Error(`Source pack folder is empty: src/packs/${folder}`);
+      throw new Error(`Source pack folder is empty: src/packs/${sourceFolder}`);
     }
 
     const dbContents =
       documents.length > 0 ? `${documents.map((document) => JSON.stringify(document)).join("\n")}\n` : "";
 
-    fs.writeFileSync(path.join(PACK_DIST, folder), dbContents, "utf8");
+    fs.writeFileSync(path.join(PACK_DIST, outputFile), dbContents, "utf8");
   }
 }
 
