@@ -263,10 +263,10 @@ function buildCardStack(cards: DrawnCard[]) {
     ? `${cardText(firstCard)}. Value +${firstCard.rank.value}. Click to cycle ${count} cards.`
     : `${cardText(firstCard)}. Value +${firstCard.rank.value}.`;
 
-  return `<div data-ssp-card-stack="1" data-cards="${encodedCards}" data-index="0" title="${escapeHTML(title)}" style="display:flex;align-items:center;justify-content:flex-start;width:100%;cursor:pointer;user-select:none;">
+  return `<div data-ssp-card-stack="1" data-cards="${encodedCards}" data-index="0" title="${escapeHTML(title)}" style="display:flex;align-items:center;justify-content:flex-start;width:100%;cursor:pointer;user-select:none;font-size:0;line-height:0;">
     <div style="position:relative;flex:0 0 auto;width:78px;height:92px;">
       ${stackShadows}
-      <div data-ssp-stack-face style="position:absolute;top:0;left:0;">${cardChip(firstCard, { large: true })}</div>
+      <div data-ssp-stack-face style="position:absolute;top:0;left:0;display:block;font-size:0;line-height:0;">${cardChip(firstCard, { large: true })}</div>
     </div>
   </div>`;
 }

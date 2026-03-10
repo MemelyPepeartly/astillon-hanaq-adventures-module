@@ -1,12 +1,13 @@
 {
   "name": "astillon-hanaq-adventures-module",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "A collection of FoundryVTT Pathfinder 2e Content for Astillon and Hanaq",
   "type": "module",
   "private": true,
   "scripts": {
     "build": "node ./build/build.mjs",
     "clean": "node ./build/build.mjs --clean",
+    "test": "node ./build/build.mjs && xcopy /s /e /y /i dist \"%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\astillon-hanaq-adventures-module\\\"",
     "typecheck": "tsc --noEmit",
     "test:local": "node ./build/build.mjs && xcopy /s /e /y /i dist \"%LOCALAPPDATA%\\FoundryVTT\\Data\\modules\\astillon-hanaq-adventures-module\\\""
   },
