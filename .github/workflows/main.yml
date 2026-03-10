@@ -55,6 +55,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: ./dist/module.json,./module.zip
           tag: latest
+          commit: ${{ github.sha }}
           body: ${{ github.event.inputs.release_notes }}
 
       - name: Create version release
@@ -67,4 +68,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: ./dist/module.json,./module.zip
           tag: ${{ steps.get_version.outputs.version }}
+          commit: ${{ github.sha }}
           body: ${{ github.event.inputs.release_notes }}
