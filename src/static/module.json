@@ -1,21 +1,21 @@
 {
-  "name": "astillon-hanaq-adventures-module",
-  "title": "Astillon Hanaq Adventures Module",
-  "version": "0.4.6",
-  "description": "", 
+  "id": "<%= id %>",
+  "title": "Astillon Hanaq Adventures",
+  "version": "<%= version %>",
+  "description": "A collection of Astillon and Hanaq content for Pathfinder 2e, with module-powered utilities and compendia.",
   "authors": [
     {
       "name": "Memely",
-      "discord": "Memely#0001"
+      "discord": "memely"
     },
     {
       "name": "Triple Sevens"
     }
   ],
   "compatibility": {
-    "minimum": "11",
-    "verified": "11",
-    "maximum": "11.999"
+    "minimum": "13",
+    "verified": "13.351",
+    "maximum": "13"
   },
   "relationships": {
     "systems": [
@@ -24,35 +24,26 @@
         "type": "system",
         "manifest": "https://github.com/foundryvtt/pf2e/releases/download/latest/system.json",
         "compatibility": {
-          "minimum": "5.14.1",
-          "verified": "5.14.1"
+          "minimum": "7.0.0",
+          "verified": "7.11.2"
         }
       }
     ]
   },
-  "manifestPlusVersion": "1.2.0",
-  "allowBugReporter": true,
   "url": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module",
+  "bugs": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/issues",
   "manifest": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/latest/download/module.json",
   "download": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/latest/download/module.zip",
-  "type": "module",
-  "media": [
+  "socket": true,
+  "esmodules": ["scripts/module.js"],
+  "styles": ["styles/module.css"],
+  "languages": [
     {
-      "type": "icon",
-      "location": ""
-    }, 
-    {
-      "type": "cover",
-      "location": ""
-    },
-    {
-      "type": "screenshot",
-      "location": ""
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
     }
   ],
-  "esmodules": [],
-  "styles": [],
-  "languages": [],
   "packFolders": [
     {
       "name": "Astillon and Hanaq Adventures",
@@ -109,7 +100,7 @@
     {
       "name": "astillon-ancestry-feats",
       "label": "Astillon Ancestry Feats",
-      "path": "packs/astillon-ancestry-feats.db",
+      "path": "packs/astillon-ancestry-feats",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -120,7 +111,7 @@
     {
       "name": "astillon-ancestries",
       "label": "Astillon Ancestries",
-      "path": "packs/astillon-ancestries.db",
+      "path": "packs/astillon-ancestries",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -131,7 +122,7 @@
     {
       "name": "ponyfinder-kirin-ancestries-and-heritages",
       "label": "Ponyfinder Kirin Ancestries and Heritages",
-      "path": "packs/ponyfinder-kirin-ancestries-and-heritages.db",
+      "path": "packs/ponyfinder-kirin-ancestries-and-heritages",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -142,7 +133,7 @@
     {
       "name": "ponyfinder-kirin-feats",
       "label": "Ponyfinder Kirin Feats",
-      "path": "packs/ponyfinder-kirin-feats.db",
+      "path": "packs/ponyfinder-kirin-feats",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -153,7 +144,7 @@
     {
       "name": "astillon-race-items",
       "label": "Astillon Race Items",
-      "path": "packs/astillon-race-items.db",
+      "path": "packs/astillon-race-items",
       "type": "Item",
       "system": "pf2e",
       "ownership": {
@@ -162,9 +153,9 @@
       }
     },
     {
-      "name":"astillon-race-macros",
+      "name": "astillon-race-macros",
       "label": "Astillon Race Macros",
-      "path": "packs/astillon-race-macros.db",
+      "path": "packs/astillon-race-macros",
       "type": "Macro",
       "system": "pf2e",
       "ownership": {
@@ -173,9 +164,9 @@
       }
     },
     {
-      "name":"astillon-retired-characters",
+      "name": "astillon-retired-characters",
       "label": "Astillon Retired Characters",
-      "path": "packs/astillon-retired-characters.db",
+      "path": "packs/astillon-retired-characters",
       "type": "Actor",
       "system": "pf2e",
       "ownership": {
@@ -186,14 +177,14 @@
   ],
   "flags": {
     "astillon-hanaq-adventures-module": {
-        "pf2e-homebrew": {
-            "creatureTraits": {
-                "kirin": "Kirin"
-            },
-            "featTraits": {
-                "kirin": "Kirin"
-            }
+      "pf2e-homebrew": {
+        "creatureTraits": {
+          "kirin": "Kirin"
+        },
+        "featTraits": {
+          "kirin": "Kirin"
         }
+      }
     }
   }
 }
