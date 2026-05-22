@@ -1014,7 +1014,7 @@ async function activateSarsaparillaSurprise() {
             const index = parseInt(jq.find("#ssp-weapon").val(), 10) || 0;
             const rawDieRoll = parseInt(jq.find("#ssp-dieroll").val(), 10) || 1;
             resolve({
-              dieRoll: Math.clamped(rawDieRoll, 1, 20),
+              dieRoll: Math.clamp(rawDieRoll, 1, 20),
               mod: strikes[index].totalModifier,
               weaponLabel: strikes[index].label,
             });

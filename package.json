@@ -1,6 +1,6 @@
 {
   "name": "astillon-hanaq-adventures-module",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "description": "A collection of FoundryVTT Pathfinder 2e Content for Astillon and Hanaq",
   "type": "module",
   "private": true,

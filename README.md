@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/Foundry-v13-informational)
+![](https://img.shields.io/badge/Foundry-v13--v14-informational)
 
 # Astillon Hanaq Adventures
 
@@ -13,6 +13,8 @@ Foundry VTT module content for Pathfinder 2e, including Astillon/Hanaq compendia
 ## Sarsaparilla Surprise
 
 The Sarsaparilla feature now lives in module runtime code, so its chat interactivity and socket-driven animations load for every connected client while the module is active.
+
+Players can drag the `Sarsaparilla Surprise` macro from the `Astillon Player Macros` compendium to their hotbar.
 
 Create a hotbar macro with:
 

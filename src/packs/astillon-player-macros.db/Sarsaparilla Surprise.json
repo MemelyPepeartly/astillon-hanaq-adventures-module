@@ -1,0 +1,23 @@
+{
+  "_id": "AhSspPlayerMac01",
+  "name": "Sarsaparilla Surprise",
+  "type": "script",
+  "author": null,
+  "img": "icons/sundries/gaming/playing-cards.webp",
+  "scope": "global",
+  "command": "const sarsaparilla = game.astillonHanaqAdventures?.sarsaparilla;\nif (!sarsaparilla?.run) {\n    ui.notifications.warn(\"Sarsaparilla Surprise is not ready. Make sure Astillon Hanaq Adventures is enabled.\");\n    return;\n}\n\nawait sarsaparilla.run();",
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 2
+  },
+  "flags": {},
+  "_stats": {
+    "systemId": "pf2e",
+    "systemVersion": "8.1.2",
+    "coreVersion": "14.362",
+    "createdTime": 1779447600000,
+    "modifiedTime": 1779447600000,
+    "lastModifiedBy": null
+  }
+}

@@ -11,7 +11,7 @@ declare const $: any;
 declare const gsap: any;
 
 interface Math {
-  clamped(value: number, min: number, max: number): number;
+  clamp(value: number, min: number, max: number): number;
 }
 
 interface Window {

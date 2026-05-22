@@ -14,18 +14,18 @@
   ],
   "compatibility": {
     "minimum": "13",
-    "verified": "13.351",
-    "maximum": "13"
+    "verified": "14",
+    "maximum": "14"
   },
   "relationships": {
     "systems": [
       {
         "id": "pf2e",
         "type": "system",
-        "manifest": "https://github.com/foundryvtt/pf2e/releases/download/latest/system.json",
+        "manifest": "https://github.com/foundryvtt/pf2e/releases/latest/download/system.json",
         "compatibility": {
           "minimum": "7.0.0",
-          "verified": "7.11.2"
+          "verified": "8.1.2"
         }
       }
     ]
@@ -76,6 +76,7 @@
           ],
           "packs": [
             "astillon-ancestry-feats",
+            "astillon-player-macros",
             "astillon-retired-characters"
           ]
         }
@@ -110,6 +111,17 @@
       "name": "astillon-race-macros",
       "label": "Astillon Race Macros",
       "path": "packs/astillon-race-macros",
+      "type": "Macro",
+      "system": "pf2e",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "astillon-player-macros",
+      "label": "Astillon Player Macros",
+      "path": "packs/astillon-player-macros",
       "type": "Macro",
       "system": "pf2e",
       "ownership": {
