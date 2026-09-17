@@ -1,1 +1,9 @@
-{}
+{
+  "ASTILLON": {
+    "Menacing": {
+      "Name": "Menacing",
+      "SelectToken": "Select a token you own to toggle Menacing.",
+      "ToggleError": "Could not toggle Menacing. See the console for details."
+    }
+  }
+}

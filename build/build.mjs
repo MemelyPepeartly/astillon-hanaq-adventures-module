@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { buildGifAssets } from "./gif-assets.mjs";
 
 const ROOT = process.cwd();
 const DIST_DIR = path.join(ROOT, "dist");
@@ -137,6 +138,7 @@ function main() {
   compileTypescript();
   const manifest = renderManifest();
   copyDirectory(path.join(ROOT, "src", "assets"), path.join(DIST_DIR, "assets"));
+  buildGifAssets(path.join(ROOT, "src", "assets", "jojo_menace.gif"), path.join(DIST_DIR, "assets"));
   copyDirectory(path.join(ROOT, "src", "lang"), path.join(DIST_DIR, "lang"));
   copyDirectory(path.join(ROOT, "src", "styles"), path.join(DIST_DIR, "styles"));
   buildPacks(manifest);

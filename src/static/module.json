@@ -2,7 +2,7 @@
   "id": "<%= id %>",
   "title": "Astillon Hanaq Adventures",
   "version": "<%= version %>",
-  "description": "A collection of Astillon and Hanaq content for Pathfinder 2e, with module-powered utilities and compendia.",
+  "description": "A collection of Astillon and Hanaq content for Pathfinder 2e, with module-powered utilities, compendia, and the animated Menacing token status.",
   "authors": [
     {
       "name": "Memely",

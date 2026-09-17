@@ -26,5 +26,5 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build module
-        run: npm run build
+      - name: Build and test module
+        run: npm test

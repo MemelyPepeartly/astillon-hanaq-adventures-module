@@ -271,12 +271,8 @@ function buildCardStack(cards: DrawnCard[]) {
   </div>`;
 }
 
-function initializeCardStacks(messageId: string | null = null) {
-  const selector = messageId
-    ? `li.chat-message[data-message-id="${messageId}"] [data-ssp-card-stack]`
-    : "[data-ssp-card-stack]";
-
-  document.body.querySelectorAll(selector).forEach((stackElement) => {
+function initializeCardStacks(root: ParentNode = document.body) {
+  root.querySelectorAll("[data-ssp-card-stack]").forEach((stackElement) => {
     if (stackElement instanceof HTMLElement) {
       renderCardStackState(stackElement);
     }
@@ -334,9 +330,9 @@ function registerChatCardInteractivity() {
 
   document.body.addEventListener("click", state.chatClickHandler);
 
-  state.chatRenderHook = Hooks.on("renderChatMessageHTML", (message: any) => {
+  state.chatRenderHook = Hooks.on("renderChatMessageHTML", (message: any, html: HTMLElement) => {
     if (!message?.flags?.world?.sarsaparillaSurprise) return;
-    window.setTimeout(() => initializeCardStacks(message.id), 0);
+    initializeCardStacks(html);
   });
 
   window.setTimeout(() => initializeCardStacks(), 0);
@@ -844,44 +840,41 @@ async function playBlackjack(
   if (naturalRollTotal > 21) busted = true;
 
   while (!busted && !blackjack) {
-    const action = await new Promise<string>((resolve) => {
-      const cardsHtml = hand
-        .map((card) => `<div style="width:46px;height:64px;border-radius:5px;border:2px solid ${CARD_BORDER};background:${CARD_BACKDROP};box-shadow:2px 2px 5px rgba(0,0,0,0.2);display:inline-flex;flex-direction:column;justify-content:center;align-items:center;font-weight:bold;color:${card.color}"><span style="font-size:1.2em;line-height:1">${card.rank.display}</span><span style="font-size:1em;line-height:1">${suitEntity(card.suit)}</span></div>`)
-        .join("");
+    const cardsHtml = hand
+      .map((card) => `<div style="width:46px;height:64px;border-radius:5px;border:2px solid ${CARD_BORDER};background:${CARD_BACKDROP};box-shadow:2px 2px 5px rgba(0,0,0,0.2);display:inline-flex;flex-direction:column;justify-content:center;align-items:center;font-weight:bold;color:${card.color}"><span style="font-size:1.2em;line-height:1">${card.rank.display}</span><span style="font-size:1em;line-height:1">${suitEntity(card.suit)}</span></div>`)
+      .join("");
 
-      const totalColor = naturalRollTotal >= 17 ? "#c0392b" : "#27ae60";
-      const prompt =
-        naturalRollTotal <= 15
-          ? "Feeling lucky? The Trickster urges you on..."
-          : naturalRollTotal <= 18
-            ? "The string hums with tension... risky territory."
-            : naturalRollTotal <= 20
-              ? "One wrong card and you are bust. Dare you push it?"
-              : "Standing at the edge of fortune.";
+    const totalColor = naturalRollTotal >= 17 ? "#c0392b" : "#27ae60";
+    const prompt =
+      naturalRollTotal <= 15
+        ? "Feeling lucky? The Trickster urges you on..."
+        : naturalRollTotal <= 18
+          ? "The string hums with tension... risky territory."
+          : naturalRollTotal <= 20
+            ? "One wrong card and you are bust. Dare you push it?"
+            : "Standing at the edge of fortune.";
 
-      new Dialog({
-        title: "Sarsaparilla Surprise - Hit or Stand?",
-        content: `<div style="${DS.wrap}">
-          <div style="font-size:1.1em;color:${DEEP_PURPLE};margin:0 0 6px">The Velvet Trickster's Table</div>
-          <div style="font-size:0.82em;color:#666;margin-bottom:6px">d20 roll: <b>${dieRoll}</b></div>
-          <div style="display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0">${cardsHtml}</div>
-          <div style="font-size:1.8em;font-weight:bold;color:${totalColor};margin:6px 0 2px">Hand: ${naturalRollTotal} / 21</div>
-          <div style="font-size:0.85em;color:#888;font-style:italic;margin-bottom:4px">${prompt}</div>
-        </div>`,
-        buttons: {
-          hit: { icon: '<i class="fas fa-plus"></i>', label: "Hit", callback: () => resolve("hit") },
-          stand: { icon: '<i class="fas fa-hand"></i>', label: "Stand", callback: () => resolve("stand") },
-        },
-        default: "hit",
-        render: (html: any) => {
-          const jq = html instanceof jQuery ? html : $(html);
-          jq.closest(".dialog,.window-app").css(DS.bg);
-        },
-        close: () => resolve("stand"),
-      }).render(true);
+    const action = await foundry.applications.api.DialogV2.wait({
+      window: { title: "Sarsaparilla Surprise - Hit or Stand?" },
+      content: `<div style="${DS.wrap}">
+        <div style="font-size:1.1em;color:${DEEP_PURPLE};margin:0 0 6px">The Velvet Trickster's Table</div>
+        <div style="font-size:0.82em;color:#666;margin-bottom:6px">d20 roll: <b>${dieRoll}</b></div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0">${cardsHtml}</div>
+        <div style="font-size:1.8em;font-weight:bold;color:${totalColor};margin:6px 0 2px">Hand: ${naturalRollTotal} / 21</div>
+        <div style="font-size:0.85em;color:#888;font-style:italic;margin-bottom:4px">${prompt}</div>
+      </div>`,
+      buttons: [
+        { action: "hit", icon: "fas fa-plus", label: "Hit", default: true },
+        { action: "stand", icon: "fas fa-hand", label: "Stand" },
+      ],
+      render: (_event: Event, dialog: { element: HTMLElement }) => {
+        Object.assign(dialog.element.style, DS.bg);
+      },
+      rejectClose: false,
     });
 
-    if (action === "stand") break;
+    // Closing the window has the same outcome as choosing to stand.
+    if (action !== "hit") break;
 
     const nextCard = drawCard();
     hand.push(nextCard);
@@ -922,7 +915,7 @@ async function playBlackjack(
   const revealColor = blackjack ? "#2ecc71" : busted ? "#e74c3c" : RESULT_COLORS[resultClass].total;
   await broadcastStandReveal(hand, revealLabel, revealColor);
 
-  await ChatMessage.create({
+  await CONFIG.ChatMessage.documentClass.create({
     author: game.user.id,
     content: buildChatCard({
       dieRoll,
@@ -990,58 +983,59 @@ async function activateSarsaparillaSurprise() {
     ? `<div style="${DS.tgtOk}">Targeting: <b>${escapeHTML(targetName)}</b></div>`
     : `<div style="${DS.tgtNo}">No target selected - the GM will determine the outcome.</div>`;
 
-  const setup = await new Promise<{ dieRoll: number; mod: number; weaponLabel: string } | null>((resolve) => {
-    new Dialog({
-      title: "Sarsaparilla Surprise - Draw from the Deck",
+  const setup: { dieRoll: number; mod: number; weaponLabel: string } | null =
+    await foundry.applications.api.DialogV2.wait({
+      window: { title: "Sarsaparilla Surprise - Draw from the Deck" },
       content: `<div style="${DS.wrap}">
         <div style="${DS.head}">Sarsaparilla Surprise</div>
         <div style="${DS.sub}">The Velvet Trickster whispers... "Shall we beat the odds, love?"</div>
         <label style="${DS.lbl}" for="ssp-weapon">Weapon:</label>
-        <select style="${DS.sel}" id="ssp-weapon">${strikeOptions}</select>
+        <select style="${DS.sel}" id="ssp-weapon" name="weapon">${strikeOptions}</select>
         <div style="${DS.modDisp}" id="ssp-mod-display">Attack modifier: ${strikes[0].totalModifier >= 0 ? "+" : ""}${strikes[0].totalModifier}</div>
         <label style="${DS.lbl}" for="ssp-dieroll">Natural d20 result from the missed strike:</label>
-        <input style="${DS.inp}" type="number" id="ssp-dieroll" value="1" min="1" max="20" autofocus />
+        <input style="${DS.inp}" type="number" id="ssp-dieroll" name="dieRoll" value="1" min="1" max="20" autofocus />
         <div style="${DS.hint}">The card values will be added to this die result.</div>
         <hr style="border-color:${GOLD};margin:10px 0" />
         ${targetLine}
       </div>`,
-      buttons: {
-        draw: {
-          icon: '<i class="fas fa-hand-sparkles"></i>',
+      buttons: [
+        {
+          action: "draw",
+          icon: "fas fa-hand-sparkles",
           label: "Draw a Card",
-          callback: (html: any) => {
-            const jq = html instanceof jQuery ? html : $(html);
-            const index = parseInt(jq.find("#ssp-weapon").val(), 10) || 0;
-            const rawDieRoll = parseInt(jq.find("#ssp-dieroll").val(), 10) || 1;
-            resolve({
-              dieRoll: Math.clamp(rawDieRoll, 1, 20),
+          default: true,
+          callback: (_event: Event, button: HTMLButtonElement) => {
+            const index = parseInt(button.form!.querySelector<HTMLSelectElement>("#ssp-weapon")!.value, 10) || 0;
+            const rawDieRoll = parseInt(button.form!.querySelector<HTMLInputElement>("#ssp-dieroll")!.value, 10) || 1;
+            return {
+              dieRoll: Math.min(20, Math.max(1, rawDieRoll)),
               mod: strikes[index].totalModifier,
               weaponLabel: strikes[index].label,
-            });
+            };
           },
         },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
+        {
+          action: "cancel",
+          icon: "fas fa-times",
           label: "Walk Away",
-          callback: () => resolve(null),
+          callback: () => null,
         },
-      },
-      default: "draw",
-      render: (html: any) => {
-        const jq = html instanceof jQuery ? html : $(html);
-        jq.closest(".dialog,.window-app").css(DS.bg);
-        jq.find("#ssp-weapon").on("change", function (this: HTMLSelectElement) {
-          const strike = strikes[parseInt(this.value, 10) || 0];
-          jq.find("#ssp-mod-display").text(`Attack modifier: ${strike.totalModifier >= 0 ? "+" : ""}${strike.totalModifier}`);
+      ],
+      render: (_event: Event, dialog: { element: HTMLElement }) => {
+        Object.assign(dialog.element.style, DS.bg);
+        const weapon = dialog.element.querySelector<HTMLSelectElement>("#ssp-weapon")!;
+        const modifier = dialog.element.querySelector<HTMLElement>("#ssp-mod-display")!;
+        weapon.addEventListener("change", () => {
+          const strike = strikes[parseInt(weapon.value, 10) || 0];
+          modifier.textContent = `Attack modifier: ${strike.totalModifier >= 0 ? "+" : ""}${strike.totalModifier}`;
         });
       },
-      close: () => resolve(null),
-    }).render(true);
-  });
+      rejectClose: false,
+    });
 
   if (!setup) return;
 
-  const speaker = ChatMessage.getSpeaker({ actor, token: token.document });
+  const speaker = CONFIG.ChatMessage.documentClass.getSpeaker({ actor, token: token.document });
   await playBlackjack(setup.dieRoll, setup.mod, setup.weaponLabel, targetAC, targetName, actor.name, speaker);
 }
 
