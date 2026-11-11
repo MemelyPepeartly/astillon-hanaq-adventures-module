@@ -4,6 +4,13 @@
       "Name": "Menacing",
       "SelectToken": "Select a token you own to toggle Menacing.",
       "ToggleError": "Could not toggle Menacing. See the console for details."
+    },
+    "YourTurn": {
+      "Enabled": "Your Turn Banner",
+      "EnabledHint": "Show a short Smash Bros–style card when combat advances to a token you own.",
+      "Portrait": "Your Turn Portrait Override",
+      "PortraitHint": "Optional image path used instead of the active combatant's token or actor portrait.",
+      "Banner": "YOUR TURN"
     }
   }
 }

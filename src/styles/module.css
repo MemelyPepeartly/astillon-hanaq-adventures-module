@@ -1,1 +1,74 @@
-/* Module styles can live here when chat card theming moves out of inline markup. */
+/* Smash Bros–style “your turn” card beside the sidebar (your-turn feature). */
+.astillon-your-turn-card {
+  --astillon-your-turn-top: 50vh;
+  --astillon-your-turn-left: 100vw;
+  --astillon-your-turn-slide: 120%;
+  position: fixed;
+  top: var(--astillon-your-turn-top);
+  left: var(--astillon-your-turn-left);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem 0.75rem;
+  max-width: 11rem;
+  pointer-events: auto;
+  cursor: pointer;
+  background: linear-gradient(145deg, #1a1030 0%, #2d1b4e 45%, #4a2070 100%);
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  box-shadow:
+    0 0 24px rgba(180, 80, 255, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+  transform: translate(calc(-100% + var(--astillon-your-turn-slide)), -50%);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  user-select: none;
+}
+
+.astillon-your-turn-card.astillon-your-turn-visible {
+  --astillon-your-turn-slide: 0%;
+}
+
+.astillon-your-turn-portrait {
+  padding: 4px;
+  background: #0d0818;
+  border-radius: 8px;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.astillon-your-turn-portrait img {
+  display: block;
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: cover;
+  border: 4px solid #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+.astillon-your-turn-name {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.astillon-your-turn-banner {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #ffe566;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 8px rgba(255, 200, 0, 0.9),
+    2px 2px 0 #c41e3a,
+    -1px -1px 0 #1a1a2e;
+}
