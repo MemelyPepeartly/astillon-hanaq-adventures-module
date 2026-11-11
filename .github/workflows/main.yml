@@ -4,6 +4,11 @@ permissions:
   contents: write
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
   workflow_dispatch:
     inputs:
       release_notes:
@@ -56,7 +61,15 @@ jobs:
             exit 1
           fi
 
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="$(git log -1 --pretty=%B)"
+          fi
+
           if gh release view "$VERSION" >/dev/null 2>&1; then
+            if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+              echo "Release $VERSION already exists; leaving it in place."
+              exit 0
+            fi
             gh release upload "$VERSION" ./dist/module.json ./module.zip --clobber
             gh release edit "$VERSION" --title "Release $VERSION" --notes "$RELEASE_NOTES" --latest
           else
