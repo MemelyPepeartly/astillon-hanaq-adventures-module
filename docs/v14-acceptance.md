@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.7.0. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.0. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
 
 ## Menacing
 
@@ -14,6 +14,12 @@ Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.7.0. Re
 6. Delete a token with Menacing active; no symbol should remain. Switch scenes while assets are loading; no symbol from the old scene should appear on the new scene.
 7. Change PF2e's condition icon theme and death icon. Reopen the palette; Menacing should still be present and toggle normally.
 8. Tab to Menacing and use Enter/Space. Right-click the status. Each interaction should toggle once, without changing the token's large overlay status.
+
+## Your Turn
+
+1. Leave **Your Turn Banner** off. Advance initiative onto a token you own. No card should appear.
+2. Enable the setting for your user. On your next turn, a card should slide out beside the right sidebar with a white-outlined portrait, the combatant's name, and YOUR TURN. The combat tracker stays usable. Click dismisses it, and it also leaves on its own after a few seconds.
+3. Another player's turn shows you nothing. Set a portrait override and confirm that image is used; clear it and confirm the token image, then the actor image.
 
 ## Existing content
 

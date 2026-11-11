@@ -27,9 +27,13 @@ await game.astillonHanaqAdventures.menacing.toggle(token.document, false);
 
 The GM or a token owner can toggle it. The token flag is `flags.astillon-hanaq-adventures-module.menacing`.
 
+## Your Turn
+
+Configure Settings includes a per-user **Your Turn Banner** toggle, off by default. When combat advances to a token you own, a short card slides out beside the right sidebar with a white-outlined portrait and YOUR TURN. Click it, or wait a few seconds, and it leaves. An optional portrait override replaces the token or actor image. The GM does not get a card for other players' turns.
+
 ## Compatibility
 
-Version 0.7.0 updates Sarsaparilla and the racing macros to Foundry's `DialogV2` and native DOM APIs. Dice evaluation is asynchronous. Menacing supports V14's ID-keyed status registry and V13's array registry. Use a PF2e release compatible with your installed Foundry version.
+Version 0.8.0 adds that optional banner. Version 0.7.0 updates Sarsaparilla and the racing macros to Foundry's `DialogV2` and native DOM APIs. Dice evaluation is asynchronous. Menacing supports V14's ID-keyed status registry and V13's array registry. Use a PF2e release compatible with your installed Foundry version.
 
 PF2e's V14 status-menu integration was checked against upstream commit [`d695228`](https://github.com/foundryvtt/pf2e/blob/d695228d8763839c8ddaa0166bee325a98c1d24f/src/module/canvas/status-effects.ts). PF2e handles its own conditions and rejects custom ActiveEffects, so Menacing uses a scoped status-control listener and a token flag. It does not patch PF2e classes.
 
