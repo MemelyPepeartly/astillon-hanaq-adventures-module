@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.9.1. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.9.2. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
 
 ## Menacing
 

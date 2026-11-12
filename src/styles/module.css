@@ -23,8 +23,8 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  width: min(52rem, 62%);
-  height: min(82%, 44rem);
+  width: var(--yt-stage-w, 640px);
+  height: var(--yt-stage-h, 560px);
   transform-origin: 100% 100%;
   transform: scale(var(--yt-scale));
   overflow: visible;

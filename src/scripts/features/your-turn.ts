@@ -446,6 +446,23 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.setProperty("--yt-right", `${right}px`);
     root.style.setProperty("--yt-bottom", `${bottom}px`);
     root.style.setProperty("--yt-left", `${left}px`);
+    // Pixel insets. A percentage height on this overlay does not resolve in Foundry,
+    // which collapsed the wedge, the banner plate, and the portrait to nothing.
+    root.style.top = `${top}px`;
+    root.style.right = `${right}px`;
+    root.style.bottom = `${bottom}px`;
+    root.style.left = `${left}px`;
+    const usableW = Math.max(280, view.width - left - right);
+    const usableH = Math.max(280, view.height - top - bottom);
+    const stageW = Math.round(Math.min(usableW * 0.72, 920));
+    const stageH = Math.round(Math.min(usableH * 0.84, 760));
+    root.style.setProperty("--yt-stage-w", `${stageW}px`);
+    root.style.setProperty("--yt-stage-h", `${stageH}px`);
+    const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
+    if (stage) {
+      stage.style.width = `${stageW}px`;
+      stage.style.height = `${stageH}px`;
+    }
   }
 
   function applyTheme(root: HTMLElement, color: string): void {
@@ -546,10 +563,6 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.position = "fixed";
     root.style.pointerEvents = "none";
     root.style.zIndex = "80";
-    root.style.top = "var(--yt-top)";
-    root.style.right = "var(--yt-right)";
-    root.style.bottom = "var(--yt-bottom)";
-    root.style.left = "var(--yt-left)";
     applyInsets(root);
     applyTheme(root, subject.color);
 
@@ -557,7 +570,6 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     stage.style.position = "absolute";
     stage.style.right = "0";
     stage.style.bottom = "0";
-    stage.style.height = "55%";
     stage.style.transformOrigin = "100% 100%";
     stage.style.transform = "scale(var(--yt-scale))";
     stage.style.pointerEvents = "none";
@@ -592,6 +604,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
     stage.append(back, saturated, accent, light, slash, banner);
     root.append(stage);
+    applyInsets(root);
 
     if (reduced) {
       const holdMs = holdMilliseconds(hold);

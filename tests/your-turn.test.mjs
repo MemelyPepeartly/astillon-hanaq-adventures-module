@@ -806,7 +806,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(root.getAttribute("role"), "status");
     assert.equal(root.getAttribute("aria-live"), "polite");
     const stage = root.querySelector(".astillon-yt-stage");
-    assert.equal(stage.style.height, "55%");
+    assert.match(stage.style.width, /^\d+px$/);
+    assert.match(stage.style.height, /^\d+px$/);
+    assert.ok(Number.parseInt(stage.style.height, 10) >= 280);
     assert.equal(stage.style.transformOrigin, "100% 100%");
     assert.equal(stage.style.transform, "scale(var(--yt-scale))");
     assert.equal(stage.style.right, "0px");
