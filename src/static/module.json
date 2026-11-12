@@ -2,7 +2,7 @@
   "id": "<%= id %>",
   "title": "Astillon Hanaq Adventures",
   "version": "<%= version %>",
-  "description": "A collection of Astillon and Hanaq content for Pathfinder 2e, with module-powered utilities, compendia, and the animated Menacing token status.",
+  "description": "Astillon and Hanaq content for Pathfinder 2e, including Blaster's level-18 encounter, charged blasts, Flash Mob, Beam Clash, and animated token utilities.",
   "authors": [
     {
       "name": "Memely",
@@ -28,6 +28,11 @@
           "verified": "8.1.2"
         }
       }
+    ],
+    "recommends": [
+      { "id": "pf2e-summons-assistant", "type": "module", "reason": "Flash Mob uses Summons Assistant's thrall placement and lifecycle." },
+      { "id": "sequencer", "type": "module", "reason": "Beam Clash uses persistent beam animations." },
+      { "id": "JB2A_DnD5e", "type": "module", "reason": "Beam Clash uses JB2A beam assets. The Patreon JB2A package is also supported." }
     ]
   },
   "url": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module",
@@ -36,7 +41,7 @@
   "download": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/latest/download/module.zip",
   "socket": true,
   "esmodules": ["scripts/module.js"],
-  "styles": ["styles/module.css"],
+  "styles": ["styles/module.css", "styles/blaster.css", "styles/beam-clash.css"],
   "languages": [
     {
       "lang": "en",
@@ -77,7 +82,10 @@
           "packs": [
             "astillon-ancestry-feats",
             "astillon-player-macros",
-            "astillon-retired-characters"
+            "astillon-retired-characters",
+            "astillon-blaster-actors",
+            "astillon-blaster-items",
+            "astillon-blaster-macros"
           ]
         }
       ],
@@ -85,6 +93,29 @@
     }
   ],
   "packs": [
+    {
+      "name": "astillon-blaster-actors",
+      "label": "Blaster — NPCs",
+      "path": "packs/astillon-blaster-actors",
+      "type": "Actor",
+      "system": "pf2e",
+      "ownership": { "PLAYER": "NONE", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "astillon-blaster-items",
+      "label": "Blaster — Support Effects",
+      "path": "packs/astillon-blaster-items",
+      "type": "Item",
+      "system": "pf2e",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "astillon-blaster-macros",
+      "label": "Blaster — Encounter Macros",
+      "path": "packs/astillon-blaster-macros",
+      "type": "Macro",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
     {
       "name": "astillon-ancestry-feats",
       "label": "Astillon Ancestry Feats",

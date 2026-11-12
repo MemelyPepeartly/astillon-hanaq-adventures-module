@@ -1,0 +1,69 @@
+{
+  "_id": "BlasterInspire01",
+  "name": "Effect: Flash Mob — Inspire",
+  "type": "effect",
+  "img": "icons/svg/sound.svg",
+  "system": {
+    "description": {
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}. Apply to Blaster, not the thrall. Blaster gains a +1 status bonus to attack rolls, damage rolls, and saving throws against fear until the start of Blaster's next turn.</p><p>Multiple copies do not stack, nor do these bonuses stack with other status bonuses to the same statistic. This does not raise save DCs or modify Beam Clash's unmodified d20s. Raw damage rolls outside PF2e's modifier pipeline require the GM to include the single damage bonus once for the whole blast, before basic-save adjustments, never once per segment.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "FlatModifier",
+        "selector": [
+          "attack-roll",
+          "damage"
+        ],
+        "type": "status",
+        "value": 1
+      },
+      {
+        "key": "FlatModifier",
+        "selector": [
+          "saving-throw"
+        ],
+        "predicate": [
+          "fear"
+        ],
+        "type": "status",
+        "value": 1
+      }
+    ],
+    "slug": "blaster-inspire",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": 1,
+      "unit": "rounds",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  }
+}

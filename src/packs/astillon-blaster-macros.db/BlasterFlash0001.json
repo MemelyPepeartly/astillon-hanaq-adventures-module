@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterFlash0001",
+  "name": "Blaster — Flash Mob",
+  "type": "script",
+  "img": "icons/svg/mystery-man.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.flashMob) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.flashMob();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

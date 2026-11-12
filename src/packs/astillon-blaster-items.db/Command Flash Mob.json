@@ -1,0 +1,41 @@
+{
+  "_id": "BlasterCommand01",
+  "name": "Command Flash Mob",
+  "type": "action",
+  "img": "icons/svg/sound.svg",
+  "system": {
+    "description": {
+      "value": "<p><strong>Frequency</strong> Once per round.</p><p><strong>Requirements</strong> Blaster has one live Flash Mob Hype Thrall within 60 feet.</p><p>Blaster spends 1 action and chooses one such thrall and one benefit for Blaster only: @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01]{Inspire} (+1 status to attack rolls, damage rolls, and saves against fear), @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterGuard0001]{Guard} (+1 status to AC), or @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster} (10 temporary HP once, never added to existing temporary HP). Each benefit lasts until the start of Blaster's next turn, or until spent for temporary HP.</p><p>The selected thrall provides only that benefit; it receives no turn, movement, Strike, spell, or extra actions. This command is available once per round, separately from Flash Mob summoning; paying extra actions does not allow another command that round. Status bonuses of the same type do not stack; temporary HP never stack. The thrall does not need to spend an action of its own.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMobCmd001]{Command Flash Mob}. Without the command runtime, pay the action, check the live thrall and 60-foot range, and drag exactly one linked effect onto Blaster during his turn. Remove the previous copy before reapplying that effect. Track expiry manually if encounter time is not advancing.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [],
+    "slug": "blaster-command-flash-mob",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [
+        "concentrate"
+      ],
+      "otherTags": []
+    },
+    "actionType": {
+      "value": "action"
+    },
+    "actions": {
+      "value": 1
+    },
+    "category": "interaction",
+    "frequency": {
+      "max": 1,
+      "per": "round"
+    }
+  }
+}

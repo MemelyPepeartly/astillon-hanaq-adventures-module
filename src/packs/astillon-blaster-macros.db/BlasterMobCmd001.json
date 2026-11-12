@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterMobCmd001",
+  "name": "Blaster — Command Flash Mob",
+  "type": "script",
+  "img": "icons/svg/sound.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.commandMob) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.commandMob();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

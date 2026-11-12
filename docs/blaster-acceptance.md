@@ -1,0 +1,53 @@
+# Blaster: live-world acceptance
+
+Target inspected: Foundry **14.370**, PF2e **8.7.0** at `bdea4f90b512ccaa13c7205c357e8863a451950d`, Summons Assistant source at `c99406b145280751898d315556252ea0d53c33db`. These are source/API pins, not a claim that a live world has been tested.
+
+Build with `npm.cmd test`. The installable output is in `dist/`. No release, remote publish, or copy into a live Foundry installation is performed by the ordinary build. Test in a disposable world with compatible PF2e, Summons Assistant and its dependencies, Sequencer, and JB2A enabled.
+
+## NPC and compendia
+
+- Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 330, visible skills, three saves, strikes, and linked abilities with no console errors.
+- Open the hype-thrall actor and support effects. Ensure core artwork resolves and links to all seven macros open the intended macro.
+- Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
+
+## Connected blast
+
+- Start combat on Blaster's turn. Use the one-action blast: click Blaster's square followed by four other squares. See a connecting preview at every click and four saved line Regions after the fifth. Confirm they are visible from a player client.
+- Undo with Backspace, cancel with Escape and right-click, and leave the scene mid-placement. None should leave Regions, pointer listeners, or consume the use.
+- Reject a starting point outside Blaster, consecutive duplicate points, and a path over the selected total length. Try diagonal turns and verify the scene's distance convention and coverage highlights.
+- Confirm all modes share one use per round; one- and two-action variants work on later turns while the large blast recharges.
+- Verify three-action full width is **three squares**, not three on each side. Attempt movement with drag, ruler, keyboard, and token configuration. It must be blocked until Blaster's next turn, but not after. Verify **Release Blast Root** allows a deliberate GM correction.
+- Advance through a round boundary before Blaster's turn: root remains until that turn. End combat: root stops blocking. Out of combat, advance world time by six seconds.
+- Verify each spectrum's damage and save links; apply saves/damage only once per target even if it occupies multiple segments. Apply the conditional riders manually only on a failed save.
+- Clear areas with the cleanup macro. Other actors' Regions and another Blaster's areas must survive.
+
+## Flash Mob
+
+- As the active GM, summon one add within 30 feet on Blaster's turn. Ensure exactly one custom hype-thrall token appears, with 1 HP, helper summoner linkage and a one-minute expiration effect.
+- Cancel the helper placement, then retry: cancellation must not consume the round's use. Verify a fourth simultaneous live add is refused; another Blaster's adds do not count toward this Blaster's limit.
+- Confirm the add has no independent initiative. Command a living owned add within 60 feet; reject another Blaster's add, a dead add, an expired add, and an out-of-range add.
+- Check inspire and guard appear on Blaster's prepared statistics, and bolster gives max(current temporary HP, 10), never additive stacking. Advance to Blaster's next turn and verify support removal, including remaining temporary HP originating from bolster.
+- Advance one minute, including with automatic PF2e expired-effect removal disabled: the custom add disappears. Unrelated summons must survive.
+- Disable Summons Assistant and verify the macro gives an actionable dependency warning without creating a substitute actor or token.
+
+## Beam Clash: three browser clients
+
+Use one GM, one owner of the blue actor, and one non-owner spectator, all viewing the same scene.
+
+- Start from one selected token and one targeted player token. All viewers pan to frame both tokens. Verify actual installed JB2A assets play persistently, **red from selected / blue from target**, meeting at the midpoint.
+- Verify only the GM can click red and only the target's non-GM owner can click blue. Spectators see disabled controls. Check changing ownership updates the controls.
+- Roll one side: wait for the other; do not advance score. Double-click, click from two owners, or repeat an old round request: accept only one roll per side per round.
+- Verify ties keep the score, and opposing wins reverse it one step. From +2, five net blue wins reach −3. At either threshold, a winner is announced and all effects/buttons disappear.
+- Pan/zoom and move a token: buttons stay aligned and beam endpoints follow. End the clash while an animation asset is still loading: no orphan beam may appear afterward.
+- Refresh a player client and switch away from then back to the scene: restore the current clash without resetting score. Disconnect the active GM and let a second GM take authority: pending requests must be handled once.
+- End via macro; delete either participant; delete the scene. Confirm cleanup and that unrelated Sequencer effects remain.
+- Disable Sequencer or choose a nonexistent JB2A key: fail before starting with a useful setup warning. Other module features must still initialize.
+
+## Evidence sources
+
+- [Foundry V14 public API](https://foundryvtt.com/api/v14/)
+- [Foundry line-shape schema](https://foundryvtt.com/api/v14/classes/foundry.data.LineShapeData.html)
+- [PF2e native area placement](https://github.com/foundryvtt/pf2e/blob/bdea4f90b512ccaa13c7205c357e8863a451950d/src/module/item/helpers.ts)
+- [Summons Assistant public API](https://github.com/ChasarooniZ/pf2e-summons-assistant/blob/c99406b145280751898d315556252ea0d53c33db/scripts/api.js)
+- [Summons Assistant summoning pipeline](https://github.com/ChasarooniZ/pf2e-summons-assistant/blob/c99406b145280751898d315556252ea0d53c33db/scripts/summon.js)
+- [PF2e creature-building benchmarks](https://2e.aonprd.com/Rules.aspx?ID=2874)

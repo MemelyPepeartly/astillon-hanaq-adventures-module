@@ -1,0 +1,230 @@
+{
+  "_id": "BlasterThrall001",
+  "name": "Flash Mob Hype Thrall",
+  "type": "npc",
+  "img": "icons/svg/skull.svg",
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterRole": "hype-thrall"
+    }
+  },
+  "prototypeToken": {
+    "name": "Flash Mob Hype Thrall",
+    "actorLink": false,
+    "texture": {
+      "src": "icons/svg/skull.svg"
+    },
+    "width": 1,
+    "height": 1,
+    "disposition": -1,
+    "bar1": {
+      "attribute": "attributes.hp"
+    }
+  },
+  "items": [
+    {
+      "_id": "BlasterThrallAct",
+      "name": "Hype Thrall — Support Shell",
+      "type": "action",
+      "img": "icons/svg/skull.svg",
+      "system": {
+        "description": {
+          "value": "<p>This is Blaster's custom disposable support minion, not a real bard NPC or a separate level-18 encounter enemy. Level 18 is a scaling shell for the summoning integration. Award no separate XP for these thralls; they are part of Blaster's abilities.</p><p>It has no independent turns, actions, reactions, Strikes, spellcasting, or free support. This specific restriction overrides the usual two-action minion command. It is stationary unless a separate ability explicitly commands movement. Blaster's one-action Command Flash Mob chooses one live thrall within 60 feet to grant exactly one linked support benefit to Blaster; the command does not move it.</p><p>It is automatically hit by attacks and automatically fails all saving throws. Its AC and save numbers are placeholders for this thrall behavior, not level-18 defenses. It has 1 HP and no dying recovery. At 0 HP it is destroyed and no longer usable for support or the live cap; remove its token. Runtime cleanup occurs after 1 minute, not immediately at 0 HP. It retains the assistant thrall's immunities and can contribute to flanking as described by that skeleton; this grants no Strike.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [
+          {
+            "key": "AdjustDegreeOfSuccess",
+            "selector": "saving-throw",
+            "adjustment": {
+              "all": "to-failure"
+            }
+          }
+        ],
+        "slug": "blaster-hype-thrall-shell",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "defensive"
+      }
+    },
+    {
+      "_id": "BlasterStagehand",
+      "name": "Hype Thrall — Yield the Stage",
+      "type": "action",
+      "img": "icons/svg/skull.svg",
+      "system": {
+        "description": {
+          "value": "<p>A Hype Thrall cannot hold its ground. A creature can move into its space as though it were unoccupied. The space is difficult terrain, and the moving creature can automatically push the thrall into an adjacent space outside its path. Forced displacement is not an independent move or support command.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-hype-thrall-movable",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "defensive"
+      }
+    }
+  ],
+  "system": {
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "abilities": {
+      "str": {
+        "mod": 0
+      },
+      "dex": {
+        "mod": 0
+      },
+      "con": {
+        "mod": 0
+      },
+      "int": {
+        "mod": 0
+      },
+      "wis": {
+        "mod": 0
+      },
+      "cha": {
+        "mod": 0
+      }
+    },
+    "attributes": {
+      "ac": {
+        "value": 0,
+        "details": "Automatically hit by attacks."
+      },
+      "adjustment": null,
+      "allSaves": {
+        "value": "Automatically fails saving throws."
+      },
+      "hp": {
+        "value": 1,
+        "max": 1,
+        "temp": 0,
+        "details": "Destroyed at 0 HP; remove token."
+      },
+      "speed": {
+        "value": 15,
+        "otherSpeeds": [],
+        "details": "Stationary unless explicitly commanded; support commands grant no movement."
+      },
+      "immunities": [
+        {
+          "type": "bleed",
+          "exceptions": []
+        },
+        {
+          "type": "death-effects",
+          "exceptions": []
+        },
+        {
+          "type": "disease",
+          "exceptions": []
+        },
+        {
+          "type": "mental",
+          "exceptions": []
+        },
+        {
+          "type": "poison",
+          "exceptions": []
+        }
+      ],
+      "weaknesses": [],
+      "resistances": []
+    },
+    "details": {
+      "level": {
+        "value": 18
+      },
+      "languages": {
+        "value": [],
+        "details": "Understands Blaster's commands."
+      },
+      "blurb": "Disposable applause and encouragement; no independent turns.",
+      "publicNotes": "<p>A one-hit-point, bard-like support prop created by Flash Mob. This custom thrall uses a level-18 scaling shell and grants no separate encounter XP. It has no independent turns, Strikes, or spells. Its one-minute expiration marker is supplied when summoned.</p>",
+      "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall actor trait for the helper's self:trait:thrall predicate. Runtime adds summoner linkage, owner actor/token UUIDs, creation nonce, and the expiration marker without generating strikes. Do not add this token to initiative as an independent enemy.</p>",
+      "publication": {
+        "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+        "authors": "",
+        "license": "ORC",
+        "remaster": true
+      }
+    },
+    "initiative": {
+      "statistic": "perception"
+    },
+    "perception": {
+      "mod": 0,
+      "details": "",
+      "senses": [],
+      "vision": true
+    },
+    "resources": {},
+    "saves": {
+      "fortitude": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      },
+      "reflex": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      },
+      "will": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      }
+    },
+    "skills": {},
+    "traits": {
+      "rarity": "uncommon",
+      "size": {
+        "value": "med"
+      },
+      "value": [
+        "minion",
+        "summoned",
+        "thrall",
+        "undead"
+      ]
+    }
+  }
+}

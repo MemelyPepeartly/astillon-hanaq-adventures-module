@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterBlast0001",
+  "name": "Blaster — Charged Blast",
+  "type": "script",
+  "img": "icons/magic/light/beam-rays-red-small.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.blast) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.blast();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

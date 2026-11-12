@@ -13,6 +13,8 @@ const CONFIGURE_ACTION = "astillon-your-turn";
 const INK_ALPHA = 16;
 const OPAQUE_ALPHA = 250;
 const MAX_EDGE = 1024;
+const ART_LOAD_TIMEOUT_MS = 15000;
+const ART_RETRY_MS = 30000;
 
 type SliceSpec = {
   id: string;
@@ -56,6 +58,8 @@ type Subject = {
   art: string[];
   color: string;
 };
+
+type ArtDraft = { art: string; color: string };
 
 type Rgb = { r: number; g: number; b: number };
 
@@ -329,9 +333,12 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   let removeTimer: ReturnType<typeof setTimeout> | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let observedSidebar: Element | null = null;
-  let draftActor: any = null;
-  let draftForm: HTMLFormElement | null = null;
   const artCache = new Map<string, ArtResult>();
+  const pendingArt = new Map<string, Promise<ArtResult>>();
+  const failedArt = new Map<string, number>();
+  let pendingSlices: Promise<void> | undefined;
+  let pendingPreload: Promise<void> | undefined;
+  const boundEditors = new WeakSet<HTMLElement>();
   const liveBlobs = new Set<string>();
   const motions = new Map<HTMLElement, Animation[]>();
 
@@ -424,16 +431,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     };
   }
 
-  function readDraft(actor: any): { art: string; color: string } | null {
-    if (draftActor !== actor || !draftForm?.isConnected) return null;
-    return {
-      art: draftForm.querySelector<HTMLInputElement>("[name=yourTurnArt]")?.value ?? "",
-      color: draftForm.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
-    };
-  }
-
-  function subjectFromActor(actor: any): Subject {
-    const draft = readDraft(actor);
+  function subjectFromActor(actor: any, draft: ArtDraft | null = null): Subject {
     const name = trimmed(actor?.name) || game.i18n.localize("ASTILLON.YourTurn.UnknownName");
     return {
       name,
@@ -605,14 +603,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   }
 
   function sliceUrl(file: string): string {
-    const path = `modules/${moduleId}/assets/your-turn/${file}`;
-    try {
-      const base = document.baseURI;
-      if (base && /^https?:/i.test(base)) return new URL(path, base).href;
-    } catch {
-      // A module-relative path still resolves in Foundry when no http base is present.
-    }
-    return path;
+    return resolveArtUrl(`modules/${moduleId}/assets/your-turn/${file}`);
   }
 
   function paintTint(tint: HTMLElement, src: string, color: string): void {
@@ -707,7 +698,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         piece.append(strip);
       }
       stage.append(piece);
-      playLayer(root, piece, spec.enterMs, spec.exitMs, reduced);
+      piece.dataset.enterMs = String(spec.enterMs);
+      piece.dataset.exitMs = String(spec.exitMs);
     }
 
     const portrait = layer("astillon-yt-layer");
@@ -721,7 +713,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     character.append(portraitImage);
     portrait.append(character);
     stage.append(portrait);
-    playLayer(root, portrait, PORTRAIT_ENTER_MS, PORTRAIT_EXIT_MS, reduced);
+    portrait.dataset.enterMs = String(PORTRAIT_ENTER_MS);
+    portrait.dataset.exitMs = String(PORTRAIT_EXIT_MS);
 
     root.append(stage);
     applyInsets(root);
@@ -759,9 +752,21 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const image = new Image();
-      const fail = () => reject(new Error("your-turn art failed"));
-      image.onload = () => resolve(image);
-      image.onerror = fail;
+      let settled = false;
+      const finish = (error?: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        image.onload = image.onerror = null;
+        if (error) reject(error);
+        else resolve(image);
+      };
+      const timeout = setTimeout(() => finish(new Error(`Your Turn image timed out: ${src}`)), ART_LOAD_TIMEOUT_MS);
+      image.onload = () => {
+        // onload alone need not mean the browser has decoded the pixels for painting.
+        void Promise.resolve().then(() => image.decode?.()).then(() => finish(), finish);
+      };
+      image.onerror = () => finish(new Error(`Your Turn image failed: ${src}`));
       image.src = src;
     });
   }
@@ -817,10 +822,25 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     return { mode: "sticker", url: create.call(URL, blob) };
   }
 
-  async function prepareArt(src: string): Promise<ArtResult> {
-    const resolved = resolveArtUrl(src);
+  function prepareArt(src: string): Promise<ArtResult> {
     const cached = artCache.get(src);
-    if (cached) return cached;
+    if (cached) return Promise.resolve(cached);
+    const pending = pendingArt.get(src);
+    if (pending) return pending;
+    if ((failedArt.get(src) ?? 0) > Date.now()) return Promise.reject(new Error("Your Turn image retry deferred"));
+    const job = prepareUncachedArt(src).then(result => {
+      failedArt.delete(src);
+      return rememberArt(src, result);
+    }).catch(error => {
+      failedArt.set(src, Date.now() + ART_RETRY_MS);
+      throw error;
+    }).finally(() => pendingArt.delete(src));
+    pendingArt.set(src, job);
+    return job;
+  }
+
+  async function prepareUncachedArt(src: string): Promise<ArtResult> {
+    const resolved = resolveArtUrl(src);
     let image: HTMLImageElement;
     let loaded = resolved;
     try {
@@ -831,35 +851,88 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       loaded = src;
     }
     try {
-      return rememberArt(src, await rasterize(image, loaded));
+      const prepared = await rasterize(image, loaded);
+      if (prepared.url !== loaded) {
+        try { await loadImage(prepared.url); }
+        catch (error) { URL.revokeObjectURL(prepared.url); throw error; }
+      }
+      return prepared;
     } catch {
       // A portrait that cannot be outlined still has to appear.
-      return rememberArt(src, { mode: "frame", url: loaded });
+      return { mode: "frame", url: loaded };
     }
   }
 
-  async function mountArt(root: HTMLElement, art: string[], gen: number): Promise<void> {
-    for (const src of art) {
-      if (gen !== generation) return;
+  async function firstArt(art: string[]): Promise<ArtResult | null> {
+    for (const src of [...new Set([...art, "icons/svg/mystery-man.svg"])]) {
       try {
-        const prepared = await prepareArt(src);
-        if (gen !== generation || overlay !== root) return;
-        revealPortrait(root, prepared);
-        return;
+        return await prepareArt(src);
       } catch {
         // A failed custom path continues down the art chain.
       }
     }
+    return null;
   }
 
-  function present(subject: Subject): void {
+  function preloadSlices(): Promise<void> {
+    if (pendingSlices) return pendingSlices;
+    pendingSlices = Promise.allSettled(SLICES.map(spec => loadImage(sliceUrl(spec.file)))).then(results => {
+      // Allow a later attempt when the server temporarily could not serve a slice.
+      if (results.some(result => result.status === "rejected")) pendingSlices = undefined;
+    });
+    return pendingSlices;
+  }
+
+  const documents = (collection: any): any[] => Array.from(collection?.values?.() ?? collection ?? []);
+
+  async function preload(): Promise<void> {
+    if (pendingPreload) return pendingPreload;
+    pendingPreload = (async () => {
+      const chains = new Map<string, string[]>();
+      const add = (subject: Subject) => chains.set(JSON.stringify(subject.art), subject.art);
+      for (const actor of documents(game.actors)) {
+        add({ ...subjectFromActor(actor), art: artChainFrom(actor, null, actor.img, actor.prototypeToken?.texture?.src, null) });
+      }
+      for (const scene of documents(game.scenes)) for (const token of documents(scene.tokens)) {
+        add(subjectFromCombatant({ actor: token.actor, token, name: token.name }));
+      }
+      for (const combat of documents(game.combats)) for (const combatant of documents(combat.combatants)) add(subjectFromCombatant(combatant));
+      const work = [...chains.values()];
+      // Keep downloads and outline work bounded even in worlds with hundreds of NPCs.
+      const worker = async () => { while (work.length) await firstArt(work.shift()!); };
+      await Promise.all([preloadSlices(), ...Array.from({ length: Math.min(4, work.length) }, worker)]);
+    })().finally(() => { pendingPreload = undefined; });
+    return pendingPreload;
+  }
+
+  function warmActor(actor: any): void {
+    void firstArt(artChainFrom(actor, actor?.token?.baseActor, actor?.img, actor?.prototypeToken?.texture?.src, null)).catch(() => {});
+  }
+
+  function warmToken(token: any): void {
+    void firstArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art).catch(() => {});
+  }
+
+  async function present(subject: Subject): Promise<void> {
     const gen = generation + 1;
     generation = gen;
     const reduced = prefersReducedMotion();
     removeOverlay();
+    const [art] = await Promise.all([firstArt(subject.art), preloadSlices()]);
+    if (gen !== generation) return;
     const root = buildOverlay(subject, gen, reduced);
+    if (art) revealPortrait(root, art);
+    const image = root.querySelector<HTMLImageElement>(".astillon-yt-character img");
+    if (art && image?.decode) {
+      try { await image.decode(); }
+      catch { releaseOverlayBlob(root); return; }
+    }
+    if (gen !== generation) { releaseOverlayBlob(root); return; }
     document.body.append(root);
     overlay = root;
+    for (const piece of Array.from(root.querySelectorAll<HTMLElement>(".astillon-yt-layer"))) {
+      playLayer(root, piece, Number(piece.dataset.enterMs), Number(piece.dataset.exitMs), reduced);
+    }
     watchSidebar();
     removeTimer = setTimeout(() => {
       try {
@@ -869,16 +942,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         // Removal is cosmetic.
       }
     }, TURN_INTRO_MS);
-    void mountArt(root, subject.art, gen).catch(() => {
-      // Decode failures stay inside the art chain.
-    });
   }
 
-  function preview(actor: any): void {
+  async function preview(actor: any, draft: ArtDraft | null = null): Promise<void> {
     try {
-      present(subjectFromActor(actor));
-    } catch {
-      // Preview must not throw into the sheet.
+      await present(subjectFromActor(actor, draft));
+    } catch (error) {
+      reportEditorError("preview", error);
     }
   }
 
@@ -908,48 +978,71 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       if (!historyChanged(prior, current)) return;
       const combatant = combat.combatant;
       if (!combatant) return;
-      present(subjectFromCombatant(combatant));
+      void present(subjectFromCombatant(combatant)).catch(error => console.warn(`${moduleId} | Your Turn playback`, error));
     } catch {
       // A bad portrait must not break the combat hook.
     }
   }
 
   function filePickerClass(): any {
-    return foundry.applications?.apps?.FilePicker?.implementation ?? (globalThis as any).FilePicker;
+    const picker = foundry.applications?.apps?.FilePicker;
+    return picker?.implementation ?? picker ?? (globalThis as any).FilePicker;
   }
 
-  function openFilePicker(input: HTMLInputElement): void {
+  function reportEditorError(action: string, error: unknown): void {
+    console.error(`${moduleId} | Your Turn ${action}`, error);
+    const detail = error instanceof Error ? error.message : String(error);
+    ui.notifications?.error?.(`Your Turn: could not ${action}. ${detail}`);
+  }
+
+  async function openFilePicker(input: HTMLInputElement): Promise<void> {
     const Picker = filePickerClass();
-    if (!Picker) return;
     try {
+      if (typeof Picker !== "function") throw new Error("Foundry's file browser is unavailable.");
       const picker = new Picker({
         type: "image",
         current: input.value,
+        field: input,
         callback: (path: string) => {
+          if (!input.isConnected) return;
           input.value = path;
+          const EventClass = input.ownerDocument.defaultView?.Event ?? Event;
+          input.dispatchEvent(new EventClass("change", { bubbles: true }));
         },
       });
-      if (typeof picker.render === "function") picker.render({ force: true });
-      else if (typeof picker.browse === "function") void picker.browse(input.value);
-    } catch {
-      // The text field still accepts a pasted path.
+      if (typeof picker.browse === "function") await picker.browse();
+      else await picker.render({ force: true });
+    } catch (error) {
+      reportEditorError("open the file browser", error);
     }
   }
 
   async function writeFlags(actor: any, art: string, color: string): Promise<void> {
-    if (typeof actor?.setFlag !== "function" || typeof actor?.unsetFlag !== "function") return;
+    if (actor?.isOwner === false || typeof actor?.update !== "function") throw new Error("You do not have permission to edit this actor.");
     const trimmedArt = art.trim();
-    if (trimmedArt) await actor.setFlag(moduleId, ART_FLAG, trimmedArt);
-    else await actor.unsetFlag(moduleId, ART_FLAG);
     const hex = normalizeHexColor(color);
-    if (hex) await actor.setFlag(moduleId, COLOR_FLAG, hex);
-    else await actor.unsetFlag(moduleId, COLOR_FLAG);
+    if (!hex) throw new Error("Choose a valid six-digit hex color.");
+    // One document update: do not leave the art and color half-saved.
+    await actor.update({
+      [`flags.${moduleId}.${trimmedArt ? ART_FLAG : `-=${ART_FLAG}`}`]: trimmedArt || null,
+      [`flags.${moduleId}.${COLOR_FLAG}`]: hex,
+    });
+    if (trimmedArt) failedArt.delete(trimmedArt);
+    warmActor(actor);
+  }
+
+  function editorDraft(element: HTMLElement): ArtDraft {
+    const art = element.querySelector<HTMLInputElement>("[name=yourTurnArt]");
+    const color = element.querySelector<HTMLInputElement>("[name=yourTurnColor]");
+    if (!art || !color) throw new Error("The editor fields are missing; close it and open it again.");
+    return { art: art.value, color: color.value };
   }
 
   function editorContent(actor: any): string {
     const art = trimmed(flagRaw(actor, ART_FLAG));
     const color = normalizeHexColor(flagRaw(actor, COLOR_FLAG)) ?? DEFAULT_COLOR;
-    return `<form class="astillon-yt-editor" autocomplete="off">
+    // DialogV2 owns the surrounding form. Nested forms are discarded by HTML parsing.
+    return `<div class="astillon-yt-editor">
       <label class="astillon-yt-editor-label">
         <span>${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Art"))}</span>
         <span class="astillon-yt-editor-file">
@@ -962,22 +1055,23 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         <input type="color" name="yourTurnColor" value="${escapeHtml(color)}">
       </label>
       <button type="button" data-action="preview">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Preview"))}</button>
-    </form>`;
+    </div>`;
   }
 
   function bindEditor(element: HTMLElement, actor: any): void {
-    const form = element.querySelector<HTMLFormElement>("form.astillon-yt-editor");
-    if (!form) return;
-    draftActor = actor;
-    draftForm = form;
+    const form = element.querySelector<HTMLElement>(".astillon-yt-editor");
+    if (!form || boundEditors.has(form)) return;
+    boundEditors.add(form);
     form.querySelector<HTMLButtonElement>("[data-action=browse]")?.addEventListener("click", (event) => {
       event.preventDefault();
+      event.stopPropagation();
       const input = form.querySelector<HTMLInputElement>("[name=yourTurnArt]");
-      if (input) openFilePicker(input);
+      if (input) void openFilePicker(input);
     });
     form.querySelector<HTMLButtonElement>("[data-action=preview]")?.addEventListener("click", (event) => {
       event.preventDefault();
-      preview(actor);
+      event.stopPropagation();
+      void preview(actor, editorDraft(form));
     });
   }
 
@@ -1006,11 +1100,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
             icon: "fas fa-save",
             label: game.i18n.localize("ASTILLON.YourTurn.Save"),
             default: true,
-            callback: () => writeFlags(
-              actor,
-              draftForm?.querySelector<HTMLInputElement>("[name=yourTurnArt]")?.value ?? "",
-              draftForm?.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
-            ),
+            callback: async (_event: Event, button: HTMLButtonElement, dialog: any) => {
+              // Read this dialog's form, never another actor's last-opened editor.
+              const element = htmlRoot(dialog?.element) ?? button.form;
+              if (!element) throw new Error("The editor form is unavailable.");
+              const { art, color } = editorDraft(element);
+              try { await writeFlags(actor, art, color); }
+              catch (error) { reportEditorError("save the portrait and color", error); throw error; }
+            },
           },
         ],
         render: (first: any, second: any) => {
@@ -1019,8 +1116,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         },
         rejectClose: false,
       });
-    } catch {
-      // Closing the editor is not an error.
+    } catch (error) {
+      // rejectClose:false handles normal dismissal; other failures must be visible.
+      reportEditorError("open the editor", error);
     }
   }
 
@@ -1037,7 +1135,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         actor,
         wrap.querySelector<HTMLInputElement>("[name=yourTurnArt]")?.value ?? "",
         wrap.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
-      );
+      ).catch(error => reportEditorError("save the portrait and color", error));
     });
     wrap.append(save);
     document.body.append(wrap);
@@ -1119,6 +1217,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     api: {
       preview,
       cancel,
+      preload,
+      configure: openEditor,
     },
     init() {
       const localize = (key: string) => game.i18n.localize(key);
@@ -1152,9 +1252,21 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       Hooks.on("getActorSheetHeaderButtons", onActorSheetHeaderButtons);
       Hooks.on("getHeaderControlsApplicationV2", onHeaderControls);
       Hooks.on("renderApplicationV2", onRenderApplicationV2);
+      Hooks.on("createActor", warmActor);
+      Hooks.on("updateActor", warmActor);
+      Hooks.on("createToken", warmToken);
+      Hooks.on("updateToken", warmToken);
+      Hooks.on("createCombatant", (combatant: any) => { void firstArt(subjectFromCombatant(combatant).art).catch(() => {}); });
+      Hooks.on("updateCombatant", (combatant: any) => { void firstArt(subjectFromCombatant(combatant).art).catch(() => {}); });
+      Hooks.on("canvasReady", () => { void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error)); });
+      Hooks.on("canvasTearDown", cancel);
 
       const view = document.defaultView;
       view?.addEventListener("resize", refreshInsets);
+    },
+    ready() {
+      // Runs on every client, including those that enable cut-ins later. No world writes.
+      void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error));
     },
   };
 }

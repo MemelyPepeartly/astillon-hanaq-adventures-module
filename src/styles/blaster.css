@@ -1,0 +1,2 @@
+.aha-blast-preview { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 90; pointer-events: none; }
+.aha-blast-instructions { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 100; max-width: 75vw; padding: 12px 18px; border: 1px solid #ffcc55; border-radius: 8px; background: #201529ed; color: #fff3d2; font: 600 14px/1.4 sans-serif; box-shadow: 0 4px 20px #0009; pointer-events: none; text-align: center; }

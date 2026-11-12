@@ -79,11 +79,14 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const imageControl = {
       auto: true,
       pending: [],
+      requested: [],
+      decoded: [],
       tainted: new Set(),
       pixels: new Map(),
       sizes: new Map(),
     };
     const filePickers = [];
+    const errors = [];
     const calls = { nextTurn: 0, update: 0 };
 
     const emit = (name, ...args) => {
@@ -141,6 +144,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
       set src(value) {
         this._src = String(value);
+        imageControl.requested.push(this._src);
         this.tainted = imageControl.tainted.has(this._src);
         this.pixels = imageControl.pixels.get(this._src) ?? null;
         const size = imageControl.sizes.get(this._src);
@@ -154,12 +158,17 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
           if (this._src.startsWith("fail:")) this.onerror?.(new dom.window.Event("error"));
           else this.onload?.(new dom.window.Event("load"));
         };
+        run.src = this._src;
         if (imageControl.auto) queueMicrotask(run);
         else imageControl.pending.push(run);
       }
 
       get src() {
         return this._src;
+      }
+
+      async decode() {
+        imageControl.decoded.push(this._src);
       }
     }
 
@@ -268,6 +277,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const viewedCombat = { id: "combat-viewed" };
     const game = {
       user: { id: userId, isGM: false },
+      actors: [], scenes: [], combats: [],
       i18n: {
         localize: (key) => ({
           "ASTILLON.YourTurn.UnknownName": "Someone",
@@ -299,7 +309,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         filePickers.push(this);
       }
 
-      render() {
+      async browse() {
+        this.browsed = true;
         this.options.callback?.("icons/picked.webp");
       }
     }
@@ -312,20 +323,32 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
             wait(config) {
               const wrap = dom.window.document.createElement("div");
               wrap.className = "astillon-yt-dialog";
-              wrap.innerHTML = config.content;
+              // Foundry DialogV2 already owns a form. Native HTML parsing drops nested forms.
+              wrap.innerHTML = `<form class="dialog-form"><div class="dialog-content">${config.content}</div><footer></footer></form>`;
               dom.window.document.body.append(wrap);
-              config.render?.(new dom.window.Event("render"), { element: wrap });
+              const dialog = { element: wrap };
+              let resolve;
+              const closed = new Promise(done => { resolve = done; });
+              config.render?.(new dom.window.Event("render"), dialog);
               for (const button of config.buttons ?? []) {
                 const element = dom.window.document.createElement("button");
                 element.type = "button";
                 element.dataset.action = button.action;
                 element.textContent = button.label;
-                element.addEventListener("click", () => {
-                  void button.callback?.(new dom.window.Event("click"), element);
+                element.addEventListener("click", async (event) => {
+                  event.preventDefault();
+                  try {
+                    const result = await button.callback?.(event, element, dialog);
+                    wrap.remove(); resolve(result);
+                  } catch (error) { errors.push(error.message); }
                 });
-                wrap.append(element);
+                wrap.querySelector("footer").append(element);
               }
-              return new Promise(() => {});
+              wrap.addEventListener("click", event => {
+                const action = event.target.closest("[data-action]")?.dataset.action;
+                if (action && !config.buttons.some(b => b.action === action)) errors.push(`Unhandled dialog action: ${action}`);
+              });
+              return closed;
             },
           },
         },
@@ -348,6 +371,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       Hooks,
       game,
       ui: {
+        notifications: { error: message => errors.push(message) },
         sidebar: { element: sidebar, expanded: true },
         combat: {
           viewed: viewedCombat,
@@ -385,8 +409,11 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const feature = createYourTurnFeature(MODULE);
     feature.init();
 
-    t.after(() => {
+    t.after(async () => {
       feature.api.cancel();
+      imageControl.auto = true;
+      for (const finish of imageControl.pending.splice(0)) finish();
+      await flush();
       for (const id of timerIds) realClearTimeout(id);
       dom.window.close();
       for (const [name, descriptor] of originals) {
@@ -430,9 +457,14 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
           delete flags[key];
           this.unsetCalls.push(key);
         },
-        async update() {
+        async update(changes) {
           this.updated = true;
           calls.update += 1;
+          for (const [key, value] of Object.entries(changes)) {
+            const flagKey = key.replace(`flags.${MODULE}.`, "");
+            if (flagKey.startsWith("-=")) { delete flags[flagKey.slice(2)]; this.unsetCalls.push(flagKey.slice(2)); }
+            else flags[flagKey] = value;
+          }
         },
       };
     }
@@ -481,8 +513,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       return instance;
     }
 
-    function turnChange(combatInstance, prior, current) {
+    async function turnChange(combatInstance, prior, current) {
       emit("combatTurnChange", combatInstance, prior, current);
+      await flush();
     }
 
     function overlays() {
@@ -502,6 +535,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       resizeObservers,
       filePickers,
       calls,
+      game,
+      errors,
       makeActor,
       combatant,
       combat,
@@ -514,9 +549,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     };
   }
 
-  test("setting off shows nothing", (t) => {
+  test("setting off shows nothing", async (t) => {
     const env = setup(t, { enabled: false });
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -528,7 +563,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const env = setup(t, {
       route: (path) => `/join/${String(path).replace(/^\//, "")}`,
     });
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ actorImg: "icons/routed.webp", tokenTexture: "" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -543,7 +578,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
   test("preview while disabled does not advance combat or write flags", async (t) => {
     const env = setup(t, { enabled: false });
     const actor = env.makeActor({ name: "Hero", img: "icons/hero.webp" });
-    env.feature.api.preview(actor);
+    await env.feature.api.preview(actor);
     await flush();
     const [root] = env.overlays();
     assert.ok(root);
@@ -556,10 +591,10 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.calls.update, 0);
   });
 
-  test("combat guards ignore other combats, repeats, and missing combatants", (t) => {
+  test("combat guards ignore other combats, repeats, and missing combatants", async (t) => {
     const env = setup(t);
     const other = env.combat({ id: "other-combat", viewed: false });
-    env.turnChange(
+    await env.turnChange(
       other,
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -567,10 +602,10 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays().length, 0);
 
     const history = { combatantId: "c1", round: 1, turn: 1 };
-    env.turnChange(env.combat(), history, { ...history });
+    await env.turnChange(env.combat(), history, { ...history });
     assert.equal(env.overlays().length, 0);
 
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: "c1", round: 1, turn: 0 },
       { combatantId: null, round: 1, turn: 1 },
@@ -579,14 +614,14 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
     const viewed = env.combat();
     viewed.combatant = null;
-    env.turnChange(
+    await env.turnChange(
       viewed,
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
     );
     assert.equal(env.overlays().length, 0);
 
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: "c1", round: 1, turn: 2 },
       { combatantId: "c1", round: 2, turn: 0 },
@@ -602,7 +637,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       actorImg: "icons/rival.webp",
       tokenTexture: "icons/token.webp",
     });
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: foe }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -615,12 +650,12 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("rapid turn leaves one overlay for the latest combatant", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "First", id: "c1", actorImg: "icons/first.webp" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
     );
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Second", id: "c2", actorImg: "icons/second.webp" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c2", round: 1, turn: 2 },
@@ -634,26 +669,22 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
   test("a late image from the previous turn is ignored", async (t) => {
     const env = setup(t);
     env.imageControl.auto = false;
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "First", actorImg: "icons/first.webp" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
     );
-    const first = env.overlays()[0];
-    assert.equal(first.querySelector(".astillon-yt-character.has-art"), null);
-    assert.ok(first.querySelector("[data-layer='banner']"));
-    env.turnChange(
+    assert.equal(env.overlays().length, 0, "do not start an empty flash-in while art loads");
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Second", id: "c2", actorImg: "icons/second.webp" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c2", round: 1, turn: 2 },
     );
-    assert.equal(env.overlays().length, 1);
-    assert.equal(first.isConnected, false);
-    env.imageControl.pending[0]();
+    assert.equal(env.overlays().length, 0);
+    for (const finish of env.imageControl.pending.filter(fn => fn.src !== "icons/second.webp")) finish();
     await flush();
-    assert.equal(first.querySelector(".astillon-yt-character.has-art"), null);
-    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character.has-art"), null);
-    env.imageControl.pending[1]();
+    assert.equal(env.overlays().length, 0, "the old portrait must never flash in late");
+    env.imageControl.pending.find(fn => fn.src === "icons/second.webp")();
     await flush();
     assert.equal(env.overlays().length, 1);
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-name").textContent, "Second");
@@ -662,7 +693,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("the demo slices carry the name and YOUR TURN on the demo timeline", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Aster" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -722,7 +753,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.ok(Math.abs(frames[4].offset - 2240 / TURN_INTRO_MS) < 0.0001);
 
     env.feature.api.cancel();
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: " ", actorName: " ", actorImg: " ", tokenTexture: " " }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c1", round: 1, turn: 2 },
@@ -730,7 +761,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     const unknown = env.overlays()[0];
     assert.equal(unknown.querySelector(".astillon-yt-name").textContent, "Someone");
-    assert.equal(unknown.querySelector(".astillon-yt-character.has-art"), null);
+    assert.equal(unknown.querySelector(".astillon-yt-character.has-art img").getAttribute("src"), "icons/svg/mystery-man.svg");
     assert.ok(unknown.querySelector("[data-layer='streaks']"));
     assert.ok(unknown.querySelector("[data-layer='theme']"));
     assert.ok(unknown.querySelector("[data-layer='banner']"));
@@ -738,7 +769,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("flag art wins, a blank flag uses actor.img, and a blank actor image uses the token", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat({
         combatant: env.combatant({
           art: "icons/flag.webp",
@@ -752,7 +783,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/flag.webp");
 
-    env.turnChange(
+    await env.turnChange(
       env.combat({
         combatant: env.combatant({
           id: "c2",
@@ -768,7 +799,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/base.webp");
 
-    env.turnChange(
+    await env.turnChange(
       env.combat({
         combatant: env.combatant({
           id: "c3",
@@ -783,7 +814,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/actor-only.webp");
 
-    env.turnChange(
+    await env.turnChange(
       env.combat({
         combatant: env.combatant({
           id: "c4",
@@ -798,7 +829,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/token-only.webp");
 
-    env.turnChange(
+    await env.turnChange(
       env.combat({
         combatant: env.combatant({
           id: "c5",
@@ -817,7 +848,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("default color is #2B8CFF and invalid hex falls back to it", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ color: "blue" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -832,7 +863,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(root.style.getPropertyValue("--yt-scale"), "1");
     assert.equal(root.querySelector("[data-layer='theme'] .astillon-yt-tint").dataset.tintColor, "#2B8CFF");
 
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ id: "c2", color: "#ff00aa" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c2", round: 1, turn: 2 },
@@ -845,9 +876,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays()[0].querySelector("[data-layer='label'] .astillon-yt-tint").dataset.tintColor, turnHighlight("#FF00AA"));
   });
 
-  test("overlay is on the body, ignores the pointer, and does not dismiss on click", (t) => {
+  test("overlay is on the body, ignores the pointer, and does not dismiss on click", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -875,9 +906,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays().length, 0);
   });
 
-  test("insets come from the sidebar, hotbar, and the side bars", (t) => {
+  test("insets come from the sidebar, hotbar, and the side bars", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -890,9 +921,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.dom.window.document.querySelector("#board"), null);
   });
 
-  test("collapse and resize leave the playing cut-in where it was measured", (t) => {
+  test("collapse and resize leave the playing cut-in where it was measured", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -936,7 +967,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     env.setSidebarLeft(2000);
     env.dom.window.innerWidth = 2400;
     env.dom.window.innerHeight = 1700;
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Wide", id: "c2" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c2", round: 1, turn: 2 },
@@ -948,7 +979,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(Number.parseInt(next.style.top, 10) + Number.parseInt(next.style.height, 10), 1500);
   });
 
-  test("full-size ui regions do not lift the cut-in off the top of the page", (t) => {
+  test("full-size ui regions do not lift the cut-in off the top of the page", async (t) => {
     const env = setup(t);
     env.uiTop.getBoundingClientRect = () => rect(0, 0, 1400, 900);
     env.hotbar.getBoundingClientRect = () => rect(0, 0, 1400, 900);
@@ -960,7 +991,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     macroBar.id = "hotbar";
     macroBar.getBoundingClientRect = () => rect(220, 820, 700, 64);
     env.dom.window.document.body.append(macroBar);
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -999,7 +1030,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("opaque art uses the angular frame and the raw image", async (t) => {
     const env = setup(t);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ actorImg: "icons/opaque.webp" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -1019,7 +1050,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     env.imageControl.tainted.add("icons/tainted.webp");
     let threw = false;
     try {
-      env.turnChange(
+      await env.turnChange(
         env.combat({ combatant: env.combatant({ actorImg: "icons/tainted.webp" }) }),
         { combatantId: null, round: 1, turn: 0 },
         { combatantId: "c1", round: 1, turn: 1 },
@@ -1041,7 +1072,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     pixels[(12 * size + 12) * 4 + 3] = 255;
     env.imageControl.pixels.set("icons/sticker.webp", pixels);
     env.imageControl.sizes.set("icons/sticker.webp", size);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ actorImg: "icons/sticker.webp" }) }),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -1053,9 +1084,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(character.querySelector("img").getAttribute("src").startsWith("blob:"), true);
   });
 
-  test("reduced motion uses the demo fade across the same 2.6 seconds", (t) => {
+  test("reduced motion uses the demo fade across the same 2.6 seconds", async (t) => {
     const env = setup(t, { reduced: true, hold: 1.45 });
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -1071,9 +1102,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
   });
 
-  test("playback stays on the demo's 2.6 second timeline", (t) => {
+  test("playback stays on the demo's 2.6 second timeline", async (t) => {
     const env = setup(t, { hold: 1.45 });
-    env.turnChange(
+    await env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
@@ -1091,7 +1122,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.ok(Math.abs(normal[4].offset - 2050 / TURN_INTRO_MS) < 0.0001);
 
     env.settings.set("yourTurnHold", 2);
-    env.turnChange(
+    await env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Later", id: "c2" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
       { combatantId: "c2", round: 1, turn: 2 },
@@ -1126,6 +1157,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     header.querySelector("button").click();
     const dialog = env.dom.window.document.querySelector(".astillon-yt-dialog");
     assert.ok(dialog);
+    assert.equal(dialog.querySelectorAll("form").length, 1, "Foundry owns the only form");
     const art = dialog.querySelector("[name=yourTurnArt]");
     const color = dialog.querySelector("[name=yourTurnColor]");
     assert.equal(art.value, "icons/stored.webp");
@@ -1135,6 +1167,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(art.value, "icons/picked.webp");
     assert.equal(env.filePickers.length, 1);
     assert.equal(env.filePickers[0].options.type, "image");
+    assert.equal(env.filePickers[0].options.field, art);
+    assert.equal(env.filePickers[0].browsed, true);
     art.value = "icons/draft.webp";
     color.value = "#112233";
     dialog.querySelector("[data-action=preview]").click();
@@ -1150,15 +1184,140 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     assert.equal(actor.flags.yourTurnArt, "icons/draft.webp");
     assert.equal(actor.flags.yourTurnColor, "#112233");
+    assert.equal(dialog.isConnected, false);
+    assert.equal(env.calls.update, 1, "portrait and color save in one document update");
 
-    art.value = "   ";
-    dialog.querySelector("[data-action=save]").click();
+    header.querySelector("button").click();
+    const reopened = env.dom.window.document.querySelector(".astillon-yt-dialog");
+    assert.equal(reopened.querySelector("[name=yourTurnArt]").value, "icons/draft.webp");
+    assert.equal(reopened.querySelector("[name=yourTurnColor]").value, "#112233");
+    reopened.querySelector("[name=yourTurnArt]").value = "   ";
+    reopened.querySelector("[data-action=save]").click();
     await flush();
     assert.ok(actor.unsetCalls.includes("yourTurnArt"));
     assert.equal(actor.flags.yourTurnArt, undefined);
+    assert.deepEqual(env.errors, [], "Browse and Preview must not fall through to DialogV2 submit actions");
   });
 
-  test("init registers exactly three settings with foundry.data.fields and no portrait setting", (t) => {
+  test("startup preloads world actors, synthetic tokens, base-actor art, combatants and all slices even while disabled", async t => {
+    const env = setup(t, { enabled: false });
+    const hero = env.makeActor({ art: "icons/hero-custom.webp" });
+    const linked = env.makeActor({ img: "icons/fallback.webp" });
+    const synthetic = env.makeActor({ art: "icons/token-custom.webp" });
+    env.game.actors.push(hero, linked);
+    env.game.scenes.push({ tokens: [
+      { actor: synthetic, texture: { src: "icons/token.webp" } },
+      { actor: env.makeActor({ img: "icons/base-fallback.webp" }), baseActor: env.makeActor({ art: "icons/base-custom.webp" }) },
+    ] });
+    env.game.combats.push({ combatants: [env.combatant({ art: "icons/combat-custom.webp" })] });
+    env.feature.ready(); await env.feature.api.preload();
+    for (const src of ["icons/hero-custom.webp", "icons/fallback.webp", "icons/token-custom.webp", "icons/base-custom.webp", "icons/combat-custom.webp"]) {
+      assert.ok(env.imageControl.decoded.includes(src), src);
+    }
+    assert.equal(env.imageControl.requested.filter(src => src.includes("assets/your-turn/")).length, 7);
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.calls.update, 0);
+    const before = env.imageControl.requested.length;
+    await env.feature.api.preview(hero);
+    assert.equal(env.imageControl.requested.length, before, "first playback uses prepared resources");
+    assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
+  });
+
+  test("startup bounds portrait work and a concurrent preview shares its image request", async t => {
+    const env = setup(t);
+    env.imageControl.auto = false;
+    env.game.actors.push(...Array.from({ length: 7 }, (_, i) => env.makeActor({ art: `icons/warm-${i}.webp` })));
+    const warming = env.feature.api.preload();
+    const showing = env.feature.api.preview(env.game.actors[0]);
+    assert.equal(env.imageControl.requested.filter(src => src.startsWith("icons/warm-")).length, 4);
+    assert.equal(env.imageControl.requested.filter(src => src === "icons/warm-0.webp").length, 1);
+    assert.equal(env.overlays().length, 0);
+    assert.ok(!env.scheduled.includes(TURN_INTRO_MS), "animation has not consumed any time while loading");
+    env.imageControl.auto = true;
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await Promise.all([warming, showing]);
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.imageControl.requested.filter(src => src.startsWith("icons/warm-")).length, 7);
+    assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
+  });
+
+  test("actor and token updates warm new art and failed custom images use a cached fallback", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ art: "fail:missing.webp", img: "icons/good.webp" });
+    env.game.actors.push(actor);
+    await env.feature.api.preload();
+    await env.feature.api.preview(actor);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/good.webp");
+    assert.equal(env.imageControl.requested.filter(src => src === "fail:missing.webp").length, 1);
+    actor.flags.yourTurnArt = "icons/replacement.webp";
+    env.emit("updateActor", actor, { flags: { [MODULE]: { yourTurnArt: actor.flags.yourTurnArt } } });
+    env.emit("createToken", { actor: env.makeActor({ art: "icons/new-token.webp" }) });
+    await flush();
+    assert.ok(env.imageControl.decoded.includes("icons/replacement.webp"));
+    assert.ok(env.imageControl.decoded.includes("icons/new-token.webp"));
+  });
+
+  test("cancel and scene teardown suppress a pending first playback", async t => {
+    const env = setup(t);
+    env.imageControl.auto = false;
+    const showing = env.feature.api.preview(env.makeActor({ img: "icons/late.webp" }));
+    env.emit("canvasTearDown");
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await showing;
+    assert.equal(env.overlays().length, 0);
+    assert.ok(!env.scheduled.includes(TURN_INTRO_MS));
+  });
+
+  test("two simultaneous editors preview and save their own actor and fields", async t => {
+    const env = setup(t, { enabled: false });
+    const first = env.makeActor({ name: "First", art: "icons/first.webp" });
+    const second = env.makeActor({ name: "Second", art: "icons/second.webp" });
+    void env.feature.api.configure(first); void env.feature.api.configure(second);
+    const [a, b] = env.dom.window.document.querySelectorAll(".astillon-yt-dialog");
+    a.querySelector("[name=yourTurnArt]").value = "icons/first-draft.webp";
+    a.querySelector("[name=yourTurnColor]").value = "#123456";
+    b.querySelector("[name=yourTurnColor]").value = "#abcdef";
+    a.querySelector("[data-action=preview]").click(); await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-name").textContent, "First");
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/first-draft.webp");
+    assert.equal(env.calls.update, 0);
+    a.querySelector("[data-action=save]").click(); await flush();
+    b.querySelector("[data-action=save]").click(); await flush();
+    assert.equal(first.flags.yourTurnArt, "icons/first-draft.webp");
+    assert.equal(first.flags.yourTurnColor, "#123456");
+    assert.equal(second.flags.yourTurnArt, "icons/second.webp");
+    assert.equal(second.flags.yourTurnColor, "#ABCDEF");
+    assert.deepEqual(env.errors, []);
+  });
+
+  test("save failures are visible and cannot silently clear the stored artwork", async t => {
+    const env = setup(t);
+    t.mock.method(console, "error", () => {});
+    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456" });
+    actor.update = async () => { throw new Error("Permission denied"); };
+    void env.feature.api.configure(actor);
+    const dialog = env.dom.window.document.querySelector(".astillon-yt-dialog");
+    dialog.querySelector("[name=yourTurnArt]").value = "icons/new.webp";
+    dialog.querySelector("[data-action=save]").click(); await flush();
+    assert.equal(actor.flags.yourTurnArt, "icons/saved.webp");
+    assert.equal(actor.flags.yourTurnColor, "#123456");
+    assert.ok(env.errors.some(message => /could not save.*Permission denied/.test(message)));
+    assert.equal(dialog.isConnected, true);
+  });
+
+  test("file browser errors are reported and the typed path remains usable", async t => {
+    const env = setup(t);
+    t.mock.method(console, "error", () => {});
+    const Picker = foundry.applications.apps.FilePicker.implementation;
+    t.mock.method(Picker.prototype, "browse", async () => { throw new Error("Storage unavailable"); });
+    void env.feature.api.configure(env.makeActor({ art: "icons/original.webp" }));
+    const dialog = env.dom.window.document.querySelector(".astillon-yt-dialog");
+    dialog.querySelector("[data-action=browse]").click(); await flush();
+    assert.ok(env.errors.some(message => /file browser.*Storage unavailable/.test(message)));
+    assert.equal(dialog.querySelector("[name=yourTurnArt]").value, "icons/original.webp");
+  });
+
+  test("init registers exactly three settings with foundry.data.fields and no portrait setting", async (t) => {
     withFoundryNamespace(
       t,
       {
@@ -1203,7 +1362,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     );
   });
 
-  test("init still registers when foundry.fields provides legacy field types", (t) => {
+  test("init still registers when foundry.fields provides legacy field types", async (t) => {
     withFoundryNamespace(
       t,
       {
@@ -1224,7 +1383,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     );
   });
 
-  test("a non-editable sheet gets no your-turn control", (t) => {
+  test("a non-editable sheet gets no your-turn control", async (t) => {
     const env = setup(t);
     const actor = env.makeActor({ name: "Locked" });
     actor.isEditable = false;

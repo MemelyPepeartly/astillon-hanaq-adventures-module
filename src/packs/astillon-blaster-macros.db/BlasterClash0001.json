@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterClash0001",
+  "name": "Beam Clash — Start",
+  "type": "script",
+  "img": "icons/svg/lightning.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.beamClash;\nif (!feature?.start) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.start();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

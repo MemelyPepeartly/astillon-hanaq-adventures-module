@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterUnroot001",
+  "name": "Blaster — Release Blast Root",
+  "type": "script",
+  "img": "icons/svg/wing.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.releaseRoot) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.releaseRoot();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

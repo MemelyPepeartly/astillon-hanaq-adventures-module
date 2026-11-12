@@ -1,0 +1,532 @@
+{
+  "_id": "BlasterActor0001",
+  "name": "Blaster",
+  "type": "npc",
+  "img": "icons/svg/lightning.svg",
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterRole": "blaster"
+    }
+  },
+  "prototypeToken": {
+    "name": "Blaster",
+    "actorLink": false,
+    "texture": {
+      "src": "icons/svg/lightning.svg"
+    },
+    "width": 1,
+    "height": 1,
+    "disposition": -1,
+    "bar1": {
+      "attribute": "attributes.hp"
+    }
+  },
+  "items": [
+    {
+      "_id": "BlasterSpectrum1",
+      "name": "Curated Spectrum",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p>When Blaster uses Charged Blast, choose one spectrum for the entire blast as part of that activity, at no additional action cost.</p><ul><li><strong>Raw spectrum:</strong> fire, cold, electricity, or sonic; deal the listed 4d6 / 9d6 / 18d6 damage of the chosen type with a DC 40 basic Reflex save.</li><li><strong>Dazzling light:</strong> fire damage reduced by 2 dice, for 2d6 / 7d6 / 16d6, with a DC 40 basic Reflex save. A creature that fails or critically fails is also dazzled for 1 round; a success or critical success causes no dazzled condition. The blast gains the light trait.</li><li><strong>Psychic humiliation:</strong> mental damage reduced by 2 dice, for 2d6 / 7d6 / 16d6, with a DC 40 basic Will save. A creature that fails or critically fails is also stupefied 1 for 1 round; a success or critical success causes no stupefied condition. The blast gains the mental trait.</li></ul><p>The chosen damage type supplies its trait; do not treat one blast as every damage type at once. Apply immunities, weaknesses, and resistances normally. Apply each rider once, with its duration ending at the start of Blaster's next turn. The rider never replaces the basic save's damage adjustment. The GM applies HP changes and riders manually from the runtime's chat card.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-curated-spectrum",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "offensive"
+      }
+    },
+    {
+      "_id": "BlasterBlastAct1",
+      "name": "Charged Blast (1 Action)",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round, shared across all three Charged Blast variants. All variants have the flourish trait. Using any variant spends the one shared use; changing action cost or spectrum, gaining extra actions, or acting on another turn does not grant another blast that round.</p><p>Choose exactly five clicked waypoints, including a first point inside Blaster's occupied square. Connect them in order to make four segments. The sum of all four segment lengths cannot exceed the listed path length; it is not that length per segment. Use the listed width throughout the path. Blaster is excluded from his own blast. All four segments form one area of effect: each creature other than Blaster attempts one save and takes damage at most once, even where segments cross or overlap. Select one Curated Spectrum for the entire blast and roll damage once; no multiple-attack penalty applies to these saving throws. Ordinary line-of-effect and wall restrictions still apply.</p><p><strong>Cost</strong> 1 action; <strong>Path</strong> 60 feet total; <strong>Width</strong> 1 square (5 feet on a 5-foot grid); <strong>Damage</strong> 4d6 raw, or 2d6 with dazzling light or psychic humiliation.</p><p><strong>Save</strong> @Check[reflex|dc:40|basic] for raw spectrum or dazzling light; @Check[will|dc:40|basic] for psychic humiliation. Use only the save matching the selected spectrum. Damage types and riders are defined in Curated Spectrum.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Charged Blast} opens the shared blast tool; choose this action cost there. @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast} removes the displayed path only, without resetting shared use, recharge, or root. The runtime displays four native Regions and save/damage links; the GM applies HP changes and condition riders manually. Without runtime, draw four connected segments and resolve the single area manually.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-charged-blast-1",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate",
+            "flourish",
+            "magical"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "actions": {
+          "value": 1
+        },
+        "category": "offensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterBlastAct2",
+      "name": "Charged Blast (2 Actions)",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round, shared across all three Charged Blast variants. All variants have the flourish trait. Using any variant spends the one shared use; changing action cost or spectrum, gaining extra actions, or acting on another turn does not grant another blast that round.</p><p>Choose exactly five clicked waypoints, including a first point inside Blaster's occupied square. Connect them in order to make four segments. The sum of all four segment lengths cannot exceed the listed path length; it is not that length per segment. Use the listed width throughout the path. Blaster is excluded from his own blast. All four segments form one area of effect: each creature other than Blaster attempts one save and takes damage at most once, even where segments cross or overlap. Select one Curated Spectrum for the entire blast and roll damage once; no multiple-attack penalty applies to these saving throws. Ordinary line-of-effect and wall restrictions still apply.</p><p><strong>Cost</strong> 2 actions; <strong>Path</strong> 90 feet total; <strong>Width</strong> 1 square (5 feet on a 5-foot grid); <strong>Damage</strong> 9d6 raw, or 7d6 with dazzling light or psychic humiliation.</p><p><strong>Save</strong> @Check[reflex|dc:40|basic] for raw spectrum or dazzling light; @Check[will|dc:40|basic] for psychic humiliation. Use only the save matching the selected spectrum. Damage types and riders are defined in Curated Spectrum.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Charged Blast} opens the shared blast tool; choose this action cost there. @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast} removes the displayed path only, without resetting shared use, recharge, or root. The runtime displays four native Regions and save/damage links; the GM applies HP changes and condition riders manually. Without runtime, draw four connected segments and resolve the single area manually.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-charged-blast-2",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate",
+            "flourish",
+            "magical"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "actions": {
+          "value": 2
+        },
+        "category": "offensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterBlastAct3",
+      "name": "Charged Blast (3 Actions)",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round, shared across all three Charged Blast variants. All variants have the flourish trait. Using any variant spends the one shared use; changing action cost or spectrum, gaining extra actions, or acting on another turn does not grant another blast that round.</p><p>Choose exactly five clicked waypoints, including a first point inside Blaster's occupied square. Connect them in order to make four segments. The sum of all four segment lengths cannot exceed the listed path length; it is not that length per segment. Use the listed width throughout the path. Blaster is excluded from his own blast. All four segments form one area of effect: each creature other than Blaster attempts one save and takes damage at most once, even where segments cross or overlap. Select one Curated Spectrum for the entire blast and roll damage once; no multiple-attack penalty applies to these saving throws. Ordinary line-of-effect and wall restrictions still apply.</p><p><strong>Cost</strong> 3 actions; <strong>Path</strong> 120 feet total; <strong>Width</strong> 3 squares (15 feet on a 5-foot grid); <strong>Damage</strong> 18d6 raw, or 16d6 with dazzling light or psychic humiliation.</p><p><strong>Save</strong> @Check[reflex|dc:40|basic] for raw spectrum or dazzling light; @Check[will|dc:40|basic] for psychic humiliation. Use only the save matching the selected spectrum. Damage types and riders are defined in Curated Spectrum.</p><p><strong>Full-charge cost</strong> After releasing this three-action blast, Blaster cannot voluntarily move until the start of his next turn; forced movement remains possible. Roll [[/r 1d4]] for the three-action mode's recharge: wait that many full intervening rounds. The mode becomes ready in the firing round plus the roll plus 1 (for example, a roll of 1 in round 4 means ready in round 6). Only the three-action mode is unavailable during recharge; the other modes remain usable on later rounds, still sharing the one-blast-per-round limit.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterUnroot001]{Release Root} is the manual release control when the root ends, or when the GM permits movement. Releasing the root does not restore a blast use or bypass recharge.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Charged Blast} opens the shared blast tool; choose this action cost there. @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast} removes the displayed path only, without resetting shared use, recharge, or root. The runtime displays four native Regions and save/damage links; the GM applies HP changes and condition riders manually. Without runtime, draw four connected segments and resolve the single area manually.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-charged-blast-3",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate",
+            "flourish",
+            "magical"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "actions": {
+          "value": 3
+        },
+        "category": "offensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterFlashAct1",
+      "name": "Flash Mob",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round. <strong>Limit</strong> At most 3 live Flash Mob Hype Thralls belonging to this Blaster.</p><p>Blaster spends 1 action to create exactly one @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-actors.Actor.BlasterThrall001]{Flash Mob Hype Thrall} in an unoccupied space within 30 feet and line of effect. It lasts 1 minute and has 1 HP. At 0 HP it is destroyed and no longer usable for support or the live cap; remove its token. Runtime cleans up marked tokens at expiration, rather than immediately at 0 HP. At the cap, no fourth thrall is created. Summoning grants no free support command, attack, or independent turn.</p><p>The thrall is stationary unless a separate ability explicitly commands movement; Command Flash Mob grants support only. Blaster must spend another action on Command Flash Mob to gain one benefit from one live thrall within 60 feet.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterFlash0001]{Flash Mob}. Without runtime, pay the action, place one unlinked token, record its owner and summon time, apply @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterExpiry001]{Thrall Expiration} to the thrall only, and enforce the once-per-round limit, live cap, and expiration manually.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-flash-mob",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate",
+            "magical",
+            "thrall"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "actions": {
+          "value": 1
+        },
+        "category": "offensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterCommand01",
+      "name": "Command Flash Mob",
+      "type": "action",
+      "img": "icons/svg/sound.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round.</p><p><strong>Requirements</strong> Blaster has one live Flash Mob Hype Thrall within 60 feet.</p><p>Blaster spends 1 action and chooses one such thrall and one benefit for Blaster only: @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01]{Inspire} (+1 status to attack rolls, damage rolls, and saves against fear), @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterGuard0001]{Guard} (+1 status to AC), or @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster} (10 temporary HP once, never added to existing temporary HP). Each benefit lasts until the start of Blaster's next turn, or until spent for temporary HP.</p><p>The selected thrall provides only that benefit; it receives no turn, movement, Strike, spell, or extra actions. This command is available once per round, separately from Flash Mob summoning; paying extra actions does not allow another command that round. Status bonuses of the same type do not stack; temporary HP never stack. The thrall does not need to spend an action of its own.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMobCmd001]{Command Flash Mob}. Without the command runtime, pay the action, check the live thrall and 60-foot range, and drag exactly one linked effect onto Blaster during his turn. Remove the previous copy before reapplying that effect. Track expiry manually if encounter time is not advancing.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-command-flash-mob",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "action"
+        },
+        "actions": {
+          "value": 1
+        },
+        "category": "interaction",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterClashAct1",
+      "name": "Beam Clash",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> Once per round. <strong>Trigger</strong> A visible foe targets Blaster with a line or beam effect, before that effect resolves.</p><p>Blaster spends his reaction. Suspend the triggering resolution and start the clash at 0. Blaster is <strong>red</strong>; the triggering foe is <strong>blue</strong>. Each pair, both sides roll an unmodified d20. The higher die moves the track one point toward that side: +1 for red or -1 for blue. Ties move it 0 points. Repeat until +3 or -3; natural 1 and 20 have no special effect.</p><p>At <strong>+3, red wins:</strong> negate the triggering effect against Blaster only. At <strong>-3, blue wins:</strong> resolve the triggering effect against Blaster normally, including its ordinary attack roll or saving throw. All other targets resolve normally regardless of the winner.</p><p>The clash deals no extra damage, reflects no damage, grants no Charged Blast, movement, actions, or extra reactions, and refunds no resources. These d20s are not attack rolls or saving throws; no modifiers, multiple-attack penalty, bonuses, fortune, or misfortune apply. This is a homebrew contest, not a counteract check.</p><p>@UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClash0001]{Start Beam Clash}. @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterStop00001]{End Beam Clash} cancels without declaring a winner; the triggering effect remains for GM adjudication. Ending the UI does not undo the spent reaction or once-per-round use. Without runtime, the GM pauses resolution and tracks the opposed rolls manually.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-beam-clash",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "magical"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "reaction"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "defensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterRange0001",
+      "name": "Crystal Flechette",
+      "type": "melee",
+      "img": "icons/svg/sword.svg",
+      "system": {
+        "description": {
+          "value": "<p>A normal one-action ranged projectile Strike with a 60-foot range increment. On a hit, it deals 3d10+17 piercing damage. It uses the normal multiple-attack penalty and critical-hit rules. This physical projectile is not a blast and does not use Curated Spectrum, waypoints, or its condition riders. It neither spends nor refreshes the shared Charged Blast use or three-action recharge.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "slug": "blaster-crystal-flechette",
+        "rules": [],
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "action": "strike",
+        "area": null,
+        "bonus": {
+          "value": 35
+        },
+        "damageRolls": {
+          "main": {
+            "damage": "3d10+17",
+            "damageType": "piercing",
+            "category": null
+          }
+        },
+        "attackEffects": {
+          "value": []
+        },
+        "range": {
+          "increment": 60,
+          "max": null
+        },
+        "subjectToMAP": true
+      }
+    },
+    {
+      "_id": "BlasterMelee0001",
+      "name": "Backhand Rebuke",
+      "type": "melee",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p>A normal one-action melee Strike with 5-foot reach. On a hit, it deals 3d8+17 bludgeoning damage. It uses the normal multiple-attack penalty and critical-hit rules. It is not Charged Blast and does not use Curated Spectrum or its riders.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "slug": "blaster-backhand-rebuke",
+        "rules": [],
+        "traits": {
+          "value": [
+            "magical",
+            "unarmed"
+          ],
+          "otherTags": []
+        },
+        "action": "strike",
+        "area": null,
+        "bonus": {
+          "value": 33
+        },
+        "damageRolls": {
+          "main": {
+            "damage": "3d8+17",
+            "damageType": "bludgeoning",
+            "category": null
+          }
+        },
+        "attackEffects": {
+          "value": []
+        },
+        "range": null,
+        "subjectToMAP": true
+      }
+    }
+  ],
+  "system": {
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "abilities": {
+      "str": {
+        "mod": 5
+      },
+      "dex": {
+        "mod": 9
+      },
+      "con": {
+        "mod": 6
+      },
+      "int": {
+        "mod": 6
+      },
+      "wis": {
+        "mod": 5
+      },
+      "cha": {
+        "mod": 9
+      }
+    },
+    "attributes": {
+      "ac": {
+        "value": 41,
+        "details": ""
+      },
+      "adjustment": null,
+      "allSaves": {
+        "value": ""
+      },
+      "hp": {
+        "value": 330,
+        "max": 330,
+        "temp": 0,
+        "details": ""
+      },
+      "speed": {
+        "value": 25,
+        "otherSpeeds": [],
+        "details": ""
+      },
+      "immunities": [],
+      "weaknesses": [],
+      "resistances": []
+    },
+    "details": {
+      "level": {
+        "value": 18
+      },
+      "languages": {
+        "value": [
+          "common"
+        ],
+        "details": ""
+      },
+      "blurb": "A theatrical artillery villain who needs every battle to applaud him.",
+      "publicNotes": "<p>Blaster announces every attack as his definitive masterpiece. He craves adulation, treats followers as disposable props, and manipulates rivals into playing to his audience. His grandiosity conceals a fragile ego: defiance and public embarrassment provoke ostentatious retaliation.</p>",
+      "privateNotes": "<p>Fictional Dark Triad characterization: narcissistic entitlement, calculated manipulation, and callous exploitation. Use these as villain motives, not as a real-world diagnosis. Telegraph the three-action blast and make his attention-seeking behavior readable. Low Will (+27) lets ordinary Demoralize and other Will-targeting tactics threaten his composure; no extra ego-vulnerability subsystem is required.</p>",
+      "publication": {
+        "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+        "authors": "",
+        "license": "ORC",
+        "remaster": true
+      }
+    },
+    "initiative": {
+      "statistic": "perception"
+    },
+    "perception": {
+      "mod": 30,
+      "details": "",
+      "senses": [],
+      "vision": true
+    },
+    "resources": {},
+    "saves": {
+      "fortitude": {
+        "value": 30,
+        "saveDetail": ""
+      },
+      "reflex": {
+        "value": 33,
+        "saveDetail": ""
+      },
+      "will": {
+        "value": 27,
+        "saveDetail": ""
+      }
+    },
+    "skills": {
+      "acrobatics": {
+        "base": 31
+      },
+      "deception": {
+        "base": 35
+      },
+      "intimidation": {
+        "base": 35
+      },
+      "occultism": {
+        "base": 31
+      },
+      "performance": {
+        "base": 35
+      }
+    },
+    "traits": {
+      "rarity": "unique",
+      "size": {
+        "value": "med"
+      },
+      "value": [
+        "human",
+        "humanoid"
+      ]
+    }
+  }
+}

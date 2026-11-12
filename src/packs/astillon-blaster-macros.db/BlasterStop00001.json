@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterStop00001",
+  "name": "Beam Clash — End",
+  "type": "script",
+  "img": "icons/svg/cancel.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.beamClash;\nif (!feature?.stop) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.stop();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}
