@@ -14,6 +14,7 @@ const BLUE_FILE = "jb2a.test.beam.blue";
 const FREE_DEFAULT_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
 const PATREON_RED = "jb2a.ranged.beam.002.03.red.30ft";
 const PATREON_BLUE = "jb2a.ranged.beam.002.03.blue.30ft";
+const AURA_FILE = "jb2a.energy_strands.overlay.dark_purple02.01";
 const flush = async () => { await setImmediate(); await setImmediate(); };
 
 function state(overrides = {}) {
@@ -113,7 +114,7 @@ function collection(entries) {
   return result;
 }
 
-function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies = true, ready = true } = {}) {
+function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies = true, aura = true, ready = true } = {}) {
   const dom = new JSDOM("<!doctype html><html><body><canvas id='board'></canvas></body></html>", { pretendToBeVisual: true });
   const callbacks = new Map();
   const hooks = {
@@ -129,6 +130,10 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   const warnings = [];
   const writes = [];
   const plays = [];
+  const auraPlays = [];
+  const results = [];
+  const databaseRegistrations = [];
+  const registeredEntries = new Map();
   const ends = [];
   const dice = [];
   const totals = [];
@@ -223,13 +228,17 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
     file(file) { this.current.file = file; return this; }
     atLocation(location) { this.current.location = structuredClone(location); return this; }
     stretchTo(target) { this.current.target = structuredClone(target); return this; }
+    attachTo(token, options) { this.current.attached = token; this.current.attachOptions = options; return this; }
+    scaleToObject(scale) { this.current.objectScale = scale; return this; }
+    playbackRate(rate) { this.current.playbackRate = rate; return this; }
+    timeRange(start, end) { this.current.timeRange = [start, end]; return this; }
     name(name) { this.current.name = name; return this; }
     persist(value = true) { this.current.persist = value; return this; }
     temporary(value = true) { this.current.temporary = value; return this; }
     tint(color) { this.current.tint = color; return this; }
     async play(options) {
       const invocation = { effects: [], options };
-      plays.push(invocation);
+      (this.effects[0]?.file === AURA_FILE ? auraPlays : plays).push(invocation);
       const complete = () => {
         invocation.effects = this.effects.filter((effect) => !emit("preCreateSequencerEffect", effect).includes(false));
       };
@@ -240,7 +249,18 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   const Sequencer = {
     Database: {
       entryExists: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE].includes(key),
-      getEntry: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE].includes(key) ? { file: `${key}.webm` } : false,
+      getEntry(key) {
+        if (registeredEntries.has(key)) return registeredEntries.get(key);
+        if ([PATREON_RED, PATREON_BLUE].includes(key)) {
+          const color = key === PATREON_RED ? "Red" : "Blue";
+          return { getFile: () => `custom-assets/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm` };
+        }
+        return [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, ...(aura ? [AURA_FILE] : [])].includes(key) ? { file: `${key}.webm` } : false;
+      },
+      registerEntries(namespace, entries, isPrivate) {
+        databaseRegistrations.push({ namespace, entries: structuredClone(entries), isPrivate });
+        for (const side of ["red", "blue"]) registeredEntries.set(`${namespace}.${side}`, { file: entries[side], markers: entries._markers });
+      },
       getAllFileEntries: () => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE],
     },
     EffectManager: { async endEffects(filter, broadcast) { ends.push({ filter, broadcast }); } },
@@ -264,7 +284,7 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
       utils: { randomID: () => `generated-${++nextMessage}` }, dice: { Roll },
       documents: { ChatMessage: { implementation: { async create(data) {
         const request = data.flags?.[MODULE]?.beamClashRequest;
-        if (!request) return { id: `result-${++nextMessage}`, author: game.user };
+        if (!request) { results.push(data); return { id: `result-${++nextMessage}`, author: game.user }; }
         const authorId = game.user.id;
         if (chatControl.gate) await chatControl.gate;
         return message(request, authorId);
@@ -297,8 +317,9 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
     }, authorId, options);
   }
   return {
-    dom, feature, emit, warnings, writes, plays, ends, dice, totals, pans, settings, registrations,
+    dom, feature, emit, warnings, writes, plays, auraPlays, results, databaseRegistrations, registeredEntries, Sequencer, ends, dice, totals, pans, settings, registrations,
     game, canvas, scene, red, blue, messages, message, request, startRequest, rollControl, chatControl, effectLoading, getState: () => flag,
+    rafs, runFrames: () => { const frames = [...rafs.values()]; rafs.clear(); for (const callback of frames) callback(); },
     button: (side) => dom.window.document.querySelector(`${ROOT} [data-side='${side}']`),
     roots: () => [...dom.window.document.querySelectorAll(ROOT)],
   };
@@ -449,6 +470,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     for (const effect of env.plays[0].effects) {
       assert.equal(effect.persist, true);
       assert.equal(effect.temporary, true);
+      assert.equal(effect.playbackRate, 2);
       assert.deepEqual(effect.target, { x: 450, y: 250 });
     }
     env.emit("canvasReady", env.canvas);
@@ -458,21 +480,69 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.pans.length, 1);
   });
 
-  for (const configured of ["auto", FREE_DEFAULT_FILE, "reference-path"]) {
-    test(`Patreon ${configured} chooses the requested ranged files with native color and persistence`, async t => {
+  for (const configured of ["auto", ""]) {
+    test(`Patreon ${JSON.stringify(configured)} plays an opener once with inspected internal loop markers`, async t => {
+      const env = setup(t);
+      env.game.modules.set("jb2a_patreon", { active: true });
+      env.game.modules.set("JB2A_DnD5e", { active: false });
+      env.settings.set("beamClashRedFile", configured);
+      env.settings.set("beamClashBlueFile", configured);
+      await env.feature.api.start(); await flush();
+      assert.deepEqual(env.warnings, []);
+      assert.deepEqual(env.plays[0].effects.map(e => [e.file, e.playbackRate, e.tint, e.timeRange]), [
+        [`${MODULE}-beam-clash.red`, 1, undefined, undefined], [`${MODULE}-beam-clash.blue`, 1, undefined, undefined],
+      ]);
+      assert.equal(env.databaseRegistrations.length, 1, "one wrapper registration for both sides");
+      const registration = env.databaseRegistrations[0];
+      assert.equal(registration.namespace, `${MODULE}-beam-clash`, "never overwrite jb2a entries");
+      assert.equal(registration.isPrivate, true);
+      assert.deepEqual(registration.entries._templates, { ranged: [200, 200, 200] });
+      assert.equal(registration.entries._template, "ranged");
+      assert.deepEqual(registration.entries._markers, { loop: { start: 1500, end: 2100 }, forcedEnd: 3033 });
+      assert.match(registration.entries.red, /^custom-assets\/.*Beam002_03_Regular_Red_30ft_1600x400\.webm$/);
+      assert.match(registration.entries.blue, /^custom-assets\/.*Beam002_03_Regular_Blue_30ft_1600x400\.webm$/);
+      env.totals.push(20, 1);
+      env.request("red", "gm"); env.request("blue", "owner"); await flush();
+      assert.deepEqual(env.plays[1].effects.map(e => [e.file, e.timeRange]), [
+        [PATREON_RED, [1500, 2100]], [PATREON_BLUE, [1500, 2100]],
+      ], "re-aim uses the loop directly, not another opener");
+      assert.equal(env.auraPlays.length, 1);
+      env.red.document.x += 100;
+      env.emit("updateToken", env.red.document); await flush();
+      assert.deepEqual(env.plays[2].effects[0].timeRange, [1500, 2100]);
+      assert.equal(env.databaseRegistrations.length, 1);
+    });
+  }
+
+  test("an explicit original energy beam remains an available 2x fallback even with Patreon", async t => {
+    const env = setup(t);
+    env.game.modules.set("jb2a_patreon", { active: true });
+    env.settings.set("beamClashRedFile", FREE_DEFAULT_FILE);
+    env.settings.set("beamClashBlueFile", FREE_DEFAULT_FILE);
+    await env.feature.api.start(); await flush();
+    assert.deepEqual(env.plays[0].effects.map(e => [e.file, e.playbackRate, e.tint]), [
+      [FREE_DEFAULT_FILE, 2, 0xff4040], [FREE_DEFAULT_FILE, 2, 0x4080ff],
+    ]);
+    assert.equal(env.databaseRegistrations.length, 0);
+  });
+
+  for (const configured of ["database-key", "reference-path"]) {
+    test(`explicit Patreon ${configured} uses the inspected native ranged opener and loop`, async t => {
       const env = setup(t);
       env.game.modules.set("jb2a_patreon", { active: true });
       env.game.modules.set("JB2A_DnD5e", { active: false });
       for (const [side, color] of [["Red", "Red"], ["Blue", "Blue"]]) {
         env.settings.set(`beamClash${side}File`, configured === "reference-path"
-          ? `modules/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm` : configured);
+          ? `modules/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm`
+          : color === "Red" ? PATREON_RED : PATREON_BLUE);
       }
       await env.feature.api.start(); await flush();
       assert.deepEqual(env.warnings, []);
-      assert.deepEqual(env.plays[0].effects.map(e => e.file), [PATREON_RED, PATREON_BLUE]);
+      assert.deepEqual(env.plays[0].effects.map(e => e.file), [`${MODULE}-beam-clash.red`, `${MODULE}-beam-clash.blue`]);
       for (const effect of env.plays[0].effects) {
         assert.equal(effect.persist, true);
         assert.equal(effect.temporary, true);
+        assert.equal(effect.playbackRate, 1);
         assert.equal(effect.tint, undefined, "do not recolor the actual red/blue artwork");
         assert.deepEqual(effect.target, { x: 450, y: 250 });
       }
@@ -485,6 +555,104 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.game.modules.set("jb2a_patreon", { active: true });
     await env.feature.api.start(); await flush();
     assert.deepEqual(env.plays[0].effects.map(e => e.file), [RED_FILE, BLUE_FILE]);
+  });
+
+  test("reconnecting to an advanced clash starts directly in the sustained segment", async t => {
+    const env = setup(t, { initial: state({ round: 3, score: -1, redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    await flush();
+    for (const effect of env.plays[0].effects) assert.deepEqual(effect.timeRange, [1500, 2100]);
+    assert.equal(env.databaseRegistrations.length, 0);
+  });
+
+  test("scene return does not replay an already displayed opener even before the first roll", async t => {
+    const env = setup(t, { initial: state({ redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    await flush();
+    assert.equal(env.plays[0].effects[0].file, `${MODULE}-beam-clash.red`);
+    env.emit("canvasTearDown", env.canvas);
+    env.emit("canvasReady", env.canvas); await flush();
+    assert.deepEqual(env.plays[1].effects[0].timeRange, [1500, 2100]);
+    assert.equal(env.databaseRegistrations.length, 1);
+  });
+
+  test("a missing database-registration API still loops the sustained section, never the opener", async t => {
+    const env = setup(t, { ready: false, initial: state({ redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    delete env.Sequencer.Database.registerEntries;
+    env.feature.ready(); await flush();
+    assert.deepEqual(env.plays[0].effects.map(e => e.timeRange), [[1500, 2100], [1500, 2100]]);
+    assert.equal(env.getState().status, "active");
+  });
+
+  test("Sequencer startup seek correction is bounded, local, and waits for trimmed beams to be ready", async t => {
+    const env = setup(t, { initial: state({ round: 2, redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    await flush();
+    const data = { ...env.plays[0].effects[0], time: { start: { value: 1500 }, end: { value: 2100 }, isRange: true } };
+    const effect = { data, ready: false, mediaCurrentTime: 0.033 };
+    env.emit("createSequencerEffect", effect);
+    env.runFrames();
+    assert.equal(effect.mediaCurrentTime, 0.033, "do not seek before media initialization");
+    assert.equal(env.rafs.size, 1);
+    effect.ready = true;
+    env.runFrames();
+    assert.equal(effect.mediaCurrentTime, 1.5, "recover from Sequencer's zero-based startup offset");
+    assert.equal(env.rafs.size, 0, "one-shot correction, not a permanent ticker");
+    effect.mediaCurrentTime = 1.8;
+    env.emit("createSequencerEffect", effect); env.runFrames();
+    assert.equal(effect.mediaCurrentTime, 1.8, "do not disturb an already correct seek");
+    env.emit("createSequencerEffect", { ...effect, data: { ...data, name: "another-module.beam" } });
+    env.emit("createSequencerEffect", { ...effect, data: { ...data, time: null } });
+    assert.equal(env.rafs.size, 0, "other modules and the initial opener are untouched");
+    effect.ready = false;
+    let now = 1000;
+    const clock = t.mock.method(Date, "now", () => now);
+    env.emit("createSequencerEffect", effect);
+    now += 15001;
+    env.runFrames();
+    assert.equal(env.rafs.size, 0, "failed media initialization cannot schedule forever");
+    clock.mock.restore();
+    env.emit("createSequencerEffect", effect);
+    await env.feature.api.stop(); await flush();
+    assert.equal(env.rafs.size, 0, "stop cancels pending media seeks");
+    assert.equal(effect.mediaCurrentTime, 1.8);
+  });
+
+  test("the exact purple overlay attaches only to the selected token and survives score and position changes", async t => {
+    const env = setup(t, { initial: state() });
+    await flush();
+    assert.equal(env.auraPlays.length, 1);
+    const aura = env.auraPlays[0].effects[0];
+    assert.equal(aura.file, AURA_FILE);
+    assert.equal(aura.attached, env.red);
+    assert.deepEqual(aura.attachOptions, { bindRotation: false });
+    assert.equal(aura.objectScale, 1.6);
+    assert.equal(aura.persist, true);
+    assert.equal(aura.temporary, true);
+    assert.equal(aura.playbackRate, undefined, "only the beams speed up");
+    assert.deepEqual(env.auraPlays[0].options, { local: true });
+    env.totals.push(20, 1);
+    env.request("red", "gm"); env.request("blue", "owner");
+    await flush();
+    env.red.document.x += 100;
+    env.emit("updateToken", env.red.document, { x: env.red.document.x });
+    env.emit("canvasReady", env.canvas);
+    await flush();
+    assert.equal(env.auraPlays.length, 1, "no duplicate or restarted swirl");
+    assert.ok(!env.ends.some(({ filter }) => filter.name === aura.name));
+    assert.equal(env.plays.length, 3, "beams still re-aim after score and movement");
+    await env.feature.api.stop(); await flush();
+    assert.ok(env.ends.some(({ filter, broadcast }) => filter.name === aura.name && broadcast === false));
+  });
+
+  test("a missing optional purple asset warns once on start but does not block beams or rolls", async t => {
+    const env = setup(t, { aura: false });
+    await env.feature.api.start(); await flush();
+    assert.equal(env.getState().status, "active");
+    assert.equal(env.plays.length, 1);
+    assert.equal(env.auraPlays.length, 0);
+    assert.equal(env.warnings.length, 1);
+    assert.match(env.warnings[0], /purple.*unavailable.*still run/i);
+    env.request("red", "gm"); await flush();
+    assert.equal(env.dice.length, 1);
+    assert.equal(env.warnings.length, 1);
   });
 
   test("GM can roll for blue without player ownership and cannot duplicate the owner's accepted roll", async t => {
@@ -739,6 +907,24 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.dice.length, 2);
   });
 
+  for (const [winner, score, totals] of [["red", 2, [20, 1]], ["blue", -2, [1, 20]]]) {
+    test(`${winner} victory names the actual token and safely escapes HTML in names`, async t => {
+      const env = setup(t, { initial: state({ score }) });
+      env.red.document.name = 'Blaster <img src=x onerror="alert(1)"> & friends';
+      env.blue.document.name = 'Moon "the Brilliant" <b>Hero</b>';
+      env.totals.push(...totals);
+      env.request("red", "gm"); env.request("blue", "owner"); await flush();
+      assert.equal(env.results.length, 2);
+      const fragment = env.dom.window.document.createElement("div");
+      fragment.innerHTML = env.results.at(-1).content;
+      assert.equal(fragment.textContent, `Beam Clash round 1: ${env.blue.document.name} rolled ${totals[1]}. ${env[winner].document.name} wins the clash!`);
+      assert.equal(fragment.querySelector("img, b, script"), null);
+      assert.ok(env.results[0].content.includes("Blaster &lt;img"));
+      assert.equal(env.results.at(-1).rolls[0].total, totals[1]);
+      assert.ok(env.ends.some(({ filter }) => filter.name.includes(".aura.")), "victory removes the aura too");
+    });
+  }
+
   for (const [userId, redDisabled, blueDisabled] of [["owner", true, false], ["outsider", true, true]]) {
     test(`${userId} reconnects to the saved map UI with role-appropriate controls`, async (t) => {
       const env = setup(t, { initial: state(), userId });
@@ -799,7 +985,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.emit("canvasReady", env.canvas);
     await flush();
     assert.equal(env.roots().length, 0);
-    assert.equal(env.ends.length, 1);
+    assert.equal(env.ends.length, 2);
     assert.equal(env.ends[0].broadcast, false);
     assert.equal(env.getState().status, "active");
     env.canvas.scene = env.scene;
@@ -807,6 +993,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.roots().length, 1);
     assert.equal(env.plays.length, 2);
+    assert.equal(env.auraPlays.length, 2);
     assert.equal(env.writes.length, 0);
   });
 
@@ -834,18 +1021,20 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.feature.ready();
     await env.feature.api.start();
     await flush();
-    assert.equal(env.effectLoading.complete.length, 1);
+    assert.equal(env.effectLoading.complete.length, 2);
     await env.feature.api.stop();
     await flush();
-    env.effectLoading.complete.shift()();
+    for (const complete of env.effectLoading.complete.splice(0)) complete();
     await flush();
     assert.deepEqual(env.plays[0].effects, []);
+    assert.deepEqual(env.auraPlays[0].effects, []);
     await env.feature.api.start();
     await flush();
     env.emit("canvasTearDown", env.canvas);
-    env.effectLoading.complete.shift()();
+    for (const complete of env.effectLoading.complete.splice(0)) complete();
     await flush();
     assert.deepEqual(env.plays[1].effects, []);
+    assert.deepEqual(env.auraPlays[1].effects, []);
     assert.equal(env.roots().length, 0);
   });
 });

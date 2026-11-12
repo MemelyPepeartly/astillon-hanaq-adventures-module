@@ -7,14 +7,19 @@ import {
 const FLAG = "beamClash";
 const REQUEST = "beamClashRequest";
 const SIDES = ["red", "blue"] as const;
-// Database keys retain JB2A's ranged-template alignment metadata. These are the
-// user's Beam002_03_Regular_{Red,Blue}_30ft_1600x400.webm files, not tinted stand-ins.
+// Database keys retain JB2A's ranged-template alignment metadata. The ranged
+// Beam002 clips have no published internal-loop markers. Both exact 30ft previews
+// at library.jb2a.com were inspected at 30fps: 1500-2100ms is fully extended,
+// before the 2300ms collapse. Keep the launch once, then loop just that window.
 // Verified: Jules-Bens-Aa/jb2a-databases @ 17ee6e0, jb2a_patreon/scripts/jb2a_sequencer.js.
 const PATREON_FILES = {
   red: "jb2a.ranged.beam.002.03.red.30ft",
   blue: "jb2a.ranged.beam.002.03.blue.30ft",
 };
 const FREE_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
+const AURA_FILE = "jb2a.energy_strands.overlay.dark_purple02.01";
+const RANGED_LOOP = { start: 1500, end: 2100 };
+const RANGED_END = 3033;
 type Intent = {
   version: 1; action: "start" | "stop" | "roll"; sceneId: string; clashId: string | null;
   round?: number; side?: BeamSide;
@@ -46,11 +51,15 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
   let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
   let root: HTMLDivElement | undefined;
   let activeEffect: EffectIdentity | undefined;
+  let activeAura: EffectIdentity | undefined;
+  let auraSignature = "";
   let effectSignature = "";
   let effectSerial = 0;
   let visualGeneration = 0;
   let pannedClash = "";
   let canvasAvailable = true;
+  const openedClashes = new Set<string>();
+  const pendingSeeks = new Set<number>();
 
   function enqueue(task: () => Promise<unknown>): Promise<unknown> {
     const result = queue.then(task);
@@ -70,16 +79,14 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       try {
         if (key?.startsWith("jb2a.") && sequencer().Database.getEntry(key, { softFail: true })) continue;
       } catch { /* Report one actionable start warning instead of failing module startup. */ }
-      return `The ${side} animation key is unavailable. In Module Settings, set Beam Clash ${side} beam to auto or an installed jb2a key from Sequencer's Database Viewer. Auto uses the Patreon ranged beam when installed, or the free energy beam otherwise.`;
+      return `The ${side} animation key is unavailable. In Module Settings, set Beam Clash ${side} beam to auto or an installed jb2a key from Sequencer's Database Viewer. Auto uses the Patreon ranged beam with a sustained loop, or the original energy beam at 2x speed.`;
     }
     return null;
   }
 
   function selectedFile(side: BeamSide): string {
     const configured = String(game.settings.get(moduleId, setting(side)) ?? "").trim();
-    // The previous built-in default may already have been saved by Foundry. Upgrade
-    // that default to the requested Patreon beam without changing other custom keys.
-    if (!configured || configured === "auto" || configured === FREE_FILE) {
+    if (!configured || configured === "auto") {
       return game.modules?.get("jb2a_patreon")?.active ? PATREON_FILES[side] : FREE_FILE;
     }
     // Accept the exact reference paths too, but resolve them to database keys so
@@ -89,6 +96,37 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       return PATREON_FILES[side];
     }
     return configured;
+  }
+
+  function auraAvailable(): boolean {
+    try { return !!sequencer()?.Database?.getEntry(AURA_FILE, { softFail: true }); }
+    catch { return false; }
+  }
+
+  function rangedLoopFile(side: BeamSide): string | null {
+    const database = sequencer()?.Database;
+    const namespace = `${moduleId}-beam-clash`;
+    const key = `${namespace}.${side}`;
+    try {
+      if (database?.getEntry(key, { softFail: true })) return key;
+      if (typeof database?.registerEntries !== "function") return null;
+      // Resolve the installed database's real files (including a custom asset
+      // prefix), without mutating JB2A's entries or bundling its Patreon videos.
+      const files: Record<string, string> = {};
+      for (const color of SIDES) {
+        const path = database.getEntry(PATREON_FILES[color], { softFail: true })?.getFile?.();
+        const title = color === "red" ? "Red" : "Blue";
+        if (typeof path !== "string" || !path.endsWith(`Beam002_03_Regular_${title}_30ft_1600x400.webm`)) return null;
+        files[color] = path;
+      }
+      database.registerEntries(namespace, {
+        _templates: { ranged: [200, 200, 200] }, _template: "ranged",
+        // End immediately on re-aim/stop instead of playing the outro while the
+        // replacement beam is already extending to a different meeting point.
+        _markers: { loop: { ...RANGED_LOOP }, forcedEnd: RANGED_END }, ...files,
+      }, true);
+      return database.getEntry(key, { softFail: true }) ? key : null;
+    } catch (error) { logError(error); return null; }
   }
 
   function currentScene(): any {
@@ -141,6 +179,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     if (pending.has(key)) return null;
     pending.add(key);
     try {
+      if (!auraAvailable()) notify("The purple energy-strands overlay is unavailable in this JB2A installation. The clash will still run without it.");
       return await createIntent({ version: 1, action: "start", sceneId: scene.id, clashId: stateOf(scene)?.id ?? null,
         redTokenId: red.id, blueTokenId: blue.id, redFile, blueFile });
     } finally { pending.delete(key); }
@@ -226,9 +265,13 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     await scene.setFlag(moduleId, FLAG, next);
     // State is committed before optional chat output, so a chat error cannot reroll a submission.
     if (isAuthority()) {
-      const outcome = next.status === "finished" ? ` ${next.winner === "red" ? "Red" : "Blue"} wins the clash!` : "";
+      const nameOf = (side: BeamSide) => String(scene.tokens.get(side === "red" ? next.redTokenId : next.blueTokenId)?.name
+        || (side === "red" ? "Selected token" : "Targeted token"));
+      const outcome = next.status === "finished" && next.winner ? ` ${nameOf(next.winner)} wins the clash!` : "";
+      const content = document.createElement("p");
+      content.textContent = `Beam Clash round ${current.round}: ${nameOf(side)} rolled ${die.total}.${outcome}`;
       await foundry.documents.ChatMessage.implementation.create({
-        content: `<p>Beam Clash round ${current.round}: ${side === "red" ? "Red" : "Blue"} rolled ${die.total}.${outcome}</p>`,
+        content: content.outerHTML,
         rolls: [die],
       });
     }
@@ -265,13 +308,19 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
   function clearVisuals(): void {
     visualGeneration += 1;
     const old = activeEffect;
+    const oldAura = activeAura;
     activeEffect = undefined;
+    activeAura = undefined;
+    auraSignature = "";
     effectSignature = "";
     pannedClash = "";
     root?.remove();
     root = undefined;
     pending.clear();
+    for (const frame of pendingSeeks) cancelAnimationFrame(frame);
+    pendingSeeks.clear();
     void endEffects(old).catch(logError);
+    void endEffects(oldAura).catch(logError);
   }
 
   function center(token: any): { x: number; y: number } {
@@ -365,7 +414,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         : sending ? "Submitting roll" : !game.users.activeGM ? "Waiting for GM"
           : !allowed ? "Owner / GM only"
             : side === "blue" && game.user.isGM ? "GM · roll for player" : "Click to push the beam";
-      button.title = `GM or this actor's owner: roll for the ${side} character`;
+      button.title = `GM or this actor's owner: roll for ${pair[i].name}`;
       button.setAttribute("aria-label", `${submitted ? `Rolled ${submitted.total}` : "Roll d20"} for ${pair[i].name}`);
       button.setAttribute("aria-busy", String(sending));
     }
@@ -388,6 +437,54 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     void Promise.resolve(canvas.animatePan({ x: (red.x + blue.x) / 2, y: (red.y + blue.y) / 2, scale, duration: 600 })).catch(logError);
   }
 
+  function renderAura(scene: any, state: BeamClashState, selected: any): void {
+    // Separate lifetime from the beams: score changes must not restart the swirl.
+    // Attachment handles position/scale/visibility; no document flags are stored.
+    const signature = JSON.stringify([scene.id, state.id, selected.id]);
+    if (signature === auraSignature || !selected.object || !auraAvailable()) return;
+    auraSignature = signature;
+    const old = activeAura;
+    const identity = { name: `${effectPrefix}${game.user.id}.${state.id}.aura.${++effectSerial}`, sceneId: scene.id };
+    activeAura = identity;
+    void (async () => {
+      await endEffects(old);
+      if (activeAura !== identity || currentScene()?.id !== scene.id) return;
+      const sequence = new globals.Sequence({ moduleName: moduleId });
+      sequence.effect().file(AURA_FILE).attachTo(selected.object, { bindRotation: false })
+        .scaleToObject(1.6).name(identity.name).persist().temporary();
+      void sequence.play({ local: true }).catch(logError);
+    })().catch(logError);
+  }
+
+  function restoreLoopSeek(effect: any): void {
+    const data = effect?.data;
+    if (data?.name !== activeEffect?.name || data?.time?.start?.value !== RANGED_LOOP.start
+      || data?.time?.end?.value !== RANGED_LOOP.end || data?.time?.isRange !== true) return;
+    // Sequencer d8529e7's startup clock correction can replace timeRange's seek
+    // with a small zero-based offset. Its create hook fires BEFORE initialization.
+    // Once ready, use the source-verified public mediaCurrentTime accessor to
+    // restore only our trimmed beam if necessary. No private engine methods,
+    // broadcast updates, persistent document writes, or perpetual ticker.
+    const deadline = Date.now() + 15000;
+    let frame = 0;
+    const restore = () => {
+      pendingSeeks.delete(frame);
+      if (data.name !== activeEffect?.name || data.sceneId !== currentScene()?.id || effect.destroyed) return;
+      if (effect.ready) {
+        if (effect.mediaCurrentTime < RANGED_LOOP.start / 1000 || effect.mediaCurrentTime >= RANGED_LOOP.end / 1000) {
+          effect.mediaCurrentTime = RANGED_LOOP.start / 1000;
+        }
+        return;
+      }
+      if (Date.now() < deadline) {
+        frame = requestAnimationFrame(restore);
+        pendingSeeks.add(frame);
+      }
+    };
+    frame = requestAnimationFrame(restore);
+    pendingSeeks.add(frame);
+  }
+
   function redraw(): void {
     const scene = currentScene();
     const state = stateOf(scene);
@@ -397,10 +494,13 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     fitView(scene, state, pair);
     // Missing optional dependencies are silent outside start(); controls and shared state still work.
     if (filesProblem(state.redFile, state.blueFile)) return;
+    renderAura(scene, state, pair[0]);
     const red = center(pair[0]);
     const blue = center(pair[1]);
     const signature = JSON.stringify([state.id, state.score, state.redFile, state.blueFile, red, blue]);
     if (signature === effectSignature) return;
+    const showOpener = !openedClashes.has(state.id) && state.round === 1 && state.score === 0 && !state.red && !state.blue;
+    openedClashes.add(state.id);
     effectSignature = signature;
     const generation = ++visualGeneration;
     const old = activeEffect;
@@ -413,12 +513,17 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       const sequence = new globals.Sequence({ moduleName: moduleId });
       for (const side of SIDES) {
         const file = side === "red" ? state.redFile : state.blueFile;
-        const effect = sequence.effect().file(file);
-        // Preserve the native launch/impact animation and colors of the ranged
-        // Patreon clips. Only the shared single-color free fallback needs tinting.
+        const ranged = file === PATREON_FILES[side];
+        const openingFile = ranged && showOpener ? rangedLoopFile(side) : null;
+        const effect = sequence.effect().file(openingFile ?? file);
+        // Range trims are supported even if registering the optional opening
+        // wrapper fails. Never fall back to endlessly replaying the launch.
+        if (ranged && !openingFile) effect.timeRange(RANGED_LOOP.start, RANGED_LOOP.end);
+        // The original energy beam is shared by free and Patreon. Custom keys
+        // retain their native colors; only this shared asset needs side tinting.
         if (file === FREE_FILE) effect.tint(side === "red" ? 0xff4040 : 0x4080ff);
         effect.atLocation(side === "red" ? red : blue).stretchTo(meeting)
-          .name(identity.name).persist().temporary();
+          .playbackRate(ranged ? 1 : 2).name(identity.name).persist().temporary();
       }
       // A persistent sequence's promise may remain pending for its whole lifetime; do not await it.
       void sequence.play({ local: true }).catch(logError);
@@ -434,7 +539,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       for (const side of SIDES) {
         game.settings.register(moduleId, setting(side), {
           name: `Beam Clash ${side} beam`,
-          hint: "auto uses the Patreon Beam002_03 red/blue ranged clips when installed, with a tinted free fallback. Or enter an installed JB2A database key.",
+          hint: "auto plays the Patreon Beam002_03 opener once, then loops its sustained segment at normal speed. Without Patreon, the original tinted beam plays at 2x. Set an explicit energy_beam key for that 2x fallback; other custom keys also play at 2x.",
           scope: "world", config: true, type: String, default: "auto",
         });
       }
@@ -455,7 +560,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         if (currentScene()?.id === token.parent?.id) redraw();
         void enqueue(() => repairScene(token.parent)).catch(logError);
       });
-      Hooks.on("deleteScene", (scene: any) => { if (activeEffect?.sceneId === scene.id) clearVisuals(); });
+      Hooks.on("deleteScene", (scene: any) => { if (activeEffect?.sceneId === scene.id || activeAura?.sceneId === scene.id) clearVisuals(); });
       Hooks.on("updateActor", redraw);
       Hooks.on("updateUser", () => { redraw(); recoverAuthority(); });
       Hooks.on("userConnected", () => { redraw(); recoverAuthority(); });
@@ -463,8 +568,9 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       // Cancel obsolete sequences that finish loading after stop, movement or a scene switch.
       Hooks.on("preCreateSequencerEffect", (data: any) => {
         if (typeof data?.name !== "string" || !data.name.startsWith(`${effectPrefix}${game.user.id}.`)) return;
-        if (data.name !== activeEffect?.name || data.sceneId !== currentScene()?.id) return false;
+        if ((data.name !== activeEffect?.name && data.name !== activeAura?.name) || data.sceneId !== currentScene()?.id) return false;
       });
+      Hooks.on("createSequencerEffect", restoreLoopSeek);
       window.addEventListener("resize", positionControls);
       redraw();
       recoverAuthority();
