@@ -8,6 +8,8 @@ Foundry VTT module content for Pathfinder 2e, including Astillon/Hanaq compendia
 
 The **Blaster — NPCs**, **Blaster — Support Effects**, and **Blaster — Encounter Macros** compendia contain the complete level-18 encounter kit. Blaster is a theatrical, narcissistic artillery villain whose need for an audience is represented by fragile hype thralls. His NPC sheet includes strikes, charged blasts, Curated Spectrum, Flash Mob, and the Beam Clash reaction. Import Blaster as a **new NPC**, then drag the encounter macros to the hotbar. The new encounter tools target **Foundry V14 with PF2e 8.7**; existing module utilities retain their existing compatibility.
 
+Blaster's portrait and prototype token both use the world asset `common/portraits/moon/blaster_portrait.png`. This is a reference to the existing Foundry data file, not an image bundled in the module.
+
 ### Charged Blast
 
 Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then click five squares, starting in Blaster's square. The four connecting segments form one blast; their **combined** path length is limited. A live preview follows the pointer; Backspace undoes a point, and Escape or right-click cancels without creating areas or spending a use. On the fifth click, four native V14 line Regions are saved and shared with the scene.

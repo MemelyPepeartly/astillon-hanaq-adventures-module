@@ -42,8 +42,9 @@ test("NPC sources omit prepared actions, skill labels, foreign ownership, and wo
     assert.equal("actions" in actor.system, false);
     assert.deepEqual(Object.keys(actor.flags), [moduleId]);
     assert.equal(actor.prototypeToken.actorLink, false);
-    assert.match(actor.img, /^icons\//);
-    assert.match(actor.prototypeToken.texture.src, /^icons\//);
+    const expectedArt = actor === blaster ? "common/portraits/moon/blaster_portrait.png" : "icons/svg/skull.svg";
+    assert.equal(actor.img, expectedArt);
+    assert.equal(actor.prototypeToken.texture.src, expectedArt);
     for (const key of ["ownership", "_stats", "_key", "folder"]) assert.equal(key in actor, false, key);
     for (const skill of Object.values(actor.system.skills)) {
       assert.equal(typeof skill.base, "number");

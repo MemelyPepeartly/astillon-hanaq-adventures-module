@@ -2,7 +2,7 @@
   "_id": "BlasterActor0001",
   "name": "Blaster",
   "type": "npc",
-  "img": "icons/svg/lightning.svg",
+  "img": "common/portraits/moon/blaster_portrait.png",
   "flags": {
     "astillon-hanaq-adventures-module": {
       "blasterRole": "blaster"
@@ -12,7 +12,7 @@
     "name": "Blaster",
     "actorLink": false,
     "texture": {
-      "src": "icons/svg/lightning.svg"
+      "src": "common/portraits/moon/blaster_portrait.png"
     },
     "width": 1,
     "height": 1,
