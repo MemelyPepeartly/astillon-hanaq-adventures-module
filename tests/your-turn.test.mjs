@@ -657,7 +657,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/second.webp");
   });
 
-  test("the name is the large line and YOUR TURN is the smaller strip", async (t) => {
+  test("YOUR TURN is the banner headline and the name is the smaller line above it", async (t) => {
     const env = setup(t);
     env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Aster" }) }),
@@ -667,11 +667,21 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const [root] = env.overlays();
     const name = root.querySelector(".astillon-yt-name");
     const strip = root.querySelector(".astillon-yt-strip");
+    const text = root.querySelector(".astillon-yt-banner-text");
     assert.equal(name.textContent, "Aster");
     assert.equal(strip.textContent, "YOUR TURN");
-    assert.notEqual(name.textContent, strip.textContent);
-    assert.ok(root.querySelector(".astillon-yt-banner-text").contains(name));
-    assert.ok(root.querySelector(".astillon-yt-banner-text").contains(strip));
+    assert.equal(text.children[0], name);
+    assert.equal(text.children[1], strip);
+    assert.equal(name.classList.contains("astillon-yt-support"), true);
+    assert.equal(strip.classList.contains("astillon-yt-headline"), true);
+    assert.equal(root.querySelector(".astillon-yt-banner-hold").style.animationName, "");
+    assert.match(root.querySelector(".astillon-yt-banner").style.animationName, /astillon-yt-enter-banner/);
+    assert.equal(root.querySelector(".astillon-yt-accent-hold").style.animationName, "");
+    assert.match(root.querySelector(".astillon-yt-panel-accent").style.animationName, /astillon-yt-enter-panels/);
+    assert.equal(root.querySelector(".astillon-yt-slash-hold").style.animationName, "");
+    assert.match(root.querySelector(".astillon-yt-slash").style.animationName, /astillon-yt-enter-panels/);
+    assert.equal(root.querySelector(".astillon-yt-banner-edge-hold").style.animationName, "");
+    assert.match(root.querySelector(".astillon-yt-banner-edge").style.animationName, /astillon-yt-exit-panels/);
 
     env.feature.api.cancel();
     env.turnChange(
@@ -806,9 +816,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(root.getAttribute("role"), "status");
     assert.equal(root.getAttribute("aria-live"), "polite");
     const stage = root.querySelector(".astillon-yt-stage");
-    assert.match(stage.style.width, /^\d+px$/);
-    assert.match(stage.style.height, /^\d+px$/);
-    assert.ok(Number.parseInt(stage.style.height, 10) >= 280);
+    assert.equal(stage.style.width, "652px");
+    assert.equal(stage.style.height, "721px");
     assert.equal(stage.style.transformOrigin, "100% 100%");
     assert.equal(stage.style.transform, "scale(var(--yt-scale))");
     assert.equal(stage.style.right, "0px");
@@ -834,7 +843,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.dom.window.document.querySelector("#board"), null);
   });
 
-  test("collapse and resize update insets without a second node", (t) => {
+  test("collapse and resize leave the playing cut-in where it was measured", (t) => {
     const env = setup(t);
     env.turnChange(
       env.combat(),
@@ -844,23 +853,50 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const [root] = env.overlays();
     const generation = root.dataset.generation;
     const delay = root.querySelector(".astillon-yt-slash").style.animationDelay;
+    const stage = root.querySelector(".astillon-yt-stage");
+    const width = stage.style.width;
+    const height = stage.style.height;
+    assert.equal(width, "652px");
+    assert.equal(height, "721px");
     env.setSidebarLeft(1280);
     env.emit("collapseSidebar", { element: env.sidebar }, true);
     assert.equal(env.overlays().length, 1);
     assert.equal(env.overlays()[0], root);
     assert.equal(root.dataset.generation, generation);
     assert.equal(root.querySelector(".astillon-yt-slash").style.animationDelay, delay);
-    assert.equal(root.style.getPropertyValue("--yt-right"), "120px");
+    assert.equal(root.style.getPropertyValue("--yt-right"), "500px");
+    assert.equal(stage.style.width, width);
+    assert.equal(stage.style.height, height);
 
     env.resizeObservers[0].callback();
     assert.equal(env.overlays().length, 1);
-    assert.equal(root.style.getPropertyValue("--yt-right"), "120px");
+    assert.equal(root.style.getPropertyValue("--yt-right"), "500px");
+    assert.equal(stage.style.width, width);
+    assert.equal(stage.style.height, height);
 
     env.dom.window.innerWidth = 1600;
     env.dom.window.dispatchEvent(new env.dom.window.Event("resize"));
     assert.equal(env.overlays().length, 1);
     assert.equal(root.dataset.generation, generation);
-    assert.equal(root.style.getPropertyValue("--yt-right"), "320px");
+    assert.equal(root.style.getPropertyValue("--yt-right"), "500px");
+    assert.equal(root.style.getPropertyValue("--yt-bottom"), "80px");
+    assert.equal(stage.style.width, width);
+    assert.equal(stage.style.height, height);
+
+    env.feature.api.cancel();
+    env.hotbar.getBoundingClientRect = () => rect(0, 1500, 2400, 100);
+    env.uiTop.getBoundingClientRect = () => rect(0, 0, 2400, 40);
+    env.setSidebarLeft(2000);
+    env.dom.window.innerWidth = 2400;
+    env.dom.window.innerHeight = 1700;
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "Wide", id: "c2" }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    const next = env.overlays()[0].querySelector(".astillon-yt-stage");
+    assert.equal(next.style.width, "1510px");
+    assert.equal(next.style.height, "1343px");
   });
 
   test("euclidean outline covers (3, 4) and leaves (4, 4) clear at radius 5", () => {

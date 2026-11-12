@@ -17,6 +17,8 @@ const MAX_EDGE = 1024;
 const INTRO_END = 0.6;
 const OUTRO = 0.55;
 const REDUCED_FADE_MS = 400;
+const STAGE_WIDTH_RATIO = 0.78;
+const STAGE_HEIGHT_RATIO = 0.92;
 
 const ENTER_PANELS = { name: "astillon-yt-enter-panels", delay: 0, duration: 0.3 };
 const ENTER_CHARACTER = { name: "astillon-yt-enter-character", delay: 0.15, duration: 0.3 };
@@ -454,8 +456,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.left = `${left}px`;
     const usableW = Math.max(280, view.width - left - right);
     const usableH = Math.max(280, view.height - top - bottom);
-    const stageW = Math.round(Math.min(usableW * 0.72, 920));
-    const stageH = Math.round(Math.min(usableH * 0.84, 760));
+    const stageW = Math.round(usableW * STAGE_WIDTH_RATIO);
+    const stageH = Math.round(usableH * STAGE_HEIGHT_RATIO);
     root.style.setProperty("--yt-stage-w", `${stageW}px`);
     root.style.setProperty("--yt-stage-h", `${stageH}px`);
     const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
@@ -519,14 +521,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (resizeObserver && observedSidebar === sidebar) return;
     resizeObserver?.disconnect();
     resizeObserver = new ResizeObserver(() => {
-      if (overlay) applyInsets(overlay);
+      // Measured once at creation. A sidebar resize must not move a playing cut-in.
     });
     resizeObserver.observe(sidebar);
     observedSidebar = sidebar;
   }
 
   function refreshInsets(): void {
-    if (overlay) applyInsets(overlay);
+    // Window resize and sidebar collapse are ignored while a cut-in is on screen.
   }
 
   function releaseOverlayBlob(node: HTMLElement): void {
@@ -563,7 +565,6 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.position = "fixed";
     root.style.pointerEvents = "none";
     root.style.zIndex = "80";
-    applyInsets(root);
     applyTheme(root, subject.color);
 
     const stage = layer("astillon-yt-stage");
@@ -574,23 +575,31 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     stage.style.transform = "scale(var(--yt-scale))";
     stage.style.pointerEvents = "none";
 
+    const slashHold = layer("astillon-yt-slash-hold");
     const slash = layer("astillon-yt-slash");
+    slashHold.append(slash);
     const back = layer("astillon-yt-panel astillon-yt-panel-back");
     const saturated = layer("astillon-yt-panel astillon-yt-panel-sat");
+    const accentHold = layer("astillon-yt-accent-hold");
     const accent = layer("astillon-yt-panel astillon-yt-panel-accent");
+    accentHold.append(accent);
     const light = layer("astillon-yt-panel astillon-yt-panel-light");
+    const bannerHold = layer("astillon-yt-banner-hold");
     const banner = layer("astillon-yt-banner");
+    const edgeHold = layer("astillon-yt-banner-edge-hold");
     const edge = layer("astillon-yt-banner-edge");
+    edgeHold.append(edge);
     const plate = layer("astillon-yt-banner-plate");
     const text = layer("astillon-yt-banner-text");
     const name = document.createElement("p");
-    name.className = "astillon-yt-name";
+    name.className = "astillon-yt-name astillon-yt-support";
     name.textContent = subject.name;
     const strip = document.createElement("p");
-    strip.className = "astillon-yt-strip";
+    strip.className = "astillon-yt-strip astillon-yt-headline";
     strip.textContent = game.i18n.localize("ASTILLON.YourTurn.Strip");
     text.append(name, strip);
-    banner.append(edge, plate, text);
+    banner.append(edgeHold, plate, text);
+    bannerHold.append(banner);
 
     const panelExit = exitMotion(EXIT_PANELS.offset, EXIT_PANELS.duration, EXIT_PANELS.name, hold);
     const textExit = exitMotion(EXIT_TEXT.offset, EXIT_TEXT.duration, EXIT_TEXT.name, hold);
@@ -602,7 +611,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     applyMotion(banner, ENTER_BANNER, null, reduced);
     applyMotion(text, null, textExit, reduced);
 
-    stage.append(back, saturated, accent, light, slash, banner);
+    stage.append(back, saturated, accentHold, light, slashHold, bannerHold);
     root.append(stage);
     applyInsets(root);
 
@@ -648,15 +657,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     image.style.objectFit = "contain";
     image.style.objectPosition = "center bottom";
     character.append(image);
+    const banner = stage.querySelector(".astillon-yt-banner-hold");
+    if (banner) stage.insertBefore(character, banner);
+    else stage.append(character);
     applyMotion(
       character,
       ENTER_CHARACTER,
       exitMotion(EXIT_CHARACTER.offset, EXIT_CHARACTER.duration, EXIT_CHARACTER.name, hold),
       reduced,
     );
-    const banner = stage.querySelector(".astillon-yt-banner");
-    if (banner) stage.insertBefore(character, banner);
-    else stage.append(character);
     if (result.mode === "sticker") retainBlob(root, result.url);
   }
 
