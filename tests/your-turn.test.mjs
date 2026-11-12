@@ -83,7 +83,8 @@ function setup(t, { enabled = true, portrait = "", userId = "player-1" } = {}) {
   const game = {
     user: { id: userId, isGM: false },
     i18n: {
-      localize: (key) => (key === "ASTILLON.YourTurn.Banner" ? "YOUR TURN" : key),
+      localize: (key) => (key === "ASTILLON.YourTurn.UnknownName" ? "Someone" : key),
+      format: (key, data) => (key === "ASTILLON.YourTurn.Banner" ? `${data.name}'s turn!` : key),
     },
     settings: {
       register() {},
@@ -201,15 +202,23 @@ test("setting off shows nothing", (t) => {
   assert.equal(env.cards().length, 0);
 });
 
-test("another user's combatant shows nothing", (t) => {
-  const env = setup(t, { userId: "player-1" });
-  const foe = env.combatant({ players: [{ id: "player-2" }] });
+test("another user's combatant is announced to this client", (t) => {
+  const env = setup(t, { userId: "player-1", portrait: "icons/mine.webp" });
+  const foe = env.combatant({
+    name: "Rival",
+    players: [{ id: "player-2" }],
+    tokenTexture: "icons/rival.webp",
+  });
   env.turnChange(
     env.combat({ combatant: foe }),
     { combatantId: null, round: 1, turn: 0 },
     { combatantId: "c1", round: 1, turn: 1 },
   );
-  assert.equal(env.cards().length, 0);
+  const [card] = env.cards();
+  assert.ok(card);
+  assert.equal(card.querySelector(".astillon-your-turn-name").textContent, "Rival");
+  assert.equal(card.querySelector(".astillon-your-turn-banner").textContent, "Rival's turn!");
+  assert.equal(card.querySelector(".astillon-your-turn-portrait img").getAttribute("src"), "icons/rival.webp");
 });
 
 test("owned combatant shows name, banner, and token portrait", (t) => {
@@ -222,7 +231,7 @@ test("owned combatant shows name, banner, and token portrait", (t) => {
   const [card] = env.cards();
   assert.ok(card);
   assert.equal(card.querySelector(".astillon-your-turn-name").textContent, "Aster");
-  assert.equal(card.querySelector(".astillon-your-turn-banner").textContent, "YOUR TURN");
+  assert.equal(card.querySelector(".astillon-your-turn-banner").textContent, "Aster's turn!");
   assert.equal(card.querySelector(".astillon-your-turn-portrait img").getAttribute("src"), "icons/token.webp");
 });
 

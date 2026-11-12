@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.0. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.1. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
 
 ## Menacing
 
@@ -17,9 +17,9 @@ Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.0. Re
 
 ## Your Turn
 
-1. Leave **Your Turn Banner** off. Advance initiative onto a token you own. No card should appear.
-2. Enable the setting for your user. On your next turn, a card should slide out beside the right sidebar with a white-outlined portrait, the combatant's name, and YOUR TURN. The combat tracker stays usable. Click dismisses it, and it also leaves on its own after a few seconds.
-3. Another player's turn shows you nothing. Set a portrait override and confirm that image is used; clear it and confirm the token image, then the actor image.
+1. Leave **Your Turn Banner** off. Advance initiative. No card should appear.
+2. Enable the setting for your user. On the next combatant's turn, a card should slide out beside the right sidebar with a white-outlined portrait, that combatant's name, and “{name}'s turn!” The combat tracker stays usable. Click dismisses it, and it also leaves on its own after a few seconds. Another player's turn, and a GM client with the setting on, should announce that combatant too.
+3. Set a portrait override and take your own turn. That image is used. Another combatant's turn still uses their token image, then their actor image. Clear the override and confirm your turn uses your token image, then your actor image.
 
 ## Existing content
 

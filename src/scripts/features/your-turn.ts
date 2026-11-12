@@ -50,8 +50,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   }
 
   function resolvePortrait(combatant: any): string | undefined {
-    const override = portraitOverride();
-    if (override) return override;
+    if (playerOwnsCombatant(combatant)) {
+      const override = portraitOverride();
+      if (override) return override;
+    }
     const tokenSrc = combatant?.token?.texture?.src;
     if (typeof tokenSrc === "string" && tokenSrc.trim()) return tokenSrc.trim();
     const actorImg = combatant?.actor?.img;
@@ -113,14 +115,17 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       element.append(portrait);
     }
 
+    const combatantName = String(combatant?.name ?? combatant?.actor?.name ?? "").trim();
     const name = document.createElement("p");
     name.className = "astillon-your-turn-name";
-    name.textContent = String(combatant?.name ?? combatant?.actor?.name ?? "");
+    name.textContent = combatantName;
     element.append(name);
 
     const banner = document.createElement("p");
     banner.className = "astillon-your-turn-banner";
-    banner.textContent = game.i18n.localize("ASTILLON.YourTurn.Banner");
+    banner.textContent = game.i18n.format("ASTILLON.YourTurn.Banner", {
+      name: combatantName || game.i18n.localize("ASTILLON.YourTurn.UnknownName"),
+    });
     element.append(banner);
 
     element.addEventListener("click", clearCard);
@@ -151,7 +156,6 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (!historyChanged(prior, current)) return;
     const combatant = combat.combatant;
     if (!combatant) return;
-    if (!playerOwnsCombatant(combatant)) return;
     showCard(combatant);
   }
 

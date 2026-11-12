@@ -7,10 +7,11 @@
     },
     "YourTurn": {
       "Enabled": "Your Turn Banner",
-      "EnabledHint": "Show a short Smash Bros–style card when combat advances to a token you own.",
+      "EnabledHint": "Show a flashy card beside the sidebar whenever combat advances, announcing whose turn it is.",
       "Portrait": "Your Turn Portrait Override",
-      "PortraitHint": "Optional image path used instead of the active combatant's token or actor portrait.",
-      "Banner": "YOUR TURN"
+      "PortraitHint": "Optional image used for your own turn instead of your token or actor portrait.",
+      "Banner": "{name}'s turn!",
+      "UnknownName": "Someone"
     }
   }
 }
