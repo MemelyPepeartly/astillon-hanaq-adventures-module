@@ -23,8 +23,8 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  width: min(28rem, 36%);
-  height: 55%;
+  width: min(52rem, 62%);
+  height: min(82%, 44rem);
   transform-origin: 100% 100%;
   transform: scale(var(--yt-scale));
   overflow: visible;
@@ -40,91 +40,87 @@
   position: absolute;
 }
 
-.astillon-yt-slash {
-  inset: 0 0 6% 6%;
-  background: var(--yt-backing);
-  clip-path: polygon(
-    78% 0%,
-    92% 4%,
-    100% 18%,
-    100% 100%,
-    18% 100%,
-    28% 78%,
-    8% 64%,
-    24% 46%,
-    6% 30%,
-    30% 16%,
-    48% 8%
-  );
-}
-
 .astillon-yt-panel-back {
-  top: 7%;
-  right: -2%;
-  bottom: 8%;
-  left: 16%;
+  z-index: 1;
+  inset: 2% -4% 0 8%;
   background: var(--yt-backing);
   clip-path: polygon(
-    54% 0%,
-    100% 0%,
+    58% 0%,
+    86% 3%,
+    100% 16%,
     100% 100%,
-    4% 100%,
-    0% 82%,
-    14% 68%,
-    2% 48%,
-    18% 30%,
-    8% 12%
+    0% 100%,
+    8% 82%,
+    0% 66%,
+    14% 52%,
+    2% 36%,
+    20% 22%,
+    8% 10%,
+    34% 2%
   );
 }
 
 .astillon-yt-panel-sat {
-  top: 1%;
-  right: 0;
-  bottom: 5%;
-  left: 20%;
-  background: var(--yt-panel);
+  z-index: 2;
+  top: 6%;
+  right: 2%;
+  bottom: 8%;
+  left: 18%;
+  background: var(--yt-color);
   clip-path: polygon(
-    62% 0%,
-    100% 0%,
+    48% 0%,
+    100% 6%,
     100% 100%,
-    0% 100%,
-    12% 86%,
-    0% 72%,
-    16% 58%,
-    2% 42%,
-    20% 28%,
-    6% 14%,
-    38% 3%
+    6% 100%,
+    0% 78%,
+    16% 62%,
+    2% 44%,
+    18% 28%,
+    4% 12%,
+    32% 2%
   );
+}
+
+.astillon-yt-panel-accent {
+  z-index: 2;
+  top: 16%;
+  right: -6%;
+  bottom: 22%;
+  left: 46%;
+  background: var(--yt-panel);
+  clip-path: polygon(18% 0%, 100% 12%, 88% 100%, 0% 78%);
+  transform: rotate(8deg);
 }
 
 .astillon-yt-panel-light {
-  top: 8%;
-  right: 4%;
-  bottom: 18%;
-  left: 28%;
+  z-index: 3;
+  top: 0%;
+  right: 8%;
+  bottom: 34%;
+  left: 36%;
   background-color: var(--yt-light);
   background-image:
-    repeating-linear-gradient(0deg, rgba(11, 11, 18, 0.38) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(90deg, rgba(11, 11, 18, 0.32) 0 1px, transparent 1px 7px);
-  clip-path: polygon(
-    46% 0%,
-    100% 8%,
-    100% 100%,
-    8% 100%,
-    0% 74%,
-    18% 52%,
-    4% 28%,
-    28% 8%
-  );
+    repeating-linear-gradient(-18deg, transparent 0 10px, rgba(11, 11, 18, 0.28) 10px 12px);
+  clip-path: polygon(22% 8%, 100% 0%, 92% 100%, 0% 72%, 12% 28%);
+}
+
+.astillon-yt-slash {
+  z-index: 3;
+  inset: 8% 0 18% 20%;
+  background:
+    linear-gradient(#fff, #fff) 72% 22% / 46% 4px no-repeat,
+    linear-gradient(#fff, #fff) 80% 34% / 28% 3px no-repeat,
+    linear-gradient(#fff, #fff) 64% 46% / 34% 3px no-repeat,
+    linear-gradient(#fff, #fff) 58% 14% / 18% 8px no-repeat;
+  transform: rotate(-8deg);
 }
 
 .astillon-yt-character {
-  top: -8%;
-  right: 2%;
-  width: 64%;
-  height: 74%;
-  z-index: 4;
+  top: -4%;
+  right: 4%;
+  width: 62%;
+  height: 78%;
+  z-index: 5;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -134,6 +130,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   object-position: center bottom;
 }
@@ -150,73 +148,30 @@
 }
 
 .astillon-yt-banner {
-  left: -28%;
-  right: -2%;
-  bottom: 2%;
-  height: 36%;
-  z-index: 5;
+  left: -16%;
+  right: 2%;
+  bottom: 4%;
+  height: 34%;
+  z-index: 6;
   transform: rotate(-7deg);
-  transform-origin: 78% 50%;
+  transform-origin: 80% 60%;
 }
 
 .astillon-yt-banner-edge,
 .astillon-yt-banner-plate {
-  inset: 8% 0 6%;
+  inset: 10% 0 8%;
 }
 
 .astillon-yt-banner-edge {
   background: #fff;
-  transform: translate(0, 5px);
-  clip-path: polygon(
-    0% 38%,
-    6% 16%,
-    14% 34%,
-    24% 10%,
-    36% 30%,
-    48% 8%,
-    60% 28%,
-    72% 12%,
-    84% 26%,
-    94% 14%,
-    100% 32%,
-    100% 70%,
-    92% 96%,
-    80% 74%,
-    68% 100%,
-    54% 76%,
-    40% 98%,
-    28% 74%,
-    16% 96%,
-    6% 72%,
-    0% 88%
-  );
+  transform: translate(-8px, 7px);
+  clip-path: polygon(0% 28%, 8% 8%, 100% 0%, 100% 72%, 90% 100%, 0% 86%);
 }
 
 .astillon-yt-banner-plate {
-  background: var(--yt-backing);
-  clip-path: polygon(
-    1.4% 42%,
-    7% 22%,
-    15% 38%,
-    25% 16%,
-    37% 34%,
-    49% 14%,
-    61% 32%,
-    73% 18%,
-    85% 30%,
-    94% 20%,
-    99% 36%,
-    98.5% 68%,
-    91% 90%,
-    79% 72%,
-    67% 94%,
-    53% 74%,
-    39% 92%,
-    27% 72%,
-    15% 90%,
-    6% 70%,
-    1% 82%
-  );
+  background: #0b0b12;
+  box-shadow: 0 0 0 3px #fff;
+  clip-path: polygon(1% 24%, 9% 6%, 100% 0%, 99% 68%, 88% 92%, 1% 78%);
 }
 
 .astillon-yt-banner-text {
@@ -284,37 +239,30 @@
 
 @keyframes astillon-yt-enter-panels {
   0% {
-    opacity: 0;
     transform: translate3d(38%, 24%, 0) scale(0.86);
   }
   100% {
-    opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes astillon-yt-enter-character {
   0% {
-    opacity: 0;
     transform: translate3d(26%, 16%, 0) scale(0.78);
   }
   62% {
-    opacity: 1;
     transform: translate3d(-4%, -3%, 0) scale(1.07);
   }
   100% {
-    opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes astillon-yt-enter-banner {
   0% {
-    opacity: 0;
     transform: translate3d(115%, 0, 0) rotate(-7deg);
   }
   100% {
-    opacity: 1;
     transform: translate3d(0, 0, 0) rotate(-7deg);
   }
 }
@@ -365,6 +313,7 @@
 @media (prefers-reduced-motion: reduce) {
   .astillon-yt-slash,
   .astillon-yt-panel,
+  .astillon-yt-panel-accent,
   .astillon-yt-character,
   .astillon-yt-banner,
   .astillon-yt-banner-edge,
@@ -376,6 +325,7 @@
 
 .astillon-yt-reduced .astillon-yt-slash,
 .astillon-yt-reduced .astillon-yt-panel,
+.astillon-yt-reduced .astillon-yt-panel-accent,
 .astillon-yt-reduced .astillon-yt-character,
 .astillon-yt-reduced .astillon-yt-banner,
 .astillon-yt-reduced .astillon-yt-banner-edge,

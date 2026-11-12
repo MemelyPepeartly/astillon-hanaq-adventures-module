@@ -243,6 +243,21 @@ function trimmed(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Foundry stores paths like `icons/foo.webp`. From `/game` those only load through getRoute. */
+function resolveArtUrl(src: string): string {
+  const path = src.trim();
+  if (!path || /^(?:https?:|blob:|data:)/i.test(path)) return path;
+  const getRoute = (foundry as { utils?: { getRoute?: (path: string) => string } }).utils?.getRoute;
+  if (typeof getRoute !== "function") return path;
+  try {
+    const routed = getRoute(path);
+    if (typeof routed === "string" && routed.trim()) return routed.trim();
+  } catch {
+    // The stored path is still tried by the loader.
+  }
+  return path;
+}
+
 function seconds(value: number): string {
   return `${value.toFixed(2)}s`;
 }
@@ -550,6 +565,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const slash = layer("astillon-yt-slash");
     const back = layer("astillon-yt-panel astillon-yt-panel-back");
     const saturated = layer("astillon-yt-panel astillon-yt-panel-sat");
+    const accent = layer("astillon-yt-panel astillon-yt-panel-accent");
     const light = layer("astillon-yt-panel astillon-yt-panel-light");
     const banner = layer("astillon-yt-banner");
     const edge = layer("astillon-yt-banner-edge");
@@ -566,7 +582,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
     const panelExit = exitMotion(EXIT_PANELS.offset, EXIT_PANELS.duration, EXIT_PANELS.name, hold);
     const textExit = exitMotion(EXIT_TEXT.offset, EXIT_TEXT.duration, EXIT_TEXT.name, hold);
-    for (const panel of [slash, back, saturated, light]) {
+    for (const panel of [back, saturated, accent, light, slash]) {
       applyMotion(panel, ENTER_PANELS, panelExit, reduced);
     }
     applyMotion(edge, null, panelExit, reduced);
@@ -574,7 +590,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     applyMotion(banner, ENTER_BANNER, null, reduced);
     applyMotion(text, null, textExit, reduced);
 
-    stage.append(slash, back, saturated, light, banner);
+    stage.append(back, saturated, accent, light, slash, banner);
     root.append(stage);
 
     if (reduced) {
@@ -612,7 +628,12 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const image = document.createElement("img");
     image.alt = "";
     image.src = result.url;
+    image.style.width = "100%";
+    image.style.height = "100%";
+    image.style.maxWidth = "none";
+    image.style.maxHeight = "none";
     image.style.objectFit = "contain";
+    image.style.objectPosition = "center bottom";
     character.append(image);
     applyMotion(
       character,
@@ -630,12 +651,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     return new Promise((resolve, reject) => {
       const image = new Image();
       const fail = () => reject(new Error("your-turn art failed"));
-      image.onload = () => {
-        const width = image.naturalWidth || image.width;
-        const height = image.naturalHeight || image.height;
-        if (!width || !height) fail();
-        else resolve(image);
-      };
+      image.onload = () => resolve(image);
       image.onerror = fail;
       image.src = src;
     });
@@ -693,10 +709,24 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   }
 
   async function prepareArt(src: string): Promise<ArtResult> {
+    const resolved = resolveArtUrl(src);
     const cached = artCache.get(src);
     if (cached) return cached;
-    const image = await loadImage(src);
-    return rememberArt(src, await rasterize(image, src));
+    let image: HTMLImageElement;
+    let loaded = resolved;
+    try {
+      image = await loadImage(resolved);
+    } catch (error) {
+      if (resolved === src) throw error;
+      image = await loadImage(src);
+      loaded = src;
+    }
+    try {
+      return rememberArt(src, await rasterize(image, loaded));
+    } catch {
+      // A portrait that cannot be outlined still has to appear.
+      return rememberArt(src, { mode: "frame", url: loaded });
+    }
   }
 
   async function mountArt(root: HTMLElement, art: string[], gen: number, reduced: boolean, hold: number): Promise<void> {

@@ -61,7 +61,7 @@ function durationList(value) {
 }
 
 describe("your turn cut-in", { concurrency: 1 }, () => {
-  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45 } = {}) {
+  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45, route = null } = {}) {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const callbacks = new Map();
     const settings = new Map([
@@ -328,6 +328,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         },
         apps: { FilePicker: { implementation: FilePickerStub } },
       },
+      ...(typeof route === "function" ? { utils: { getRoute: route } } : {}),
     };
 
     const blobUrls = [];
@@ -518,6 +519,22 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c1", round: 1, turn: 1 },
     );
     assert.equal(env.overlays().length, 0);
+  });
+
+  test("a foundry route is used before the stored portrait path is drawn", async (t) => {
+    const env = setup(t, {
+      route: (path) => `/join/${String(path).replace(/^\//, "")}`,
+    });
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ actorImg: "icons/routed.webp", tokenTexture: "" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    await flush();
+    const image = env.overlays()[0]?.querySelector(".astillon-yt-character img");
+    assert.equal(image?.getAttribute("src"), "/join/icons/routed.webp");
+    assert.ok(env.overlays()[0]?.querySelector(".astillon-yt-panel-accent"));
+    assert.ok(env.overlays()[0]?.querySelector(".astillon-yt-panel-back"));
   });
 
   test("preview while disabled does not advance combat or write flags", async (t) => {
