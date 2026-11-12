@@ -117,6 +117,8 @@ test("placement commits exactly four regions, one chat card and shared cooldown;
   assert.equal(env.messages.length, 1);
   assert.match(env.messages[0].content, /16d6\[mental\]/);
   assert.match(env.messages[0].content, /@Check\[will/);
+  assert.match(env.messages[0].content, /options:area-damage/);
+  assert.match(env.messages[0].content, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.e1XGnhKNSQIm5IXg\]\{Stupefied 1\}/);
   assert.equal(env.flags.blastUse.readyRound, 4);
   assert.equal(env.tokenFlags.blastRoot.round, 1);
   env.regions.push({ id: "other", getFlag: () => ({ tokenId: "other-token" }) });
@@ -190,4 +192,59 @@ test("failed bookkeeping rolls back only just-created areas and never leaves Bla
   assert.equal(env.tokenFlags.blastRoot, undefined);
   assert.equal(env.messages.length, 0);
   assert.match(env.errors.at(-1), /failed actor write/);
+});
+
+test("refresh updates only matched ability descriptions, preserving actor state and custom items", async t => {
+  const env = setup(t);
+  const actor = env.scene.tokens.get("blaster").actor;
+  actor.system = { attributes: { hp: { value: 103, max: 330 } } };
+  actor.img = "custom-portrait.webp";
+  actor.items = [
+    { id: "same", slug: "blaster-charged-blast-1", type: "action", system: { description: { value: "old", gm: "GM note" }, rules: [{ key: "Note" }] } },
+    { id: "remapped", slug: "blaster-beam-clash", type: "action", system: { description: { value: "old clash" } } },
+    { id: "custom", slug: "custom-action", type: "action", system: { description: { value: "leave alone" } } },
+    { id: "effect", slug: "blaster-inspire", type: "effect", system: { description: { value: "active effect" } } },
+  ];
+  const originals = [
+    { id: "same", slug: "blaster-charged-blast-1", type: "action", toObject: () => ({ system: { description: { value: "@Damage[4d6[fire]]" } } }) },
+    { id: "source-clash", slug: "blaster-beam-clash", type: "action", toObject: () => ({ system: { description: { value: "new clash" } } }) },
+    { id: "missing", slug: "deleted-by-gm", type: "action", toObject: () => ({ system: { description: { value: "do not recreate" } } }) },
+  ];
+  const writes = [];
+  foundry.utils.fromUuid = async uuid => {
+    assert.equal(uuid, `Compendium.${MODULE}.astillon-blaster-actors.Actor.BlasterActor0001`);
+    return { type: "npc", items: originals };
+  };
+  actor.updateEmbeddedDocuments = async (type, updates) => {
+    assert.equal(type, "Item"); writes.push(updates);
+    for (const update of updates) {
+      assert.deepEqual(Object.keys(update), ["_id", "system.description.value"]);
+      actor.items.find(i => i.id === update._id).system.description.value = update["system.description.value"];
+    }
+  };
+  assert.equal(await env.feature.api.refreshDescriptions(), 2);
+  assert.deepEqual(writes[0].map(i => i._id), ["same", "remapped"]);
+  assert.equal(actor.items[0].system.description.gm, "GM note");
+  assert.deepEqual(actor.items[0].system.rules, [{ key: "Note" }]);
+  assert.equal(actor.items[2].system.description.value, "leave alone");
+  assert.equal(actor.items[3].system.description.value, "active effect");
+  assert.equal(actor.system.attributes.hp.value, 103);
+  assert.equal(actor.img, "custom-portrait.webp");
+  assert.equal(actor.items.length, 4);
+  assert.equal(await env.feature.api.refreshDescriptions(), 0);
+  assert.equal(writes.length, 1);
+});
+
+test("refresh refuses another actor and will not guess among duplicated ability slugs", async t => {
+  const env = setup(t);
+  t.mock.method(console, "error", () => {});
+  const actor = env.scene.tokens.get("blaster").actor;
+  actor.items = ["copy1", "copy2"].map(id => ({ id, slug: "blaster-beam-clash", type: "action", system: { description: { value: "customized" } } }));
+  foundry.utils.fromUuid = async () => ({ type: "npc", items: [{ id: "original", slug: "blaster-beam-clash", type: "action" }] });
+  actor.updateEmbeddedDocuments = async () => assert.fail("Must not update ambiguous or unrelated items");
+  await env.feature.api.refreshDescriptions();
+  assert.match(env.errors.at(-1), /No matching shipped/);
+  env.flags.blasterRole = "hype-thrall";
+  await env.feature.api.refreshDescriptions();
+  assert.match(env.errors.at(-1), /Select exactly one Blaster/);
 });

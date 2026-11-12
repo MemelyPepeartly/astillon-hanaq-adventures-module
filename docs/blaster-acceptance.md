@@ -7,8 +7,10 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 ## NPC and compendia
 
 - Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 330, visible skills, three saves, strikes, and linked abilities with no console errors.
-- Open the hype-thrall actor and support effects. Ensure core artwork resolves and links to all seven macros open the intended macro.
+- Open the hype-thrall actor and support effects. Ensure core artwork resolves and links to all eight macros open the intended macro.
 - Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
+- On an existing Blaster with current HP, effects, custom artwork, and GM notes, run **Refresh Sheet Descriptions**. Only shipped ability descriptions should change; repeat it and confirm there are no further writes. Deleted abilities must not be recreated, and ambiguous duplicates must not be overwritten.
+- Expand each charge's ability. Check that all six typed damage links and matching basic saves render, Dazzled and Stupefied 1 open the correct conditions, and the recharge die is rollable. Support links should open this module's correct effects. The manual Beam Clash die must not advance the animated contest. Native Strike controls still handle attack, MAP, and critical damage.
 
 ## Connected blast
 
@@ -35,6 +37,7 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 Use one GM, one owner of the blue actor, and one non-owner spectator, all viewing the same scene.
 
 - Start from one selected token and one targeted player token. All viewers pan to frame both tokens. Verify actual installed JB2A assets play persistently, **red from selected / blue from target**, meeting at the midpoint.
+- Repeat the start while only the GM is connected, including before blue has an assigned player owner. It must start without an ownership/connection error. Assign blue's Owner permission and connect that player; the blue roll control becomes usable in the existing clash. The GM still cannot roll blue.
 - Verify only the GM can click red and only the target's non-GM owner can click blue. Spectators see disabled controls. Check changing ownership updates the controls.
 - Roll one side: wait for the other; do not advance score. Double-click, click from two owners, or repeat an old round request: accept only one roll per side per round.
 - Verify ties keep the score, and opposing wins reverse it one step. From +2, five net blue wins reach −3. At either threshold, a winner is announced and all effects/buttons disappear.

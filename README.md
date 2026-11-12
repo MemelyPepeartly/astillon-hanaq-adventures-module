@@ -10,6 +10,8 @@ The **Blaster — NPCs**, **Blaster — Support Effects**, and **Blaster — Enc
 
 Blaster's portrait and prototype token both use the world asset `common/portraits/moon/blaster_portrait.png`. This is a reference to the existing Foundry data file, not an image bundled in the module.
 
+**Updating an existing Blaster:** module updates refresh compendia, not actors already imported into a world. Select Blaster and run **Blaster — Refresh Sheet Descriptions** from the encounter macros compendium. It replaces only matching shipped ability description text; HP, statistics, artwork, effects, private item notes, and other items remain unchanged. Fresh imports already include the updated descriptions.
+
 ### Charged Blast
 
 Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then click five squares, starting in Blaster's square. The four connecting segments form one blast; their **combined** path length is limited. A live preview follows the pointer; Backspace undoes a point, and Escape or right-click cancels without creating areas or spending a use. On the fifth click, four native V14 line Regions are saved and shared with the scene.
@@ -24,6 +26,8 @@ All modes share one use per round. Standing Ovation roots Blaster until the star
 
 Curated Spectrum selects fire, cold, electricity, or sonic with a DC 40 basic Reflex save. Dazzling light uses fire with two fewer damage dice and dazzles on a failed save; psychic humiliation uses mental damage with two fewer dice, a basic Will save, and stupefied 1 on a failed save. Conditions last one round. The chat card supplies PF2e save/damage links. Resolve saves, HP, condition application, cover, and line of effect normally; each creature is affected **once**, even where segments overlap, and Blaster is excluded. The tool does not debit PF2e actions automatically.
 
+Each charge's sheet description also has six labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Recharge has an inline GM die, and Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. The custom macro remains the correct way to place the five-point area.
+
 **Clear Blast Areas** removes only the selected Blaster's areas. **Release Blast Root** is a GM adjudication tool for forced movement or corrections; clearing areas does not refund a use or end the root. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
 
 ### Flash Mob
@@ -34,7 +38,7 @@ On Blaster's turn, Flash Mob costs one action and places one 1-HP hype thrall wi
 
 ### Beam Clash
 
-Enable **Sequencer** and **JB2A** (free content is sufficient). As GM, select the red-side character, target exactly one player-owned character, and run **Beam Clash — Start**. A non-GM owner of the target must be connected to start. Viewers of that scene pan to frame both participants. Persistent red and blue beams meet at the middle, with on-map d20 buttons visible to everyone. GMs can roll red; only non-GM owners of the target actor can roll blue.
+Enable **Sequencer** and **JB2A** (free content is sufficient). As GM, select Blaster (red), target exactly one different character token (blue), and run **Beam Clash — Start**. Both tokens need actors, but the GM can start before the target's owner connects or is assigned. Viewers of that scene pan to frame both participants. Persistent red and blue beams meet at the middle, with on-map d20 buttons visible to everyone. GMs can roll red; only non-GM owners of the target actor can roll blue. If no player owns blue yet, grant Owner permission and have the player connect; they can join the existing clash without restarting it.
 
 Each pair of unmodified d20 rolls moves the shared score one point toward the higher roller; ties do not move it. Red wins at +3, blue at −3. From a red lead of +2, blue needs five net wins. The active GM rolls and adjudicates authenticated chat-document requests; duplicate clicks, stale rounds, and claimed client totals cannot advance the contest. Scene flags restore the clash after reconnecting. **Beam Clash — End**, a winner, or removal of either token cleans up the beams and controls.
 
@@ -76,6 +80,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art and color together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.1 adds native clickable rolls and links to Blaster's descriptions, a description-only refresh macro for existing actors, and GM-started Beam Clash setup without an online-player prerequisite.
 
 Version 0.10.0 adds Blaster's level-18 encounter, connected charged blasts, Summons Assistant support thralls, Beam Clash, startup flash-in artwork preloading, and repaired native portrait-editor controls. The Blaster encounter tools target Foundry V14/PF2e 8.7; live-world acceptance remains a separate check from the automated suite.
 

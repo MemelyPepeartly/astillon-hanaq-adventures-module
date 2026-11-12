@@ -17,6 +17,16 @@ const thrall = actors.find((actor) => actor._id === "BlasterThrall001");
 const byId = new Map(items.map((item) => [item._id, item]));
 const embedded = (id) => blaster.items.find((item) => item._id === id);
 const description = (item) => item.system.description.value;
+const readableDescription = (item) => description(item)
+  .replace(/@UUID\[[^\]]+\]\{([^}]+)\}/g, "$1")
+  .replace(/\[\[[^\]]+\]\]\{([^}]+)\}/g, "$1");
+// Verified against PF2e bdea4f90: conditions/dazzled.json, conditions/stupefied.json,
+// and actions/skill/demoralize.json. The actual IDs, not translated names, are portable.
+const pf2eLinks = new Set([
+  "Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh",
+  "Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg",
+  "Compendium.pf2e.actionspf2e.Item.2u915NdUyQan6uKF",
+]);
 const round = { max: 1, per: "round" };
 const supportDuration = { value: 1, unit: "rounds", expiry: "turn-start", sustained: false };
 const contentItems = [...items, ...actors.flatMap((actor) => actor.items)];
@@ -24,6 +34,7 @@ const contentItems = [...items, ...actors.flatMap((actor) => actor.items)];
 test("expected documents have stable IDs, unique per document collection", () => {
   assert.equal(actors.length, 2);
   assert.equal(items.length, 5);
+  assert.equal(macros.length, 8);
   for (const documents of [actors, items, macros, ...actors.map((actor) => actor.items)]) {
     assert.equal(new Set(documents.map((doc) => doc._id)).size, documents.length);
     for (const doc of documents) assert.match(doc._id, /^[A-Za-z0-9]{16}$/, doc.name);
@@ -79,7 +90,7 @@ test("all source items use current action, effect, or NPC Strike shapes and core
   }
 });
 
-test("every module compendium link resolves, including all seven macros", () => {
+test("every module and core compendium link resolves, including the description refresh macro", () => {
   const sources = new Map();
   for (const [pack, type, documents] of [
     ["astillon-blaster-actors", "Actor", actors],
@@ -89,13 +100,13 @@ test("every module compendium link resolves, including all seven macros", () => 
   const linkedMacros = new Set();
   for (const doc of [...actors, ...items]) {
     for (const match of JSON.stringify(doc).matchAll(/@UUID\[([^\]]+)\]/g)) {
-      assert.ok(sources.has(match[1]), "unresolved UUID " + match[1]);
+      assert.ok(sources.has(match[1]) || pf2eLinks.has(match[1]), "unresolved UUID " + match[1]);
       if (match[1].includes(".Macro.")) linkedMacros.add(match[1].split(".").at(-1));
     }
   }
   assert.deepEqual([...linkedMacros].sort(), [
     "BlasterBlast0001", "BlasterFlash0001", "BlasterMobCmd001", "BlasterClash0001",
-    "BlasterStop00001", "BlasterClear0001", "BlasterUnroot001",
+    "BlasterStop00001", "BlasterClear0001", "BlasterUnroot001", "BlasterText00001",
   ].sort());
 });
 
@@ -143,11 +154,18 @@ test("all three blast activities share once-per-round flourish and a single area
       /Once per round, shared across all three/, /five clicked waypoints/, /four segments/,
       /first point inside Blaster's occupied square/, /sum of all four segment lengths/,
       /Blaster is excluded/, /takes damage at most once/, /roll damage once/,
-      /@Check\[reflex\|dc:40\|basic\]/, /@Check\[will\|dc:40\|basic\]/,
+      /@Check\[reflex\|dc:40\|basic\|traits:/, /@Check\[will\|dc:40\|basic\|traits:mental\]/,
     ]) assert.match(text, pattern);
     assert.ok(text.includes(length + " feet total"));
     assert.ok(text.includes(width + " square"));
-    assert.ok(text.includes(dice + "d6 raw, or " + (dice - 2) + "d6"));
+    const damageLinks = [...text.matchAll(/@Damage\[(\d+)d6\[([a-z]+)\]\|traits:([a-z,]+)\|options:area-damage\]/g)];
+    assert.deepEqual(damageLinks.map(([, n, damage, traits]) => [Number(n), damage, traits]), [
+      [dice, "fire", "fire"], [dice, "cold", "cold"], [dice, "electricity", "electricity"], [dice, "sonic", "sonic"],
+      [dice - 2, "fire", "fire,light"], [dice - 2, "mental", "mental"],
+    ]);
+    assert.match(text, /choose one row/i);
+    assert.match(text, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.TkIyaNPgTZFBCCuh\]\{Dazzled\}/);
+    assert.match(text, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.e1XGnhKNSQIm5IXg\]\{Stupefied 1\}/);
   }
 });
 
@@ -155,7 +173,7 @@ test("full charge pays its root and full-intervening-round recharge without lock
   const text = description(embedded("BlasterBlastAct3"));
   assert.match(text, /cannot voluntarily move until the start of his next turn/);
   assert.match(text, /forced movement remains possible/);
-  assert.match(text, /1d4/);
+  assert.match(text, /\[\[\/gmr 1d4 #Standing Ovation recharge\]\]\{1d4\}/);
   assert.match(text, /full intervening rounds/);
   assert.match(text, /round 4 means ready in round 6/);
   assert.match(text, /other modes remain usable/);
@@ -165,14 +183,14 @@ test("full charge pays its root and full-intervening-round recharge without lock
 test("Curated Spectrum preserves basic saves and riders only on failed saves", () => {
   const item = embedded("BlasterSpectrum1");
   assert.equal(item.system.actionType.value, "passive");
-  const text = description(item);
+  const text = readableDescription(item);
   assert.match(text, /fire, cold, electricity, or sonic/);
   assert.match(text, /4d6 \/ 9d6 \/ 18d6/);
   assert.match(text, /2d6 \/ 7d6 \/ 16d6/);
-  assert.match(text, /DC 40 basic Reflex/);
-  assert.match(text, /DC 40 basic Will/);
-  assert.match(text, /fails or critically fails is also dazzled for 1 round/);
-  assert.match(text, /fails or critically fails is also stupefied 1 for 1 round/);
+  assert.match(text, /@Check\[reflex\|dc:40\|basic/);
+  assert.match(text, /@Check\[will\|dc:40\|basic/);
+  assert.match(text, /fails or critically fails is also dazzled for 1 round/i);
+  assert.match(text, /fails or critically fails is also stupefied 1 for 1 round/i);
   assert.match(text, /success or critical success causes no dazzled/);
   assert.match(text, /success or critical success causes no stupefied/);
 });
@@ -181,7 +199,7 @@ test("Beam Clash is a defensive reaction, without damage or action refunds", () 
   const item = embedded("BlasterClashAct1");
   assert.equal(item.system.actionType.value, "reaction");
   assert.deepEqual(item.system.frequency, round);
-  const text = description(item);
+  const text = readableDescription(item);
   for (const pattern of [
     /visible foe/, /before that effect resolves/, /Suspend the triggering resolution/,
     /start the clash at 0/, /unmodified d20/, /Ties move it 0/,
@@ -189,6 +207,8 @@ test("Beam Clash is a defensive reaction, without damage or action refunds", () 
     /All other targets resolve normally/, /deals no extra damage/, /refunds no resources/,
     /cancels without declaring a winner/, /GM adjudication/,
   ]) assert.match(text, pattern);
+  assert.match(description(item), /\[\[\/r 1d20 #Beam Clash manual contest\]\]\{d20\}/);
+  assert.match(text, /inline d20 does not submit a roll/);
 });
 
 test("Flash Mob and its separate support command each cost one action once per round", () => {

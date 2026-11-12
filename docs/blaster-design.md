@@ -63,7 +63,9 @@ Actor UUIDs use Compendium.astillon-hanaq-adventures-module.astillon-blaster-act
 | Bolster | BlasterTempHP001 | blaster-temp-hp |
 | Thrall expiration | BlasterExpiry001 | effect-thrall-expiration-date |
 
-Actor roles are stored under flags.astillon-hanaq-adventures-module.blasterRole. Macro links resolve in astillon-blaster-macros to BlasterBlast0001, BlasterFlash0001, BlasterMobCmd001, BlasterClash0001, BlasterStop00001, BlasterClear0001, and BlasterUnroot001. Embedded Strike IDs are BlasterRange0001 and BlasterMelee0001.
+Actor roles are stored under flags.astillon-hanaq-adventures-module.blasterRole. Macro links resolve in astillon-blaster-macros to BlasterBlast0001, BlasterFlash0001, BlasterMobCmd001, BlasterClash0001, BlasterStop00001, BlasterClear0001, BlasterUnroot001, and BlasterText00001 (description-only refresh). Embedded Strike IDs are BlasterRange0001 and BlasterMelee0001.
+
+Descriptions follow the [PF2e inline-automation style guide](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation): typed damage and area-damage options, basic saves, stable condition UUIDs, effect links, and non-damage dice. These formatting changes do not change the numbers above. Use only one spectrum row. The refresh macro updates matching action/Strike descriptions in a selected existing Blaster without replacing the actor; other data and unmatched/ambiguous items are preserved. Native template links are not substitutes for the four-segment path, and manual d20 links do not submit to Beam Clash's GM-controlled state.
 
 The expiration effect has duration {value:1, unit:"minutes", expiry:"turn-start", sustained:false} and rules:[]. The runtime passes this cloned source through itemsToAdd, not the helper factory that generates attacks. It supplies context.origin actor/token as Blaster and helper summoner linkage {uuid,id,signature}; module owner data uses full actor/token UUIDs and a creation nonce. The helper's auto-expire setting defaults true; the module's marked-summon cleanup also enforces 60 world-time seconds. Do not pre-embed expiration, ownership, nonce, or helper world IDs in the reusable actor.
 

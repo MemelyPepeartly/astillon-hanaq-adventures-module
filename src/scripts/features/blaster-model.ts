@@ -10,8 +10,8 @@ export const BLAST_MODES = {
   cold: { label: "Cold", damage: "cold", save: "reflex", penalty: 0, color: "#55ccff", rider: "" },
   electricity: { label: "Electricity", damage: "electricity", save: "reflex", penalty: 0, color: "#a88bff", rider: "" },
   sonic: { label: "Sonic", damage: "sonic", save: "reflex", penalty: 0, color: "#ffcc55", rider: "" },
-  dazzling: { label: "Dazzling light", damage: "fire", save: "reflex", penalty: 2, color: "#ffffbb", rider: "On a failed save, also dazzled for 1 round. Apply the condition manually." },
-  humiliation: { label: "Psychic humiliation", damage: "mental", save: "will", penalty: 2, color: "#ff55cc", rider: "Mental effect. On a failed save, also stupefied 1 for 1 round. Apply the condition manually." },
+  dazzling: { label: "Dazzling light", damage: "fire", save: "reflex", penalty: 2, color: "#ffffbb", rider: "On a failed save, also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled} for 1 round. Apply the condition manually." },
+  humiliation: { label: "Psychic humiliation", damage: "mental", save: "will", penalty: 2, color: "#ff55cc", rider: "Mental effect. On a failed save, also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1} for 1 round. Apply the condition manually." },
 } as const;
 export type BlastMode = keyof typeof BLAST_MODES;
 

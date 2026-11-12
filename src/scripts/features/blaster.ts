@@ -198,7 +198,7 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
         if (charge === 3) await token.document.unsetFlag(moduleId, "blastRoot");
         throw error;
       }
-      const card = `<h3>${escape(token.name)} · ${tier.name}</h3><p>${charge} action${charge === 1 ? "" : "s"} · ${spectrum.label} · DC 40 · ${tier.width} square${tier.width === 1 ? "" : "s"} wide</p><p>@Check[${spectrum.save}|dc:40|basic|traits:${traits}] @Damage[${tier.dice - spectrum.penalty}d6[${spectrum.damage}]|traits:${traits}]</p><p>One save and one damage application per creature, even where segments overlap. Blaster is excluded. Resolve cover and line of effect normally.</p>${spectrum.rider ? `<p>${spectrum.rider}</p>` : ""}${recharge ? `<p>Rooted until the start of Blaster's next turn (6 seconds outside combat). Standing Ovation recharge: ${recharge.total} full rounds; available round ${use.readyRound} in this combat.</p>` : ""}`;
+      const card = `<h3>${escape(token.name)} · ${tier.name}</h3><p>${charge} action${charge === 1 ? "" : "s"} · ${spectrum.label} · DC 40 · ${tier.width} square${tier.width === 1 ? "" : "s"} wide</p><p>@Check[${spectrum.save}|dc:40|basic|traits:${traits}] @Damage[${tier.dice - spectrum.penalty}d6[${spectrum.damage}]|traits:${traits}|options:area-damage]</p><p>One save and one damage application per creature, even where segments overlap. Blaster is excluded. Resolve cover and line of effect normally.</p>${spectrum.rider ? `<p>${spectrum.rider}</p>` : ""}${recharge ? `<p>Rooted until the start of Blaster's next turn (6 seconds outside combat). Standing Ovation recharge: ${recharge.total} full rounds; available round ${use.readyRound} in this combat.</p>` : ""}`;
       const action = token.actor.items?.find?.((item: any) => item.slug === `blaster-charged-blast-${charge}`);
       const content = await game.pf2e.TextEditor.enrichHTML(card, { rollData: action?.getRollData() ?? token.actor.getRollData() });
       await foundry.documents.ChatMessage.implementation.create({
@@ -219,6 +219,29 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
     } catch (error) { notifyError(error); }
   }
 
+  async function refreshDescriptions() {
+    try {
+      const token = selected();
+      const source = await foundry.utils.fromUuid(`Compendium.${moduleId}.astillon-blaster-actors.Actor.BlasterActor0001`);
+      if (source?.type !== "npc") throw new Error("The Blaster compendium entry could not be loaded.");
+      const actor = token.actor;
+      const updates: { _id: string; "system.description.value": string }[] = [];
+      let matched = 0;
+      for (const original of source.items) {
+        const candidates = actor.items.filter((item: any) => item.type === original.type && item.slug === original.slug);
+        const current = candidates.find((item: any) => item.id === original.id) ?? (candidates.length === 1 ? candidates[0] : null);
+        if (!current) continue;
+        matched += 1;
+        const description = original.toObject().system.description.value;
+        if (current.system.description.value !== description) updates.push({ _id: current.id, "system.description.value": description });
+      }
+      if (!matched) throw new Error("No matching shipped Blaster abilities were found on the selected actor.");
+      if (updates.length) await actor.updateEmbeddedDocuments("Item", updates);
+      ui.notifications.info(`Updated ${updates.length} Blaster ability description(s). Stats, HP, artwork, effects, and other items were left unchanged.`);
+      return updates.length;
+    } catch (error) { notifyError(error); }
+  }
+
   async function releaseRoot() {
     try { await selected().document.unsetFlag(moduleId, "blastRoot"); }
     catch (error) { notifyError(error); }
@@ -233,7 +256,7 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
   }
 
   return {
-    id: "blaster", api: { blast, clearBlast, releaseRoot, flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => cancelPicker?.() },
+    id: "blaster", api: { blast, clearBlast, releaseRoot, refreshDescriptions, flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => cancelPicker?.() },
     ready() {
       summons.ready();
       Hooks.on("preMoveToken", (token: any, _movement: any, options: any) => preventMovement(token, options));

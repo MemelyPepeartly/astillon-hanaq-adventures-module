@@ -1,0 +1,10 @@
+{
+  "_id": "BlasterText00001",
+  "name": "Blaster — Refresh Sheet Descriptions",
+  "type": "script",
+  "img": "icons/svg/book.svg",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.refreshDescriptions) {\n  ui.notifications.warn(\"Update Astillon Hanaq Adventures and reload the world first.\");\n  return;\n}\nawait feature.refreshDescriptions();",
+  "ownership": { "default": 2 },
+  "flags": {}
+}

@@ -112,11 +112,8 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     }
     const red = controlled[0].document;
     const blue = targets[0].document;
-    if (red?.parent?.id !== scene.id || blue?.parent?.id !== scene.id || red.id === blue.id || !blue.actor) {
-      notify("Choose two different tokens on this scene; blue must have an actor owned by a non-GM player."); return null;
-    }
-    if (!game.users.contents.some((user: any) => user.active && canSubmitBeamRoll("blue", user, blue.actor))) {
-      notify("A non-GM Owner of the blue actor must be connected before the clash starts."); return null;
+    if (red?.parent?.id !== scene.id || blue?.parent?.id !== scene.id || red.id === blue.id || !red.actor || !blue.actor) {
+      notify("Choose two different tokens on this scene, each with an actor."); return null;
     }
     const redFile = String(game.settings.get(moduleId, setting("red")) ?? "").trim();
     const blueFile = String(game.settings.get(moduleId, setting("blue")) ?? "").trim();
@@ -177,7 +174,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         || typeof intent.redTokenId !== "string" || typeof intent.blueTokenId !== "string"
         || typeof intent.redFile !== "string" || typeof intent.blueFile !== "string") return;
       const pair = tokenPair(scene, { redTokenId: intent.redTokenId, blueTokenId: intent.blueTokenId });
-      if (!pair || !game.users.contents.some((user: any) => user.active && canSubmitBeamRoll("blue", user, pair[1].actor))) return;
+      if (!pair || !pair[0].actor || !pair[1].actor) return;
       const problem = filesProblem(intent.redFile, intent.blueFile);
       if (problem) { notify(problem); return; }
       const next: BeamClashState = {

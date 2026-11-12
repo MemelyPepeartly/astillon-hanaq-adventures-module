@@ -285,23 +285,106 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   function request(side, authorId, extras = {}, options = {}) {
     return message({ version: 1, action: "roll", sceneId: scene.id, clashId: flag?.id, round: flag?.round, side, ...extras }, authorId, options);
   }
+  function startRequest(authorId, extras = {}, options = {}) {
+    return message({
+      version: 1, action: "start", sceneId: scene.id, clashId: flag?.id ?? null,
+      redTokenId: red.id, blueTokenId: blue.id, redFile: RED_FILE, blueFile: BLUE_FILE, ...extras,
+    }, authorId, options);
+  }
   return {
     dom, feature, emit, warnings, writes, plays, ends, dice, totals, pans, settings, registrations,
-    game, canvas, scene, red, blue, messages, message, request, rollControl, chatControl, effectLoading, getState: () => flag,
+    game, canvas, scene, red, blue, messages, message, request, startRequest, rollControl, chatControl, effectLoading, getState: () => flag,
     button: (side) => dom.window.document.querySelector(`${ROOT} [data-side='${side}']`),
     roots: () => [...dom.window.document.querySelectorAll(ROOT)],
   };
 }
 
 describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
-  test("a clash cannot start with only offline owners of the blue actor", async (t) => {
+  test("a solo connected GM can stage a clash while the blue actor's owner is offline", async (t) => {
     const env = setup(t);
-    env.game.users.get("owner").active = false;
+    for (const user of env.game.users.values()) user.active = user.id === "gm";
+    assert.deepEqual(env.game.users.contents.filter((user) => user.active).map((user) => user.id), ["gm"]);
     await env.feature.api.start();
-    assert.equal(env.messages.size, 0);
-    assert.equal(env.writes.length, 0);
-    assert.match(env.warnings[0], /Owner.*connected/i);
+    await flush();
+    assert.equal(env.messages.size, 1);
+    assert.equal(env.writes.length, 1);
+    assert.equal(env.getState().status, "active");
+    assert.deepEqual(env.warnings, []);
+    assert.equal(env.button("red").disabled, false);
+    assert.equal(env.button("blue").disabled, true);
   });
+
+  test("a clash can be staged before ownership is assigned and its later-connected owner can roll blue", async (t) => {
+    const env = setup(t);
+    const gm = env.game.users.get("gm");
+    const owner = env.game.users.get("owner");
+    for (const user of env.game.users.values()) user.active = user.id === gm.id;
+    env.blue.actor.testUserPermission = () => false;
+    await env.feature.api.start();
+    await flush();
+    assert.equal(env.getState().status, "active");
+    assert.deepEqual(env.warnings, []);
+
+    env.game.user = owner;
+    env.emit("updateActor", env.blue.actor);
+    assert.equal(env.button("blue").disabled, true);
+    assert.equal(await env.feature.api.roll("blue"), null, "unassigned players still cannot submit blue rolls");
+    assert.equal(env.messages.size, 1);
+    assert.equal(env.dice.length, 0);
+
+    env.blue.actor.testUserPermission = (user, permission) => user.id === owner.id && permission === "OWNER";
+    owner.active = true;
+    env.emit("updateActor", env.blue.actor);
+    env.emit("userConnected", owner, true);
+    assert.equal(env.button("red").disabled, true);
+    assert.equal(env.button("blue").disabled, false);
+    const rollRequest = await env.feature.api.roll("blue");
+    await flush();
+    assert.ok(rollRequest, "the newly assigned owner can submit through the public API");
+    assert.equal(env.dice.length, 0, "a player client never adjudicates its own request");
+
+    // Deliver that same native document to the GM client's hook.
+    env.game.user = gm;
+    env.totals.push(15);
+    env.emit("createChatMessage", rollRequest, {}, owner.id);
+    await flush();
+    assert.deepEqual(env.getState().blue, submission(rollRequest.id, 15, owner.id));
+    assert.equal(env.getState().red, null);
+    assert.equal(env.getState().round, 1);
+    assert.equal(env.dice.length, 1);
+  });
+
+  test("non-GMs cannot start through the API or forged native start intents", async (t) => {
+    const env = setup(t, { userId: "owner" });
+    assert.equal(await env.feature.api.start(), null);
+    assert.equal(env.messages.size, 0);
+    assert.match(env.warnings[0], /Only a GM can start/i);
+
+    env.game.user = env.game.users.get("gm");
+    env.startRequest("owner", { userId: "gm" });
+    env.startRequest("gm", {}, { origin: "owner" });
+    await flush();
+    assert.equal(env.writes.length, 0);
+    assert.equal(env.getState(), null);
+  });
+
+  for (const side of ["red", "blue"]) {
+    test(`a ${side} token without an actor is rejected by both the caller and GM authority`, async (t) => {
+      const env = setup(t);
+      env[side].document.actor = null;
+      env[side].actor = null;
+      assert.equal(await env.feature.api.start(), null);
+      await flush();
+      assert.equal(env.messages.size, 0);
+      assert.equal(env.warnings.length, 1);
+      assert.equal(env.writes.length, 0);
+
+      env.startRequest("gm");
+      await flush();
+      assert.equal(env.writes.length, 0, "a direct start intent cannot bypass actor validation");
+      assert.equal(env.getState(), null);
+    });
+  }
 
   test("optional dependencies are silent on load and missing keys produce an actionable start warning", async (t) => {
     const env = setup(t, { dependencies: false });
