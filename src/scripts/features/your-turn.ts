@@ -452,23 +452,54 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   function elementRect(selector: string): DOMRect | null {
     const element = document.querySelector(selector);
-    if (!element || typeof (element as HTMLElement).getBoundingClientRect !== "function") return null;
-    return (element as HTMLElement).getBoundingClientRect();
+    return boxOf(element);
+  }
+
+  function boxOf(element: any): DOMRect | null {
+    if (!element || typeof element.getBoundingClientRect !== "function") return null;
+    const rect = element.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return rect;
+  }
+
+  /**
+   * Foundry's #ui-top and #ui-bottom regions can be full-viewport wrappers.
+   * Only a short strip at the matching edge is a real dock. A tall box was
+   * pinning the full-height stage to the middle of the page and clipping it.
+   */
+  function dockInset(elements: any[], viewHeight: number, edge: "top" | "bottom"): number {
+    let inset = 0;
+    for (const element of elements) {
+      const rect = boxOf(element);
+      if (!rect || rect.height > viewHeight * 0.4) continue;
+      if (edge === "top") {
+        if (rect.top >= viewHeight * 0.25 || rect.bottom >= viewHeight * 0.45) continue;
+        inset = Math.max(inset, rect.bottom);
+      } else {
+        if (rect.top <= viewHeight * 0.5 || rect.bottom <= viewHeight * 0.6) continue;
+        inset = Math.max(inset, viewHeight - rect.top);
+      }
+    }
+    return Math.round(Math.max(0, inset));
   }
 
   function applyInsets(root: HTMLElement): void {
     const view = viewport();
     const sidebar = ui.sidebar?.element;
-    const sidebarRect = sidebar && typeof sidebar.getBoundingClientRect === "function"
-      ? sidebar.getBoundingClientRect()
-      : null;
+    const sidebarRect = boxOf(sidebar);
     const right = sidebarRect ? Math.max(0, view.width - sidebarRect.left) : 0;
-    const bottomBar = elementRect("#ui-bottom") ?? elementRect("#hotbar");
-    const bottom = bottomBar ? Math.max(0, view.height - bottomBar.top) : 0;
     const leftBar = elementRect("#ui-left");
     const left = leftBar ? Math.max(0, leftBar.right) : 0;
-    const topBar = elementRect("#ui-top");
-    const top = topBar ? Math.max(0, topBar.bottom) : 0;
+    const top = dockInset(
+      [document.querySelector("#navigation"), document.querySelector("#ui-top")],
+      view.height,
+      "top",
+    );
+    const bottom = dockInset(
+      [ui.hotbar?.element, document.querySelector("#hotbar"), document.querySelector("#ui-bottom")],
+      view.height,
+      "bottom",
+    );
     root.style.setProperty("--yt-top", `${top}px`);
     root.style.setProperty("--yt-right", `${right}px`);
     root.style.setProperty("--yt-bottom", `${bottom}px`);
@@ -479,12 +510,25 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.right = `${right}px`;
     root.style.bottom = `${bottom}px`;
     root.style.left = `${left}px`;
-    const usableH = Math.max(0, view.height - top - bottom);
-    // The demo square spans the usable page height and stays anchored to the lower right.
-    const stageSize = Math.round(usableH > 0 ? usableH : view.height);
+    let placeTop = top;
+    let placeBottom = bottom;
+    let usableH = view.height - placeTop - placeBottom;
+    if (usableH <= 0) {
+      placeTop = 0;
+      placeBottom = 0;
+      usableH = view.height;
+    }
+    // The square stays the usable page height. Its top is the top dock and its
+    // bottom lands on the hotbar, so the portrait cannot leave the viewport.
+    const stageSize = Math.round(usableH);
     root.style.setProperty("--yt-stage-size", `${stageSize}px`);
     const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
     if (stage) {
+      stage.style.position = "fixed";
+      stage.style.top = `${placeTop}px`;
+      stage.style.right = `${right}px`;
+      stage.style.bottom = "auto";
+      stage.style.left = "auto";
       stage.style.width = `${stageSize}px`;
       stage.style.height = `${stageSize}px`;
     }
@@ -621,9 +665,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     applyTheme(root, subject.color);
 
     const stage = layer("astillon-yt-stage");
-    stage.style.position = "absolute";
-    stage.style.right = "0";
-    stage.style.bottom = "0";
+    stage.style.position = "fixed";
+    stage.style.bottom = "auto";
     stage.style.transformOrigin = "100% 100%";
     stage.style.transform = "scale(var(--yt-scale))";
     stage.style.pointerEvents = "none";

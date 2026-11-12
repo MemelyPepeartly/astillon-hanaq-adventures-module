@@ -19,9 +19,9 @@
 }
 
 .astillon-yt-stage {
-  position: absolute;
-  right: 0;
-  bottom: 0;
+  position: fixed;
+  top: var(--yt-top, 0px);
+  right: var(--yt-right, 0px);
   width: var(--yt-stage-size, 640px);
   height: var(--yt-stage-size, 640px);
   aspect-ratio: 1;

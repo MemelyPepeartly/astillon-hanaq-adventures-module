@@ -864,8 +864,11 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(stage.style.height, "784px");
     assert.equal(stage.style.transformOrigin, "100% 100%");
     assert.equal(stage.style.transform, "scale(var(--yt-scale))");
-    assert.equal(stage.style.right, "0px");
-    assert.equal(stage.style.bottom, "0px");
+    assert.equal(stage.style.position, "fixed");
+    assert.equal(stage.style.top, "36px");
+    assert.equal(stage.style.right, "500px");
+    assert.equal(stage.style.bottom, "auto");
+    assert.equal(Number.parseInt(stage.style.top, 10) + Number.parseInt(stage.style.height, 10), 820);
     root.click();
     assert.equal(env.overlays().length, 1);
     env.feature.api.cancel();
@@ -941,6 +944,34 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const next = env.overlays()[0].querySelector(".astillon-yt-stage");
     assert.equal(next.style.width, "1460px");
     assert.equal(next.style.height, "1460px");
+    assert.equal(next.style.top, "40px");
+    assert.equal(Number.parseInt(next.style.top, 10) + Number.parseInt(next.style.height, 10), 1500);
+  });
+
+  test("full-size ui regions do not lift the cut-in off the top of the page", (t) => {
+    const env = setup(t);
+    env.uiTop.getBoundingClientRect = () => rect(0, 0, 1400, 900);
+    env.hotbar.getBoundingClientRect = () => rect(0, 0, 1400, 900);
+    const navigation = env.dom.window.document.createElement("nav");
+    navigation.id = "navigation";
+    navigation.getBoundingClientRect = () => rect(0, 0, 1400, 36);
+    env.dom.window.document.body.append(navigation);
+    const macroBar = env.dom.window.document.createElement("div");
+    macroBar.id = "hotbar";
+    macroBar.getBoundingClientRect = () => rect(220, 820, 700, 64);
+    env.dom.window.document.body.append(macroBar);
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const stage = env.overlays()[0].querySelector(".astillon-yt-stage");
+    assert.equal(env.overlays()[0].style.getPropertyValue("--yt-top"), "36px");
+    assert.equal(env.overlays()[0].style.getPropertyValue("--yt-bottom"), "80px");
+    assert.equal(stage.style.top, "36px");
+    assert.equal(stage.style.width, "784px");
+    assert.equal(stage.style.height, "784px");
+    assert.equal(Number.parseInt(stage.style.top, 10) + Number.parseInt(stage.style.height, 10), 820);
   });
 
   test("euclidean outline covers (3, 4) and leaves (4, 4) clear at radius 5", () => {
