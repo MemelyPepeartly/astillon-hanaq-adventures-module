@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.1. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.9.0. Reload connected clients after installing the build. No Sequencer or JB2A dependency is required.
 
 ## Menacing
 
@@ -17,9 +17,9 @@ Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.8.1. Re
 
 ## Your Turn
 
-1. Leave **Your Turn Banner** off. Advance initiative. No card should appear.
-2. Enable the setting for your user. On the next combatant's turn, a card should slide out beside the right sidebar with a white-outlined portrait, that combatant's name, and “{name}'s turn!” The combat tracker stays usable. Click dismisses it, and it also leaves on its own after a few seconds. Another player's turn, and a GM client with the setting on, should announce that combatant too.
-3. Set a portrait override and take your own turn. That image is used. Another combatant's turn still uses their token image, then their actor image. Clear the override and confirm your turn uses your token image, then your actor image.
+1. Leave **Your Turn Cut-In** off. Advance initiative. No cut-in should appear. From an actor sheet you can edit, open Your Turn and choose Preview. The draft plays anyway, without enabling the setting, writing flags, or advancing combat. A sheet you cannot edit has no control.
+2. Enable the setting for your user. On the next change of combatant, round, or turn, one cut-in should enter from the lower right of the map. The large line is the combatant's name and the smaller line is YOUR TURN. The portrait has a thick white outline. Most of the map to the left stays visible and clickable. The cut-in leaves on its own. Another player's combatant, and a GM client with the setting on, should announce that combatant too. Collapse the sidebar or resize the window: the graphic moves and does not replay.
+3. Save a custom image and color on the actor. That image is used, then the same flag on the token's base actor, then the actor image, then the token image. Clear the image and confirm the actor image is used, then the token image. An invalid color falls back to #2B8CFF. With reduced motion enabled, the cut-in fades in and out together instead of slamming in layers.
 
 ## Existing content
 

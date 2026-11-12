@@ -6,12 +6,21 @@
       "ToggleError": "Could not toggle Menacing. See the console for details."
     },
     "YourTurn": {
-      "Enabled": "Your Turn Banner",
-      "EnabledHint": "Show a flashy card beside the sidebar whenever combat advances, announcing whose turn it is.",
-      "Portrait": "Your Turn Portrait Override",
-      "PortraitHint": "Optional image used for your own turn instead of your token or actor portrait.",
-      "Banner": "{name}'s turn!",
-      "UnknownName": "Someone"
+      "Enabled": "Your Turn Cut-In",
+      "EnabledHint": "Play a Persona-style cut-in on the map whenever the combat turn changes.",
+      "Scale": "Your Turn Scale",
+      "ScaleHint": "Size of the cut-in, from half size to one and a half. 1 is the default.",
+      "Hold": "Your Turn Hold",
+      "HoldHint": "Seconds the cut-in stays fully visible before it leaves.",
+      "Strip": "YOUR TURN",
+      "UnknownName": "Someone",
+      "Configure": "Your Turn",
+      "EditorTitle": "Your Turn Cut-In",
+      "Art": "Portrait",
+      "Color": "Color",
+      "Browse": "Browse",
+      "Preview": "Preview",
+      "Save": "Save"
     }
   }
 }

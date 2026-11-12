@@ -1,17 +1,18 @@
 import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { JSDOM } from "jsdom";
-import { createYourTurnFeature } from "../dist/scripts/features/your-turn.js";
+import {
+  createYourTurnFeature,
+  euclideanOutlineCovers,
+  mixTowardWhite,
+  renderOutlineMask,
+  saturatedPanelColor,
+} from "../dist/scripts/features/your-turn.js";
 
 const MODULE = "astillon-hanaq-adventures-module";
-const CARD_TIMEOUT_MS = 3000;
-const CARD_SELECTOR = ".astillon-your-turn-card";
+const ROOT = ".astillon-yt";
 const flush = () => setImmediate();
-const flushFrames = async () => {
-  await flush();
-  await flush();
-};
 
 class BooleanFieldStub {
   constructor() {
@@ -19,343 +20,1102 @@ class BooleanFieldStub {
   }
 }
 
-class FilePathFieldStub {
+class NumberFieldStub {
   constructor(options) {
-    this.kind = "filePath";
+    this.kind = "number";
     this.options = options;
   }
 }
 
-function setup(t, { enabled = true, portrait = "", userId = "player-1" } = {}) {
-  const dom = new JSDOM("<!doctype html><html><body></body></html>");
-  const callbacks = new Map();
-  const settings = new Map([
-    ["yourTurnEnabled", enabled],
-    ["yourTurnPortrait", portrait],
-  ]);
-  const emit = (name, ...args) => {
-    for (const callback of callbacks.get(name) ?? []) callback(...args);
-  };
-
-  const sidebar = dom.window.document.createElement("aside");
-  sidebar.id = "sidebar";
-  sidebar.getBoundingClientRect = () => ({
-    top: 80,
-    left: 900,
-    width: 300,
-    height: 600,
-    right: 1200,
-    bottom: 680,
-    x: 900,
-    y: 80,
+function rect(left, top, width, height) {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
     toJSON() {
       return {};
     },
-  });
-  dom.window.document.body.append(sidebar);
-
-  const combatTracker = dom.window.document.createElement("section");
-  combatTracker.id = "combat-tracker";
-  sidebar.append(combatTracker);
-
-  const resizeObservers = [];
-  class ResizeObserverMock {
-    constructor(callback) {
-      this.callback = callback;
-      resizeObservers.push(this);
-    }
-    observe() {}
-    disconnect() {
-      const index = resizeObservers.indexOf(this);
-      if (index >= 0) resizeObservers.splice(index, 1);
-    }
-  }
-
-  const Hooks = {
-    on(name, callback) {
-      const listeners = callbacks.get(name) ?? [];
-      listeners.push(callback);
-      callbacks.set(name, listeners);
-    },
-  };
-
-  const viewedCombat = { id: "combat-viewed" };
-  const game = {
-    user: { id: userId, isGM: false },
-    i18n: {
-      localize: (key) => (key === "ASTILLON.YourTurn.UnknownName" ? "Someone" : key),
-      format: (key, data) => (key === "ASTILLON.YourTurn.Banner" ? `${data.name}'s turn!` : key),
-    },
-    settings: {
-      register() {},
-      get(_scope, key) {
-        return settings.get(key);
-      },
-      set(_scope, key, value) {
-        settings.set(key, value);
-      },
-    },
-  };
-
-  const globals = {
-    document: dom.window.document,
-    HTMLElement: dom.window.HTMLElement,
-    Element: dom.window.Element,
-    requestAnimationFrame: (fn) => {
-      fn();
-      return 0;
-    },
-    ResizeObserver: ResizeObserverMock,
-    Hooks,
-    game,
-    ui: {
-      sidebar: { element: sidebar, expanded: true },
-      combat: { viewed: viewedCombat },
-    },
-    foundry: {
-      data: {
-        fields: {
-          BooleanField: BooleanFieldStub,
-          FilePathField: FilePathFieldStub,
-        },
-      },
-    },
-  };
-
-  const originals = new Map(
-    Object.keys(globals).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
-  );
-  for (const [name, value] of Object.entries(globals)) {
-    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
-  }
-
-  t.after(() => {
-    dom.window.close();
-    for (const [name, descriptor] of originals) {
-      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-      else delete globalThis[name];
-    }
-  });
-
-  const feature = createYourTurnFeature(MODULE);
-  feature.init();
-
-  function combatant({
-    id = "c1",
-    name = "Hero",
-    players = [{ id: userId }],
-    tokenTexture = "icons/token.webp",
-    actorImg = "icons/actor.webp",
-  } = {}) {
-    const token = {
-      texture: tokenTexture ? { src: tokenTexture } : { src: "" },
-    };
-    return {
-      id,
-      name,
-      players,
-      token,
-      actor: { name, img: actorImg },
-    };
-  }
-
-  function combat({
-    id = "combat-viewed",
-    combatant: current = combatant(),
-    viewed = true,
-  } = {}) {
-    const instance = { id, combatant: current };
-    if (viewed) ui.combat.viewed = instance;
-    return instance;
-  }
-
-  function turnChange(combatInstance, prior, current) {
-    emit("combatTurnChange", combatInstance, prior, current);
-  }
-
-  function cards() {
-    return [...dom.window.document.body.querySelectorAll(CARD_SELECTOR)];
-  }
-
-  return {
-    feature,
-    dom,
-    sidebar,
-    combatTracker,
-    settings,
-    combatant,
-    combat,
-    turnChange,
-    cards,
-    emit,
-    game,
   };
 }
 
-test("setting off shows nothing", (t) => {
-  const env = setup(t, { enabled: false });
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  assert.equal(env.cards().length, 0);
-});
+function secondsList(value) {
+  return String(value)
+    .split(",")
+    .map((part) => parseFloat(part.trim()))
+    .filter((part) => !Number.isNaN(part));
+}
 
-test("another user's combatant is announced to this client", (t) => {
-  const env = setup(t, { userId: "player-1", portrait: "icons/mine.webp" });
-  const foe = env.combatant({
-    name: "Rival",
-    players: [{ id: "player-2" }],
-    tokenTexture: "icons/rival.webp",
+function durationList(value) {
+  return String(value)
+    .split(",")
+    .map((part) => {
+      const amount = parseFloat(part.trim());
+      return part.includes("ms") ? amount : amount * 1000;
+    })
+    .filter((part) => !Number.isNaN(part));
+}
+
+describe("your turn cut-in", { concurrency: 1 }, () => {
+  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45 } = {}) {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const callbacks = new Map();
+    const settings = new Map([
+      ["yourTurnEnabled", enabled],
+      ["yourTurnScale", scale],
+      ["yourTurnHold", hold],
+    ]);
+    const scheduled = [];
+    const timerIds = [];
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const imageControl = {
+      auto: true,
+      pending: [],
+      tainted: new Set(),
+      pixels: new Map(),
+      sizes: new Map(),
+    };
+    const filePickers = [];
+    const calls = { nextTurn: 0, update: 0 };
+
+    const emit = (name, ...args) => {
+      for (const callback of callbacks.get(name) ?? []) callback(...args);
+    };
+
+    const sidebar = dom.window.document.createElement("aside");
+    sidebar.id = "sidebar";
+    let sidebarLeft = 900;
+    sidebar.getBoundingClientRect = () => rect(sidebarLeft, 40, 300, 760);
+    dom.window.document.body.append(sidebar);
+
+    const hotbar = dom.window.document.createElement("div");
+    hotbar.id = "ui-bottom";
+    hotbar.getBoundingClientRect = () => rect(0, 820, 1400, 80);
+    dom.window.document.body.append(hotbar);
+
+    const uiLeft = dom.window.document.createElement("div");
+    uiLeft.id = "ui-left";
+    uiLeft.getBoundingClientRect = () => rect(0, 36, 64, 784);
+    dom.window.document.body.append(uiLeft);
+
+    const uiTop = dom.window.document.createElement("div");
+    uiTop.id = "ui-top";
+    uiTop.getBoundingClientRect = () => rect(0, 0, 1400, 36);
+    dom.window.document.body.append(uiTop);
+
+    dom.window.innerWidth = 1400;
+    dom.window.innerHeight = 900;
+    dom.window.matchMedia = (query) => ({
+      matches: reduced && String(query).includes("prefers-reduced-motion"),
+      media: String(query),
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent() {
+        return false;
+      },
+      onchange: null,
+    });
+
+    class FakeImage {
+      constructor() {
+        this.naturalWidth = 40;
+        this.naturalHeight = 40;
+        this.width = 40;
+        this.height = 40;
+        this.onload = null;
+        this.onerror = null;
+        this._src = "";
+        this.tainted = false;
+        this.pixels = null;
+      }
+
+      set src(value) {
+        this._src = String(value);
+        this.tainted = imageControl.tainted.has(this._src);
+        this.pixels = imageControl.pixels.get(this._src) ?? null;
+        const size = imageControl.sizes.get(this._src);
+        if (size) {
+          this.naturalWidth = size;
+          this.naturalHeight = size;
+          this.width = size;
+          this.height = size;
+        }
+        const run = () => {
+          if (this._src.startsWith("fail:")) this.onerror?.(new dom.window.Event("error"));
+          else this.onload?.(new dom.window.Event("load"));
+        };
+        if (imageControl.auto) queueMicrotask(run);
+        else imageControl.pending.push(run);
+      }
+
+      get src() {
+        return this._src;
+      }
+    }
+
+    const canvasProto = dom.window.HTMLCanvasElement.prototype;
+    canvasProto.getContext = function getContext() {
+      const canvas = this;
+      const buffer = () => {
+        const count = canvas.width * canvas.height * 4;
+        if (!canvas.__px || canvas.__px.length !== count) canvas.__px = new Uint8ClampedArray(count);
+        return canvas.__px;
+      };
+      return {
+        drawImage(source, dx = 0, dy = 0, dw, dh) {
+          const dest = buffer();
+          const destW = canvas.width;
+          const destH = canvas.height;
+          canvas.__tainted = source?.tainted === true;
+          const sourcePixels = source instanceof dom.window.HTMLCanvasElement ? source.__px : source?.pixels;
+          const sw = source instanceof dom.window.HTMLCanvasElement
+            ? source.width
+            : source?.naturalWidth || source?.width || destW;
+          const sh = source instanceof dom.window.HTMLCanvasElement
+            ? source.height
+            : source?.naturalHeight || source?.height || destH;
+          const copyW = dw ?? sw;
+          const copyH = dh ?? sh;
+          for (let y = 0; y < copyH; y += 1) {
+            for (let x = 0; x < copyW; x += 1) {
+              const tx = dx + x;
+              const ty = dy + y;
+              if (tx < 0 || ty < 0 || tx >= destW || ty >= destH) continue;
+              const di = (ty * destW + tx) * 4;
+              if (sourcePixels) {
+                const sx = Math.min(sw - 1, Math.floor((x * sw) / copyW));
+                const sy = Math.min(sh - 1, Math.floor((y * sh) / copyH));
+                const si = (sy * sw + sx) * 4;
+                dest[di] = sourcePixels[si] ?? 0;
+                dest[di + 1] = sourcePixels[si + 1] ?? 0;
+                dest[di + 2] = sourcePixels[si + 2] ?? 0;
+                dest[di + 3] = sourcePixels[si + 3] ?? 0;
+              } else {
+                dest[di] = 255;
+                dest[di + 1] = 255;
+                dest[di + 2] = 255;
+                dest[di + 3] = 255;
+              }
+            }
+          }
+        },
+        getImageData(_x, _y, w, h) {
+          if (canvas.__tainted) {
+            const error = new Error("The canvas has been tainted by cross-origin data.");
+            error.name = "SecurityError";
+            throw error;
+          }
+          return { data: buffer().slice(0, w * h * 4), width: w, height: h };
+        },
+        putImageData(imageData, dx, dy) {
+          const dest = buffer();
+          for (let y = 0; y < imageData.height; y += 1) {
+            for (let x = 0; x < imageData.width; x += 1) {
+              const tx = dx + x;
+              const ty = dy + y;
+              if (tx < 0 || ty < 0 || tx >= canvas.width || ty >= canvas.height) continue;
+              const si = (y * imageData.width + x) * 4;
+              const di = (ty * canvas.width + tx) * 4;
+              dest[di] = imageData.data[si];
+              dest[di + 1] = imageData.data[si + 1];
+              dest[di + 2] = imageData.data[si + 2];
+              dest[di + 3] = imageData.data[si + 3];
+            }
+          }
+        },
+        clearRect() {},
+      };
+    };
+    canvasProto.toBlob = function toBlob(callback) {
+      callback(new dom.window.Blob(["png"], { type: "image/png" }));
+    };
+
+    class ResizeObserverMock {
+      constructor(callback) {
+        this.callback = callback;
+        resizeObservers.push(this);
+      }
+
+      observe(element) {
+        this.element = element;
+      }
+
+      disconnect() {
+        const index = resizeObservers.indexOf(this);
+        if (index >= 0) resizeObservers.splice(index, 1);
+      }
+    }
+    const resizeObservers = [];
+
+    const Hooks = {
+      on(name, callback) {
+        const listeners = callbacks.get(name) ?? [];
+        listeners.push(callback);
+        callbacks.set(name, listeners);
+      },
+    };
+
+    const viewedCombat = { id: "combat-viewed" };
+    const game = {
+      user: { id: userId, isGM: false },
+      i18n: {
+        localize: (key) => ({
+          "ASTILLON.YourTurn.UnknownName": "Someone",
+          "ASTILLON.YourTurn.Strip": "YOUR TURN",
+          "ASTILLON.YourTurn.Configure": "Your Turn",
+          "ASTILLON.YourTurn.EditorTitle": "Your Turn Cut-In",
+          "ASTILLON.YourTurn.Art": "Portrait",
+          "ASTILLON.YourTurn.Color": "Color",
+          "ASTILLON.YourTurn.Browse": "Browse",
+          "ASTILLON.YourTurn.Preview": "Preview",
+          "ASTILLON.YourTurn.Save": "Save",
+        })[key] ?? key,
+        format: (key) => key,
+      },
+      settings: {
+        register() {},
+        get(_scope, key) {
+          return settings.get(key);
+        },
+        set(_scope, key, value) {
+          settings.set(key, value);
+        },
+      },
+    };
+
+    class FilePickerStub {
+      constructor(options) {
+        this.options = options;
+        filePickers.push(this);
+      }
+
+      render() {
+        this.options.callback?.("icons/picked.webp");
+      }
+    }
+
+    const foundryNamespace = {
+      data: { fields: { BooleanField: BooleanFieldStub, NumberField: NumberFieldStub } },
+      applications: {
+        api: {
+          DialogV2: {
+            wait(config) {
+              const wrap = dom.window.document.createElement("div");
+              wrap.className = "astillon-yt-dialog";
+              wrap.innerHTML = config.content;
+              dom.window.document.body.append(wrap);
+              config.render?.(new dom.window.Event("render"), { element: wrap });
+              for (const button of config.buttons ?? []) {
+                const element = dom.window.document.createElement("button");
+                element.type = "button";
+                element.dataset.action = button.action;
+                element.textContent = button.label;
+                element.addEventListener("click", () => {
+                  void button.callback?.(new dom.window.Event("click"), element);
+                });
+                wrap.append(element);
+              }
+              return new Promise(() => {});
+            },
+          },
+        },
+        apps: { FilePicker: { implementation: FilePickerStub } },
+      },
+    };
+
+    const blobUrls = [];
+    const globals = {
+      document: dom.window.document,
+      HTMLElement: dom.window.HTMLElement,
+      Element: dom.window.Element,
+      Image: FakeImage,
+      requestAnimationFrame: (fn) => {
+        fn();
+        return 0;
+      },
+      ResizeObserver: ResizeObserverMock,
+      Hooks,
+      game,
+      ui: {
+        sidebar: { element: sidebar, expanded: true },
+        combat: {
+          viewed: viewedCombat,
+          nextTurn() {
+            calls.nextTurn += 1;
+          },
+        },
+      },
+      foundry: foundryNamespace,
+      setTimeout: (fn, ms, ...args) => {
+        scheduled.push(ms);
+        const id = realSetTimeout(fn, ms, ...args);
+        timerIds.push(id);
+        return id;
+      },
+      clearTimeout: (id) => realClearTimeout(id),
+    };
+
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = () => {
+      const url = `blob:your-turn-${blobUrls.length + 1}`;
+      blobUrls.push(url);
+      return url;
+    };
+    URL.revokeObjectURL = () => {};
+
+    const originals = new Map(
+      Object.keys(globals).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+    );
+    for (const [name, value] of Object.entries(globals)) {
+      Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+    }
+
+    const feature = createYourTurnFeature(MODULE);
+    feature.init();
+
+    t.after(() => {
+      feature.api.cancel();
+      for (const id of timerIds) realClearTimeout(id);
+      dom.window.close();
+      for (const [name, descriptor] of originals) {
+        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+        else delete globalThis[name];
+      }
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    });
+
+    function makeActor({
+      name = "Hero",
+      img = "icons/actor.webp",
+      art,
+      color,
+      documentName = "Actor",
+    } = {}) {
+      const flags = {};
+      if (art !== undefined) flags.yourTurnArt = art;
+      if (color !== undefined) flags.yourTurnColor = color;
+      return {
+        name,
+        img,
+        documentName,
+        flags,
+        setCalls: [],
+        unsetCalls: [],
+        updated: false,
+        isEditable: true,
+        getFlag(module, key) {
+          assert.equal(module, MODULE);
+          return flags[key];
+        },
+        async setFlag(module, key, value) {
+          assert.equal(module, MODULE);
+          flags[key] = value;
+          this.setCalls.push([key, value]);
+        },
+        async unsetFlag(module, key) {
+          assert.equal(module, MODULE);
+          delete flags[key];
+          this.unsetCalls.push(key);
+        },
+        async update() {
+          this.updated = true;
+          calls.update += 1;
+        },
+      };
+    }
+
+    function combatant({
+      id = "c1",
+      name = "Hero",
+      players = [{ id: "player-2" }],
+      tokenTexture = "icons/token.webp",
+      actorImg = "icons/actor.webp",
+      art,
+      color,
+      baseArt,
+      baseColor,
+      actorName,
+    } = {}) {
+      const actor = makeActor({ name: actorName ?? name, img: actorImg, art, color });
+      const baseActor = baseArt !== undefined || baseColor !== undefined
+        ? makeActor({ name: "Base", img: "icons/base.webp", art: baseArt, color: baseColor })
+        : null;
+      return {
+        id,
+        name,
+        players,
+        actor,
+        token: {
+          texture: { src: tokenTexture },
+          baseActor,
+        },
+      };
+    }
+
+    function combat({
+      id = "combat-viewed",
+      combatant: current = combatant(),
+      viewed = true,
+    } = {}) {
+      const instance = {
+        id,
+        combatant: current,
+        nextTurn() {
+          calls.nextTurn += 1;
+        },
+      };
+      if (viewed) ui.combat.viewed = instance;
+      return instance;
+    }
+
+    function turnChange(combatInstance, prior, current) {
+      emit("combatTurnChange", combatInstance, prior, current);
+    }
+
+    function overlays() {
+      return [...dom.window.document.body.querySelectorAll(ROOT)];
+    }
+
+    return {
+      feature,
+      dom,
+      sidebar,
+      hotbar,
+      uiLeft,
+      uiTop,
+      settings,
+      scheduled,
+      imageControl,
+      resizeObservers,
+      filePickers,
+      calls,
+      makeActor,
+      combatant,
+      combat,
+      turnChange,
+      overlays,
+      emit,
+      setSidebarLeft(left) {
+        sidebarLeft = left;
+      },
+    };
+  }
+
+  test("setting off shows nothing", (t) => {
+    const env = setup(t, { enabled: false });
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    assert.equal(env.overlays().length, 0);
   });
-  env.turnChange(
-    env.combat({ combatant: foe }),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const [card] = env.cards();
-  assert.ok(card);
-  assert.equal(card.querySelector(".astillon-your-turn-name").textContent, "Rival");
-  assert.equal(card.querySelector(".astillon-your-turn-banner").textContent, "Rival's turn!");
-  assert.equal(card.querySelector(".astillon-your-turn-portrait img").getAttribute("src"), "icons/rival.webp");
-});
 
-test("owned combatant shows name, banner, and token portrait", (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat({ combatant: env.combatant({ name: "Aster", tokenTexture: "icons/token.webp" }) }),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const [card] = env.cards();
-  assert.ok(card);
-  assert.equal(card.querySelector(".astillon-your-turn-name").textContent, "Aster");
-  assert.equal(card.querySelector(".astillon-your-turn-banner").textContent, "Aster's turn!");
-  assert.equal(card.querySelector(".astillon-your-turn-portrait img").getAttribute("src"), "icons/token.webp");
-});
+  test("preview while disabled does not advance combat or write flags", async (t) => {
+    const env = setup(t, { enabled: false });
+    const actor = env.makeActor({ name: "Hero", img: "icons/hero.webp" });
+    env.feature.api.preview(actor);
+    await flush();
+    const [root] = env.overlays();
+    assert.ok(root);
+    assert.equal(root.querySelector(".astillon-yt-name").textContent, "Hero");
+    assert.equal(root.querySelector(".astillon-yt-strip").textContent, "YOUR TURN");
+    assert.equal(root.querySelector(".astillon-yt-character img").getAttribute("src"), "icons/hero.webp");
+    assert.equal(actor.setCalls.length, 0);
+    assert.equal(actor.updated, false);
+    assert.equal(env.calls.nextTurn, 0);
+    assert.equal(env.calls.update, 0);
+  });
 
-test("empty token image falls through to actor portrait", (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat({
-      combatant: env.combatant({ tokenTexture: "", actorImg: "icons/actor-only.webp" }),
-    }),
-    { combatantId: "c1", round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const img = env.cards()[0]?.querySelector(".astillon-your-turn-portrait img");
-  assert.ok(img);
-  assert.equal(img.getAttribute("src"), "icons/actor-only.webp");
-});
+  test("combat guards ignore other combats, repeats, and missing combatants", (t) => {
+    const env = setup(t);
+    const other = env.combat({ id: "other-combat", viewed: false });
+    env.turnChange(
+      other,
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    assert.equal(env.overlays().length, 0);
 
-test("portrait setting replaces token and actor images", (t) => {
-  const env = setup(t, { portrait: "icons/custom.webp" });
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const img = env.cards()[0]?.querySelector(".astillon-your-turn-portrait img");
-  assert.equal(img.getAttribute("src"), "icons/custom.webp");
-});
+    const history = { combatantId: "c1", round: 1, turn: 1 };
+    env.turnChange(env.combat(), history, { ...history });
+    assert.equal(env.overlays().length, 0);
 
-test("click removes the card", (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  assert.equal(env.cards().length, 1);
-  env.cards()[0].click();
-  assert.equal(env.cards().length, 0);
-});
+    env.turnChange(
+      env.combat(),
+      { combatantId: "c1", round: 1, turn: 0 },
+      { combatantId: null, round: 1, turn: 1 },
+    );
+    assert.equal(env.overlays().length, 0);
 
-test("timer removes the card", async (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  assert.equal(env.cards().length, 1);
-  await new Promise((resolve) => setTimeout(resolve, CARD_TIMEOUT_MS + 50));
-  assert.equal(env.cards().length, 0);
-});
+    const viewed = env.combat();
+    viewed.combatant = null;
+    env.turnChange(
+      viewed,
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    assert.equal(env.overlays().length, 0);
 
-test("second combatTurnChange leaves only one card", (t) => {
-  const env = setup(t);
-  const first = env.combat({ combatant: env.combatant({ name: "First", id: "c1" }) });
-  env.turnChange(
-    first,
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const second = env.combat({ combatant: env.combatant({ name: "Second", id: "c2" }) });
-  env.turnChange(
-    second,
-    { combatantId: "c1", round: 1, turn: 1 },
-    { combatantId: "c2", round: 1, turn: 2 },
-  );
-  assert.equal(env.cards().length, 1);
-  assert.equal(env.cards()[0].querySelector(".astillon-your-turn-name").textContent, "Second");
-});
+    env.turnChange(
+      env.combat(),
+      { combatantId: "c1", round: 1, turn: 2 },
+      { combatantId: "c1", round: 2, turn: 0 },
+    );
+    assert.equal(env.overlays().length, 1);
+  });
 
-test("card is appended to body, not inside sidebar or combat tracker", (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  const [card] = env.cards();
-  assert.ok(card);
-  assert.equal(card.parentElement, env.dom.window.document.body);
-  assert.equal(env.sidebar.contains(card), false);
-  assert.equal(env.combatTracker.contains(card), false);
-});
+  test("another user's combatant is announced", async (t) => {
+    const env = setup(t, { userId: "player-1" });
+    const foe = env.combatant({
+      name: "Rival",
+      players: [{ id: "player-2" }],
+      actorImg: "icons/rival.webp",
+      tokenTexture: "icons/token.webp",
+    });
+    env.turnChange(
+      env.combat({ combatant: foe }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    await flush();
+    const [root] = env.overlays();
+    assert.equal(root.querySelector(".astillon-yt-name").textContent, "Rival");
+    assert.equal(root.querySelector(".astillon-yt-character img").getAttribute("src"), "icons/rival.webp");
+  });
 
-test("combat that is not ui.combat.viewed shows nothing", (t) => {
-  const env = setup(t);
-  const other = env.combat({ id: "other-combat", viewed: false });
-  env.turnChange(
-    other,
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  assert.equal(env.cards().length, 0);
-});
+  test("rapid turn leaves one overlay for the latest combatant", async (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "First", id: "c1", actorImg: "icons/first.webp" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "Second", id: "c2", actorImg: "icons/second.webp" }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-name").textContent, "Second");
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/second.webp");
+  });
 
-test("identical prior and current history shows nothing", (t) => {
-  const env = setup(t);
-  const history = { combatantId: "c1", round: 1, turn: 1 };
-  env.turnChange(env.combat(), history, { ...history });
-  assert.equal(env.cards().length, 0);
-});
+  test("a late image from the previous turn is ignored", async (t) => {
+    const env = setup(t);
+    env.imageControl.auto = false;
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "First", actorImg: "icons/first.webp" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const first = env.overlays()[0];
+    assert.equal(first.querySelector(".astillon-yt-character"), null);
+    assert.ok(first.querySelector(".astillon-yt-banner"));
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "Second", id: "c2", actorImg: "icons/second.webp" }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    assert.equal(env.overlays().length, 1);
+    assert.equal(first.isConnected, false);
+    env.imageControl.pending[0]();
+    await flush();
+    assert.equal(first.querySelector(".astillon-yt-character"), null);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character"), null);
+    env.imageControl.pending[1]();
+    await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-name").textContent, "Second");
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/second.webp");
+  });
 
-test("new round for the same combatant shows again", (t) => {
-  const env = setup(t);
-  const instance = env.combat();
-  env.turnChange(
-    instance,
-    { combatantId: "c1", round: 1, turn: 2 },
-    { combatantId: "c1", round: 2, turn: 0 },
-  );
-  assert.equal(env.cards().length, 1);
-});
+  test("the name is the large line and YOUR TURN is the smaller strip", async (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "Aster" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const [root] = env.overlays();
+    const name = root.querySelector(".astillon-yt-name");
+    const strip = root.querySelector(".astillon-yt-strip");
+    assert.equal(name.textContent, "Aster");
+    assert.equal(strip.textContent, "YOUR TURN");
+    assert.notEqual(name.textContent, strip.textContent);
+    assert.ok(root.querySelector(".astillon-yt-banner-text").contains(name));
+    assert.ok(root.querySelector(".astillon-yt-banner-text").contains(strip));
 
-test("positions card using sidebar geometry", async (t) => {
-  const env = setup(t);
-  env.turnChange(
-    env.combat(),
-    { combatantId: null, round: 1, turn: 0 },
-    { combatantId: "c1", round: 1, turn: 1 },
-  );
-  await flushFrames();
-  const [card] = env.cards();
-  assert.equal(card.style.getPropertyValue("--astillon-your-turn-top"), "380px");
-  assert.equal(card.style.getPropertyValue("--astillon-your-turn-left"), "900px");
+    env.feature.api.cancel();
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: " ", actorName: " ", actorImg: " ", tokenTexture: " " }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c1", round: 1, turn: 2 },
+    );
+    await flush();
+    const unknown = env.overlays()[0];
+    assert.equal(unknown.querySelector(".astillon-yt-name").textContent, "Someone");
+    assert.equal(unknown.querySelector(".astillon-yt-character"), null);
+    assert.ok(unknown.querySelector(".astillon-yt-slash"));
+    assert.ok(unknown.querySelector(".astillon-yt-panel-sat"));
+    assert.ok(unknown.querySelector(".astillon-yt-banner"));
+  });
+
+  test("flag art wins, a blank flag uses actor.img, and a blank actor image uses the token", async (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat({
+        combatant: env.combatant({
+          art: "icons/flag.webp",
+          actorImg: "icons/actor.webp",
+          tokenTexture: "icons/token.webp",
+        }),
+      }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/flag.webp");
+
+    env.turnChange(
+      env.combat({
+        combatant: env.combatant({
+          id: "c2",
+          art: "   ",
+          baseArt: "icons/base.webp",
+          actorImg: "icons/actor.webp",
+          tokenTexture: "icons/token.webp",
+        }),
+      }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/base.webp");
+
+    env.turnChange(
+      env.combat({
+        combatant: env.combatant({
+          id: "c3",
+          art: "",
+          actorImg: "icons/actor-only.webp",
+          tokenTexture: "icons/token.webp",
+        }),
+      }),
+      { combatantId: "c2", round: 1, turn: 2 },
+      { combatantId: "c3", round: 1, turn: 3 },
+    );
+    await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/actor-only.webp");
+
+    env.turnChange(
+      env.combat({
+        combatant: env.combatant({
+          id: "c4",
+          art: "",
+          actorImg: "  ",
+          tokenTexture: "icons/token-only.webp",
+        }),
+      }),
+      { combatantId: "c3", round: 1, turn: 3 },
+      { combatantId: "c4", round: 1, turn: 4 },
+    );
+    await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/token-only.webp");
+
+    env.turnChange(
+      env.combat({
+        combatant: env.combatant({
+          id: "c5",
+          art: "fail:missing.webp",
+          actorImg: "icons/after-failure.webp",
+          tokenTexture: "icons/token.webp",
+        }),
+      }),
+      { combatantId: "c4", round: 1, turn: 4 },
+      { combatantId: "c5", round: 1, turn: 5 },
+    );
+    await flush();
+    await flush();
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/after-failure.webp");
+  });
+
+  test("default color is #2B8CFF and invalid hex falls back to it", async (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ color: "blue" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    let [root] = env.overlays();
+    assert.equal(root.style.getPropertyValue("--yt-color"), "#2B8CFF");
+    assert.equal(root.style.getPropertyValue("--yt-backing"), "#0B0B12");
+    assert.equal(root.style.getPropertyValue("--yt-light"), mixTowardWhite("#2B8CFF", 0.35));
+    assert.equal(root.style.getPropertyValue("--yt-panel"), saturatedPanelColor("#2B8CFF"));
+    assert.equal(root.style.getPropertyValue("--yt-scale"), "1");
+
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ id: "c2", color: "#ff00aa" }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    await flush();
+    [, root] = [null, env.overlays()[0]];
+    assert.equal(env.overlays()[0].style.getPropertyValue("--yt-color"), "#FF00AA");
+  });
+
+  test("overlay is on the body, ignores the pointer, and does not dismiss on click", (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const [root] = env.overlays();
+    assert.equal(root.parentElement, env.dom.window.document.body);
+    assert.equal(root.style.position, "fixed");
+    assert.equal(root.style.pointerEvents, "none");
+    assert.equal(root.style.zIndex, "80");
+    assert.equal(root.getAttribute("role"), "status");
+    assert.equal(root.getAttribute("aria-live"), "polite");
+    const stage = root.querySelector(".astillon-yt-stage");
+    assert.equal(stage.style.height, "55%");
+    assert.equal(stage.style.transformOrigin, "100% 100%");
+    assert.equal(stage.style.transform, "scale(var(--yt-scale))");
+    assert.equal(stage.style.right, "0px");
+    assert.equal(stage.style.bottom, "0px");
+    root.click();
+    assert.equal(env.overlays().length, 1);
+    env.feature.api.cancel();
+    assert.equal(env.overlays().length, 0);
+  });
+
+  test("insets come from the sidebar, hotbar, and the side bars", (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const [root] = env.overlays();
+    assert.equal(root.style.getPropertyValue("--yt-right"), "500px");
+    assert.equal(root.style.getPropertyValue("--yt-bottom"), "80px");
+    assert.equal(root.style.getPropertyValue("--yt-left"), "64px");
+    assert.equal(root.style.getPropertyValue("--yt-top"), "36px");
+    assert.equal(env.dom.window.document.querySelector("#board"), null);
+  });
+
+  test("collapse and resize update insets without a second node", (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const [root] = env.overlays();
+    const generation = root.dataset.generation;
+    const delay = root.querySelector(".astillon-yt-slash").style.animationDelay;
+    env.setSidebarLeft(1280);
+    env.emit("collapseSidebar", { element: env.sidebar }, true);
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.overlays()[0], root);
+    assert.equal(root.dataset.generation, generation);
+    assert.equal(root.querySelector(".astillon-yt-slash").style.animationDelay, delay);
+    assert.equal(root.style.getPropertyValue("--yt-right"), "120px");
+
+    env.resizeObservers[0].callback();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(root.style.getPropertyValue("--yt-right"), "120px");
+
+    env.dom.window.innerWidth = 1600;
+    env.dom.window.dispatchEvent(new env.dom.window.Event("resize"));
+    assert.equal(env.overlays().length, 1);
+    assert.equal(root.dataset.generation, generation);
+    assert.equal(root.style.getPropertyValue("--yt-right"), "320px");
+  });
+
+  test("euclidean outline covers (3, 4) and leaves (4, 4) clear at radius 5", () => {
+    assert.equal(euclideanOutlineCovers(3, 4, 5), true);
+    assert.equal(euclideanOutlineCovers(4, 4, 5), false);
+    const width = 11;
+    const height = 11;
+    const radius = 5;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const inkX = 5;
+    const inkY = 5;
+    pixels[(inkY * width + inkX) * 4 + 3] = 255;
+    const mask = renderOutlineMask(pixels, width, height, radius);
+    const outWidth = width + radius * 2;
+    const outHeight = height + radius * 2;
+    for (let y = 0; y < outHeight; y += 1) {
+      for (let x = 0; x < outWidth; x += 1) {
+        const covered = euclideanOutlineCovers(x - (inkX + radius), y - (inkY + radius), radius);
+        assert.equal(mask[(y * outWidth + x) * 4 + 3], covered ? 255 : 0, `${x},${y}`);
+      }
+    }
+    assert.equal(mixTowardWhite("#000000", 0.35), "#595959");
+    assert.equal(mixTowardWhite("#FFFFFF", 0.35), "#FFFFFF");
+  });
+
+  test("opaque art uses the angular frame and the raw image", async (t) => {
+    const env = setup(t);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ actorImg: "icons/opaque.webp" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    await flush();
+    const character = env.overlays()[0].querySelector(".astillon-yt-character");
+    const image = character.querySelector("img");
+    assert.equal(character.classList.contains("astillon-yt-frame"), true);
+    assert.equal(character.classList.contains("astillon-yt-sticker"), false);
+    assert.equal(image.getAttribute("src"), "icons/opaque.webp");
+    assert.equal(image.style.objectFit, "contain");
+    assert.equal(image.getAttribute("src").startsWith("blob:"), false);
+  });
+
+  test("a tainted getImageData keeps the raw image in the frame", async (t) => {
+    const env = setup(t);
+    env.imageControl.tainted.add("icons/tainted.webp");
+    let threw = false;
+    try {
+      env.turnChange(
+        env.combat({ combatant: env.combatant({ actorImg: "icons/tainted.webp" }) }),
+        { combatantId: null, round: 1, turn: 0 },
+        { combatantId: "c1", round: 1, turn: 1 },
+      );
+    } catch {
+      threw = true;
+    }
+    await flush();
+    assert.equal(threw, false);
+    const character = env.overlays()[0].querySelector(".astillon-yt-character");
+    assert.equal(character.classList.contains("astillon-yt-frame"), true);
+    assert.equal(character.querySelector("img").getAttribute("src"), "icons/tainted.webp");
+  });
+
+  test("sticker art becomes a blob url", async (t) => {
+    const env = setup(t);
+    const size = 24;
+    const pixels = new Uint8ClampedArray(size * size * 4);
+    pixels[(12 * size + 12) * 4 + 3] = 255;
+    env.imageControl.pixels.set("icons/sticker.webp", pixels);
+    env.imageControl.sizes.set("icons/sticker.webp", size);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ actorImg: "icons/sticker.webp" }) }),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    await flush();
+    const character = env.overlays()[0].querySelector(".astillon-yt-character");
+    assert.equal(character.classList.contains("astillon-yt-sticker"), true);
+    assert.equal(character.classList.contains("astillon-yt-frame"), false);
+    assert.equal(character.querySelector("img").getAttribute("src").startsWith("blob:"), true);
+  });
+
+  test("reduced motion fades the root and does not stagger layers", (t) => {
+    const env = setup(t, { reduced: true, hold: 1.45 });
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    const [root] = env.overlays();
+    assert.match(root.style.animationName, /astillon-yt-fade-in/);
+    assert.match(root.style.animationName, /astillon-yt-fade-out/);
+    assert.deepEqual(durationList(root.style.animationDuration), [400, 400]);
+    assert.deepEqual(durationList(root.style.animationDelay), [0, 400 + 1450]);
+    assert.equal(root.querySelector(".astillon-yt-slash").style.animationName, "none");
+    assert.equal(root.querySelector(".astillon-yt-banner").style.animationName, "none");
+    assert.equal(root.querySelector(".astillon-yt-banner-text").style.animationName, "none");
+    assert.equal(env.scheduled.at(-1), 400 + 1450 + 400);
+  });
+
+  test("hold changes the removal time and the outro delay", (t) => {
+    const env = setup(t, { hold: 1.45 });
+    env.turnChange(
+      env.combat(),
+      { combatantId: null, round: 1, turn: 0 },
+      { combatantId: "c1", round: 1, turn: 1 },
+    );
+    assert.equal(env.scheduled.at(-1), 2600);
+    const firstSlash = secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDelay);
+    const firstText = secondsList(env.overlays()[0].querySelector(".astillon-yt-banner-text").style.animationDelay);
+    const firstBanner = secondsList(env.overlays()[0].querySelector(".astillon-yt-banner").style.animationDelay);
+    assert.equal(firstSlash[0], 0);
+    assert.equal(secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDuration)[0], 0.3);
+    assert.ok(Math.abs(firstBanner[0] - 0.3) < 0.001);
+    assert.ok(Math.abs(secondsList(env.overlays()[0].querySelector(".astillon-yt-banner").style.animationDuration)[0] - 0.3) < 0.001);
+    assert.ok(firstText[0] < firstSlash[1]);
+    assert.ok(Math.abs(firstSlash[1] + 0.3 - 2.6) < 0.02);
+
+    env.settings.set("yourTurnHold", 2);
+    env.turnChange(
+      env.combat({ combatant: env.combatant({ name: "Later", id: "c2" }) }),
+      { combatantId: "c1", round: 1, turn: 1 },
+      { combatantId: "c2", round: 1, turn: 2 },
+    );
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.scheduled.at(-1), 600 + 2000 + 550);
+    const secondSlash = secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDelay);
+    assert.ok(secondSlash[1] > firstSlash[1]);
+  });
+
+  test("editable sheet can preview the draft and save flags", async (t) => {
+    const env = setup(t, { enabled: false });
+    const actor = env.makeActor({ name: "Editor", img: "icons/saved-actor.webp", art: "icons/stored.webp" });
+    const host = env.dom.window.document.createElement("section");
+    const header = env.dom.window.document.createElement("div");
+    header.className = "window-header";
+    host.append(header);
+    env.dom.window.document.body.append(host);
+    const app = { isEditable: true, actor, document: actor, element: host };
+    const buttons = [];
+    const controls = [];
+    env.emit("getActorSheetHeaderButtons", app, buttons);
+    env.emit("getHeaderControlsApplicationV2", app, controls);
+    env.emit("renderApplicationV2", app, host);
+    env.emit("renderApplicationV2", app, host);
+    assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].class, "astillon-your-turn-configure");
+    assert.equal(typeof buttons[0].onclick, "function");
+    assert.equal(controls.length, 1);
+    assert.equal(controls[0].action, "astillon-your-turn");
+    assert.equal(header.querySelectorAll(".astillon-your-turn-configure").length, 1);
+
+    header.querySelector("button").click();
+    const dialog = env.dom.window.document.querySelector(".astillon-yt-dialog");
+    assert.ok(dialog);
+    const art = dialog.querySelector("[name=yourTurnArt]");
+    const color = dialog.querySelector("[name=yourTurnColor]");
+    assert.equal(art.value, "icons/stored.webp");
+    assert.equal(dialog.querySelector("[data-action=preview]").textContent, "Preview");
+    assert.equal(dialog.querySelector("[data-action=save]").textContent, "Save");
+    dialog.querySelector("[data-action=browse]").click();
+    assert.equal(art.value, "icons/picked.webp");
+    assert.equal(env.filePickers.length, 1);
+    assert.equal(env.filePickers[0].options.type, "image");
+    art.value = "icons/draft.webp";
+    color.value = "#112233";
+    dialog.querySelector("[data-action=preview]").click();
+    await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(actor.setCalls.length, 0);
+    assert.equal(actor.updated, false);
+    assert.equal(env.calls.nextTurn, 0);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/draft.webp");
+    assert.equal(env.overlays()[0].style.getPropertyValue("--yt-color"), "#112233");
+
+    dialog.querySelector("[data-action=save]").click();
+    await flush();
+    assert.equal(actor.flags.yourTurnArt, "icons/draft.webp");
+    assert.equal(actor.flags.yourTurnColor, "#112233");
+
+    art.value = "   ";
+    dialog.querySelector("[data-action=save]").click();
+    await flush();
+    assert.ok(actor.unsetCalls.includes("yourTurnArt"));
+    assert.equal(actor.flags.yourTurnArt, undefined);
+  });
+
+  test("init registers exactly three settings with foundry.data.fields and no portrait setting", (t) => {
+    withFoundryNamespace(
+      t,
+      {
+        data: {
+          fields: {
+            BooleanField: BooleanFieldStub,
+            NumberField: NumberFieldStub,
+          },
+        },
+      },
+      ({ registrations, hooks }) => {
+        assert.equal("fields" in foundry, false);
+        createYourTurnFeature(MODULE).init();
+        assert.equal(registrations.length, 3);
+        assert.equal(registrations.some((entry) => entry.key === "yourTurnPortrait"), false);
+        const names = registrations.map((entry) => entry.key);
+        assert.deepEqual(names, ["yourTurnEnabled", "yourTurnScale", "yourTurnHold"]);
+        for (const entry of registrations) {
+          assert.equal(entry.data.scope, "user");
+          assert.equal(entry.data.config, true);
+        }
+        const enabled = registrations.find((entry) => entry.key === "yourTurnEnabled");
+        const scale = registrations.find((entry) => entry.key === "yourTurnScale");
+        const hold = registrations.find((entry) => entry.key === "yourTurnHold");
+        assert.equal(enabled.data.default, false);
+        assert.ok(enabled.data.type instanceof BooleanFieldStub);
+        assert.equal(scale.data.default, 1);
+        assert.ok(scale.data.type instanceof NumberFieldStub);
+        assert.deepEqual(scale.data.type.options, { min: 0.5, max: 1.5, step: 0.05 });
+        assert.equal(hold.data.default, 1.45);
+        assert.deepEqual(hold.data.type.options, { min: 0.5, max: 4, step: 0.05 });
+        for (const name of [
+          "combatTurnChange",
+          "collapseSidebar",
+          "getActorSheetHeaderButtons",
+          "getHeaderControlsApplicationV2",
+          "renderApplicationV2",
+        ]) {
+          assert.equal(hooks.some((entry) => entry.name === name), true, name);
+        }
+      },
+    );
+  });
+
+  test("init still registers when foundry.fields provides legacy field types", (t) => {
+    withFoundryNamespace(
+      t,
+      {
+        fields: {
+          BooleanField: BooleanFieldStub,
+          NumberField: NumberFieldStub,
+        },
+      },
+      ({ registrations, hooks }) => {
+        createYourTurnFeature(MODULE).init();
+        assert.equal(registrations.length, 3);
+        assert.equal(registrations.some((entry) => entry.key === "yourTurnPortrait"), false);
+        assert.equal(hooks.some((entry) => entry.name === "combatTurnChange"), true);
+        assert.ok(registrations.find((entry) => entry.key === "yourTurnEnabled").data.type instanceof BooleanFieldStub);
+        assert.ok(registrations.find((entry) => entry.key === "yourTurnScale").data.type instanceof NumberFieldStub);
+        assert.ok(registrations.find((entry) => entry.key === "yourTurnHold").data.type instanceof NumberFieldStub);
+      },
+    );
+  });
+
+  test("a non-editable sheet gets no your-turn control", (t) => {
+    const env = setup(t);
+    const actor = env.makeActor({ name: "Locked" });
+    actor.isEditable = false;
+    const host = env.dom.window.document.createElement("section");
+    const app = { isEditable: false, actor, document: actor, element: host };
+    const buttons = [];
+    const controls = [];
+    env.emit("getActorSheetHeaderButtons", app, buttons);
+    env.emit("getHeaderControlsApplicationV2", app, controls);
+    env.emit("renderApplicationV2", app, host);
+    assert.equal(buttons.length, 0);
+    assert.equal(controls.length, 0);
+    assert.equal(host.querySelector(".astillon-your-turn-configure"), null);
+
+    const itemHost = env.dom.window.document.createElement("section");
+    env.emit("renderApplicationV2", { isEditable: true, document: { documentName: "Item" }, element: itemHost }, itemHost);
+    assert.equal(itemHost.querySelector(".astillon-your-turn-configure"), null);
+    const itemControls = [];
+    env.emit("getHeaderControlsApplicationV2", { isEditable: true, document: { documentName: "Item" } }, itemControls);
+    assert.equal(itemControls.length, 0);
+  });
 });
 
 function withFoundryNamespace(t, foundryNamespace, run) {
@@ -398,51 +1158,3 @@ function withFoundryNamespace(t, foundryNamespace, run) {
   });
   run({ registrations, hooks });
 }
-
-test("init registers settings and hooks combatTurnChange with foundry.data.fields only", (t) => {
-  withFoundryNamespace(
-    t,
-    {
-      data: {
-        fields: {
-          BooleanField: BooleanFieldStub,
-          FilePathField: FilePathFieldStub,
-        },
-      },
-    },
-    ({ registrations, hooks }) => {
-      assert.equal("fields" in foundry, false);
-      createYourTurnFeature(MODULE).init();
-      assert.equal(registrations.length, 2);
-      assert.equal(hooks.some((entry) => entry.name === "combatTurnChange"), true);
-      const enabled = registrations.find((entry) => entry.key === "yourTurnEnabled");
-      const portrait = registrations.find((entry) => entry.key === "yourTurnPortrait");
-      assert.equal(enabled.data.scope, "user");
-      assert.equal(enabled.data.config, true);
-      assert.equal(enabled.data.default, false);
-      assert.ok(enabled.data.type instanceof BooleanFieldStub);
-      assert.equal(portrait.data.scope, "user");
-      assert.equal(portrait.data.default, "");
-      assert.ok(portrait.data.type instanceof FilePathFieldStub);
-      assert.deepEqual(portrait.data.type.options, { categories: ["IMAGE"], blank: true, initial: "" });
-    },
-  );
-});
-
-test("init still registers when foundry.fields provides legacy field types", (t) => {
-  withFoundryNamespace(
-    t,
-    {
-      fields: {
-        BooleanField: BooleanFieldStub,
-        FilePathField: FilePathFieldStub,
-      },
-    },
-    ({ registrations, hooks }) => {
-      createYourTurnFeature(MODULE).init();
-      assert.equal(registrations.length, 2);
-      assert.equal(hooks.some((entry) => entry.name === "combatTurnChange"), true);
-      assert.ok(registrations.find((entry) => entry.key === "yourTurnEnabled").data.type instanceof BooleanFieldStub);
-    },
-  );
-});
