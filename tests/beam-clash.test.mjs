@@ -14,7 +14,7 @@ const BLUE_FILE = "jb2a.test.beam.blue";
 const FREE_DEFAULT_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
 const PATREON_RED = "jb2a.ranged.beam.002.03.red.30ft";
 const PATREON_BLUE = "jb2a.ranged.beam.002.03.blue.30ft";
-const AURA_FILE = "jb2a.energy_strands.overlay.dark_purple02.01";
+const AURA_FILE = "jb2a.static_electricity.02.dark_purple";
 const flush = async () => { await setImmediate(); await setImmediate(); };
 
 function state(overrides = {}) {
@@ -138,7 +138,7 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   const dice = [];
   const totals = [];
   const rollControl = { gate: null };
-  const chatControl = { gate: null };
+  const requestControl = { gate: null };
   const effectLoading = { deferred: false, complete: [] };
   const pans = [];
   const settings = new Map([["beamClashRedFile", RED_FILE], ["beamClashBlueFile", BLUE_FILE]]);
@@ -184,6 +184,7 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   scene.tokens = collection([red.document, blue.document]);
   for (const user of users.values()) user.targets = new Set([blue]);
   const messages = collection([]);
+  const requests = collection([]);
   const game = {
     user: users.get(userId), users, scenes: collection([scene]), messages,
     modules: new Map([["sequencer", { active: dependencies }], ["JB2A_DnD5e", { active: dependencies }]]),
@@ -203,14 +204,33 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   };
   let nextMessage = 0;
   function message(request, authorId, { id = `request-${++nextMessage}`, origin = authorId, emitCreate = true } = {}) {
-    const document = {
-      id, author: { id: authorId }, _stats: { lastModifiedBy: origin },
-      flags: { [MODULE]: { beamClashRequest: request } },
-      getFlag(scope, key) { return this.flags[scope]?.[key]; },
+    const payload = { ...request, id };
+    const user = users.get(authorId);
+    const slot = request.action === "roll" ? request.side : "control";
+    if (user) {
+      user.flags[MODULE].beamClashRequests[slot] = structuredClone(payload);
+      user._stats = { lastModifiedBy: origin };
+    }
+    requests.set(id, payload);
+    if (emitCreate && user) emit("updateUser", user, { flags: { [MODULE]: { beamClashRequests: { [slot]: payload } } } }, {}, origin);
+    return payload;
+  }
+  function deliver(payload, origin) {
+    const user = users.get(origin);
+    const slot = payload.action === "roll" ? payload.side : "control";
+    user.flags[MODULE].beamClashRequests[slot] = structuredClone(payload);
+    emit("updateUser", user, { flags: { [MODULE]: { beamClashRequests: { [slot]: payload } } } }, {}, origin);
+  }
+  for (const user of users.values()) {
+    user.flags = { [MODULE]: { beamClashRequests: {} } };
+    user.getFlag = (scope, key) => user.flags[scope]?.[key];
+    user.setFlag = async (scope, key, payload) => {
+      assert.equal(scope, MODULE);
+      assert.equal(key, `beamClashRequests.${payload.action === "roll" ? payload.side : "control"}`);
+      if (requestControl.gate) await requestControl.gate;
+      message(payload, user.id, { id: payload.id });
+      return user;
     };
-    messages.set(id, document);
-    if (emitCreate) emit("createChatMessage", document, {}, origin);
-    return document;
   }
   class Roll {
     constructor(formula) { this.formula = formula; dice.push(this); }
@@ -253,7 +273,9 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
         if (registeredEntries.has(key)) return registeredEntries.get(key);
         if ([PATREON_RED, PATREON_BLUE].includes(key)) {
           const color = key === PATREON_RED ? "Red" : "Blue";
-          return { getFile: () => `custom-assets/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm` };
+          // Match SequencerFileRangeFind: an exact .30ft lookup can still return
+          // a range object whose default is 15ft (the original missing-opener bug).
+          return { getFile: (range = "15ft") => `custom-assets/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_${range}_${range === "30ft" ? "1600" : "1000"}x400.webm` };
         }
         return [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, ...(aura ? [AURA_FILE] : [])].includes(key) ? { file: `${key}.webm` } : false;
       },
@@ -283,11 +305,10 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
     foundry: {
       utils: { randomID: () => `generated-${++nextMessage}` }, dice: { Roll },
       documents: { ChatMessage: { implementation: { async create(data) {
-        const request = data.flags?.[MODULE]?.beamClashRequest;
-        if (!request) { results.push(data); return { id: `result-${++nextMessage}`, author: game.user }; }
-        const authorId = game.user.id;
-        if (chatControl.gate) await chatControl.gate;
-        return message(request, authorId);
+        results.push(data);
+        const result = { ...data, id: `chat-${++nextMessage}`, author: game.user };
+        messages.set(result.id, result);
+        return result;
       } } } },
     },
   };
@@ -318,9 +339,10 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   }
   return {
     dom, feature, emit, warnings, writes, plays, auraPlays, results, databaseRegistrations, registeredEntries, Sequencer, ends, dice, totals, pans, settings, registrations,
-    game, canvas, scene, red, blue, messages, message, request, startRequest, rollControl, chatControl, effectLoading, getState: () => flag,
+    game, canvas, scene, red, blue, messages, requests, message, deliver, request, startRequest, rollControl, requestControl, effectLoading, getState: () => flag,
     rafs, runFrames: () => { const frames = [...rafs.values()]; rafs.clear(); for (const callback of frames) callback(); },
     button: (side) => dom.window.document.querySelector(`${ROOT} [data-side='${side}']`),
+    indicator: (side) => dom.window.document.querySelector(`${ROOT} [data-indicator='${side}']`),
     roots: () => [...dom.window.document.querySelectorAll(ROOT)],
   };
 }
@@ -332,7 +354,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.deepEqual(env.game.users.contents.filter((user) => user.active).map((user) => user.id), ["gm"]);
     await env.feature.api.start();
     await flush();
-    assert.equal(env.messages.size, 1);
+    assert.equal(env.requests.size, 1);
     assert.equal(env.writes.length, 1);
     assert.equal(env.getState().status, "active");
     assert.deepEqual(env.warnings, []);
@@ -355,7 +377,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.emit("updateActor", env.blue.actor);
     assert.equal(env.button("blue").disabled, true);
     assert.equal(await env.feature.api.roll("blue"), null, "unassigned players still cannot submit blue rolls");
-    assert.equal(env.messages.size, 1);
+    assert.equal(env.requests.size, 1);
     assert.equal(env.dice.length, 0);
 
     env.blue.actor.testUserPermission = (user, permission) => user.id === owner.id && permission === "OWNER";
@@ -372,7 +394,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     // Deliver that same native document to the GM client's hook.
     env.game.user = gm;
     env.totals.push(15);
-    env.emit("createChatMessage", rollRequest, {}, owner.id);
+    env.deliver(rollRequest, owner.id);
     await flush();
     assert.deepEqual(env.getState().blue, submission(rollRequest.id, 15, owner.id));
     assert.equal(env.getState().red, null);
@@ -383,7 +405,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
   test("non-GMs cannot start through the API or forged native start intents", async (t) => {
     const env = setup(t, { userId: "owner" });
     assert.equal(await env.feature.api.start(), null);
-    assert.equal(env.messages.size, 0);
+    assert.equal(env.requests.size, 0);
     assert.match(env.warnings[0], /Only a GM can start/i);
 
     env.game.user = env.game.users.get("gm");
@@ -401,7 +423,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
       env[side].actor = null;
       assert.equal(await env.feature.api.start(), null);
       await flush();
-      assert.equal(env.messages.size, 0);
+      assert.equal(env.requests.size, 0);
       assert.equal(env.warnings.length, 1);
       assert.equal(env.writes.length, 0);
 
@@ -426,7 +448,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     const env = setup(t);
     env.settings.set("beamClashRedFile", "jb2a.not-installed");
     await env.feature.api.start();
-    assert.equal(env.messages.size, 0);
+    assert.equal(env.requests.size, 0);
     assert.equal(env.writes.length, 0);
     assert.match(env.warnings[0], /red.*Module Settings.*Database Viewer/i);
   });
@@ -456,7 +478,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     await flush();
     assert.equal(env.getState().status, "active");
     assert.equal(env.writes.length, 1);
-    assert.equal(env.messages.size, 1);
+    assert.equal(env.requests.size, 1);
     assert.equal(env.pans.length, 1);
     assert.equal(env.pans[0].x, 450);
     assert.equal(env.pans[0].y, 250);
@@ -504,7 +526,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
       env.totals.push(20, 1);
       env.request("red", "gm"); env.request("blue", "owner"); await flush();
       assert.deepEqual(env.plays[1].effects.map(e => [e.file, e.timeRange]), [
-        [PATREON_RED, [1500, 2100]], [PATREON_BLUE, [1500, 2100]],
+        [`${MODULE}-beam-clash.red`, [1500, 2100]], [`${MODULE}-beam-clash.blue`, [1500, 2100]],
       ], "re-aim uses the loop directly, not another opener");
       assert.equal(env.auraPlays.length, 1);
       env.red.document.x += 100;
@@ -557,11 +579,94 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.deepEqual(env.plays[0].effects.map(e => e.file), [RED_FILE, BLUE_FILE]);
   });
 
+  test("the opener also resolves when Sequencer returns an exact file path string", async t => {
+    const env = setup(t, { ready: false, initial: state({ redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    const getEntry = env.Sequencer.Database.getEntry;
+    env.Sequencer.Database.getEntry = key => {
+      const entry = getEntry(key);
+      return [PATREON_RED, PATREON_BLUE].includes(key) ? entry.getFile("30ft") : entry;
+    };
+    env.feature.ready(); await flush();
+    assert.equal(env.databaseRegistrations.length, 1);
+    assert.equal(env.plays[0].effects[0].file, `${MODULE}-beam-clash.red`);
+    assert.equal(env.plays[0].effects[0].timeRange, undefined, "retain the complete opener");
+  });
+
+  test("replacing a still-loading initial sequence does not consume the opener", async t => {
+    const env = setup(t, { ready: false, initial: state({ redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
+    env.effectLoading.deferred = true;
+    env.feature.ready(); await flush();
+    env.red.document.x += 100;
+    env.emit("updateToken", env.red.document); await flush();
+    for (const complete of env.effectLoading.complete.splice(0)) complete();
+    await flush();
+    assert.equal(env.plays[0].effects.length, 0, "stale first sequence is vetoed");
+    assert.equal(env.plays[1].effects[0].timeRange, undefined, "the current sequence still gets its launch");
+  });
+
+  test("start, simultaneous GM-side rolls, victory and End create zero chat messages", async t => {
+    const env = setup(t);
+    await env.feature.api.start(); await flush();
+    for (let round = 0; round < 3; round += 1) {
+      env.totals.push(20, 1);
+      await Promise.all([env.feature.api.roll("red"), env.feature.api.roll("blue")]); await flush();
+      assert.equal(env.getState().lastRound.red.authorId, "gm");
+      assert.equal(env.getState().lastRound.blue.authorId, "gm");
+    }
+    assert.equal(env.getState().winner, "red");
+    assert.equal(env.dice.length, 6);
+    assert.equal(env.messages.size, 0);
+    assert.deepEqual(Object.keys(env.game.user.getFlag(MODULE, "beamClashRequests")).sort(), ["blue", "control", "red"]);
+    await env.feature.api.stop(); await flush();
+    assert.equal(env.messages.size, 0);
+    assert.equal(env.results.length, 0);
+    assert.equal(env.roots().length, 0);
+  });
+
+  test("token circles retain the completed pair, then clearly label the new pending round", async t => {
+    const env = setup(t, { initial: state({ score: 1 }) });
+    const die = side => env.indicator(side).querySelector(".astillon-beam-clash__die").textContent;
+    const remaining = side => env.indicator(side).querySelector(".astillon-beam-clash__indicator-remaining").textContent;
+    env.totals.push(18, 6, 9);
+    await env.feature.api.roll("red"); await flush();
+    assert.equal(die("red"), "18");
+    assert.equal(die("blue"), "—");
+    await env.feature.api.roll("blue"); await flush();
+    assert.equal(env.getState().round, 2);
+    assert.equal(die("red"), "18");
+    assert.equal(die("blue"), "6");
+    assert.match(env.indicator("blue").textContent, /Round 1/);
+    assert.equal(env.indicator("red").querySelectorAll(".filled").length, 2);
+    assert.equal(env.indicator("blue").querySelectorAll(".filled").length, 0);
+    assert.equal(remaining("red"), "1 push to win");
+    assert.equal(remaining("blue"), "5 pushes to win");
+    await env.feature.api.roll("red"); await flush();
+    assert.equal(die("red"), "9");
+    assert.equal(die("blue"), "—", "never present a prior-round die as the pending opponent's result");
+    assert.match(env.indicator("blue").textContent, /Round 2.*waiting/);
+    assert.equal(env.messages.size, 0);
+  });
+
+  test("flattened native User updates work but unrelated edits and mismatched origins do not submit", async t => {
+    const env = setup(t, { initial: state() });
+    const user = env.game.users.get("owner");
+    const request = env.request("blue", "owner", {}, { emitCreate: false });
+    env.emit("updateUser", user, { name: "Different name" }, {}, "owner");
+    env.emit("updateUser", user, { [`flags.${MODULE}.beamClashRequests.blue`]: request }, {}, "outsider");
+    env.emit("updateUser", user, { [`flags.${MODULE}.beamClashRequests.blue`]: request }, {});
+    await flush();
+    assert.equal(env.dice.length, 0);
+    env.emit("updateUser", user, { [`flags.${MODULE}.beamClashRequests.blue`]: request }, {}, "owner");
+    await flush();
+    assert.equal(env.dice.length, 1);
+    assert.equal(env.getState().blue.authorId, "owner");
+  });
+
   test("reconnecting to an advanced clash starts directly in the sustained segment", async t => {
     const env = setup(t, { initial: state({ round: 3, score: -1, redFile: PATREON_RED, blueFile: PATREON_BLUE }) });
     await flush();
     for (const effect of env.plays[0].effects) assert.deepEqual(effect.timeRange, [1500, 2100]);
-    assert.equal(env.databaseRegistrations.length, 0);
+    assert.equal(env.databaseRegistrations.length, 1, "force the verified 30ft file even when skipping its opener");
   });
 
   test("scene return does not replay an already displayed opener even before the first roll", async t => {
@@ -686,7 +791,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.ok(request);
     assert.equal(env.dice.length, 0);
     env.game.user = env.game.users.get("gm");
-    env.emit("createChatMessage", request, {}, "gm-two"); await flush();
+    env.deliver(request, "gm-two"); await flush();
     assert.equal(env.getState().blue.authorId, "gm-two");
     assert.equal(env.dice.length, 1);
   });
@@ -704,14 +809,14 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.game.user = env.game.users.get("gm");
     env.request("blue", "outsider");
     env.request("red", "owner");
-    env.emit("createChatMessage", request, {}, "outsider");
+    env.deliver(request, "outsider");
     await flush();
     assert.equal(env.dice.length, 1);
     assert.equal(env.getState().red.authorId, "outsider");
     assert.equal(env.getState().blue, null);
   });
 
-  test("authoritative document author and current actor ownership override forged identities and totals", async (t) => {
+  test("authenticated native User origin and current actor ownership override forged identities and totals", async (t) => {
     const env = setup(t, { initial: state() });
     env.totals.push(7);
     env.request("red", "owner", { userId: "gm", total: 20 });
@@ -747,19 +852,19 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.getState().processed.length, 2);
   });
 
-  test("double clicks remain latched while native ChatMessage creation is unresolved", async (t) => {
+  test("double clicks remain latched while native User flag update is unresolved", async (t) => {
     const env = setup(t, { initial: state() });
     let release;
-    env.chatControl.gate = new Promise((resolve) => { release = resolve; });
+    env.requestControl.gate = new Promise((resolve) => { release = resolve; });
     const first = env.feature.api.roll("red");
     const second = await env.feature.api.roll("red");
     assert.equal(second, null);
     assert.equal(env.button("red").disabled, true);
-    assert.equal(env.messages.size, 0);
+    assert.equal(env.requests.size, 0);
     release();
     await first;
     await flush();
-    assert.equal(env.messages.size, 1);
+    assert.equal(env.requests.size, 1);
     assert.equal(env.dice.length, 1);
     assert.equal(env.button("red").disabled, true, "a persisted roll keeps that side disabled");
   });
@@ -783,7 +888,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.button("red").disabled, false, "a failed write must not leave the client stuck waiting");
     await env.feature.api.roll("red");
     await flush();
-    assert.equal(env.messages.size, 2);
+    assert.equal(env.requests.size, 2);
     assert.equal(env.dice.length, 2);
     assert.equal(env.getState().red.total, 8);
     assert.equal(env.getState().round, 1);
@@ -794,7 +899,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     const env = setup(t, { initial: state(), userId: "gm-two" });
     await env.feature.api.roll("red");
     await flush();
-    assert.equal(env.messages.size, 1);
+    assert.equal(env.requests.size, 1);
     assert.equal(env.dice.length, 0);
     assert.equal(env.writes.length, 0);
     env.game.users.activeGM = env.game.user;
@@ -832,7 +937,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.request("red", "gm", { userId: "gm", total: 20 }, { emitCreate: false, origin: "owner" });
     env.request("blue", "owner", {}, { emitCreate: false, origin: "gm" });
     const missing = env.request("red", "gm", {}, { emitCreate: false });
-    delete missing._stats;
+    delete env.game.users.get("gm")._stats;
     const legitimate = env.request("blue", "owner", {}, { emitCreate: false });
     env.totals.push(9);
     env.feature.ready();
@@ -843,12 +948,12 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.deepEqual(env.getState().blue, submission(legitimate.id, 9, "owner"));
   });
 
-  test("a live native create hook supplies provenance when stored stats are unavailable", async (t) => {
+  test("a live native update hook supplies provenance when stored stats are unavailable", async (t) => {
     const env = setup(t, { initial: state() });
     const live = env.request("blue", "owner", {}, { emitCreate: false });
-    delete live._stats;
+    delete env.game.users.get("owner")._stats;
     env.totals.push(11);
-    env.emit("createChatMessage", live, {}, "owner");
+    env.deliver(live, "owner");
     await flush();
     assert.equal(env.dice.length, 1);
     assert.deepEqual(env.getState().blue, submission(live.id, 11, "owner"));
@@ -890,7 +995,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.getState().red, null);
   });
 
-  test("a winning round persists its winner and tears down the map interaction", async (t) => {
+  test("a winning round ends beams but retains the token result until GM End", async (t) => {
     const env = setup(t, { initial: state({ score: 2 }) });
     await flush();
     env.totals.push(20, 1);
@@ -900,11 +1005,18 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.getState().status, "finished");
     assert.equal(env.getState().winner, "red");
     assert.equal(env.getState().score, 3);
-    assert.equal(env.roots().length, 0);
+    assert.equal(env.roots().length, 1);
+    assert.equal(env.indicator("red").dataset.state, "won");
+    assert.equal(env.indicator("blue").dataset.state, "lost");
+    assert.equal(env.button("red").hidden, true);
     assert.ok(env.ends.some(({ broadcast }) => broadcast === false));
     env.request("red", "gm");
     await flush();
     assert.equal(env.dice.length, 2);
+    await env.feature.api.stop(); await flush();
+    assert.equal(env.getState().status, "stopped");
+    assert.equal(env.roots().length, 0);
+    assert.equal(env.messages.size, 0);
   });
 
   for (const [winner, score, totals] of [["red", 2, [20, 1]], ["blue", -2, [1, 20]]]) {
@@ -914,13 +1026,12 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
       env.blue.document.name = 'Moon "the Brilliant" <b>Hero</b>';
       env.totals.push(...totals);
       env.request("red", "gm"); env.request("blue", "owner"); await flush();
-      assert.equal(env.results.length, 2);
-      const fragment = env.dom.window.document.createElement("div");
-      fragment.innerHTML = env.results.at(-1).content;
-      assert.equal(fragment.textContent, `Beam Clash round 1: ${env.blue.document.name} rolled ${totals[1]}. ${env[winner].document.name} wins the clash!`);
+      assert.equal(env.results.length, 0);
+      const fragment = env.roots()[0];
+      assert.equal(fragment.querySelector(".astillon-beam-clash__score").textContent, `${env[winner].document.name} wins the clash!`);
       assert.equal(fragment.querySelector("img, b, script"), null);
-      assert.ok(env.results[0].content.includes("Blaster &lt;img"));
-      assert.equal(env.results.at(-1).rolls[0].total, totals[1]);
+      assert.ok(env.indicator("red").getAttribute("aria-label").includes(env.red.document.name));
+      assert.equal(env.indicator("blue").querySelector(".astillon-beam-clash__die").textContent, String(totals[1]));
       assert.ok(env.ends.some(({ filter }) => filter.name.includes(".aura.")), "victory removes the aura too");
     });
   }
@@ -965,6 +1076,8 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.button("red").style.left, "195px");
     assert.equal(env.button("red").style.top, "222px");
     assert.equal(env.button("blue").style.left, "495px");
+    assert.equal(env.indicator("red").style.left, "195px");
+    assert.equal(env.indicator("red").style.top, "150px");
     const score = env.roots()[0].querySelector(".astillon-beam-clash__score");
     assert.equal(score.style.left, "345px");
     assert.equal(score.style.top, "145px");
@@ -1012,6 +1125,18 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     env.emit("deleteToken", env.blue.document);
     await flush();
     assert.equal(env.getState().status, "stopped");
+    assert.equal(env.roots().length, 0);
+  });
+
+  test("deleting a finished scene clears result indicators even though its beams have ended", async t => {
+    const env = setup(t, { initial: state({ status: "finished", score: 3, winner: "red",
+      lastRound: { round: 1, red: submission("r", 20), blue: submission("b", 1, "owner") } }) });
+    await flush();
+    assert.equal(env.indicator("red").dataset.state, "won");
+    assert.equal(env.plays.length, 0);
+    assert.equal(env.auraPlays.length, 0);
+    env.game.scenes.delete(env.scene.id);
+    env.emit("deleteScene", env.scene);
     assert.equal(env.roots().length, 0);
   });
 

@@ -55,6 +55,45 @@
 .astillon-beam-clash .astillon-beam-clash__roll:disabled { cursor: default; filter: saturate(0.45); opacity: 0.72; }
 .astillon-beam-clash .astillon-beam-clash__roll[data-state="rolled"] { background: #16252fed; border-color: #93c8af; opacity: 0.95; }
 .astillon-beam-clash .astillon-beam-clash__roll[data-state="locked"] { background: #17202dee; border-color: #637286; opacity: 0.7; }
+.astillon-beam-clash .astillon-beam-clash__roll[hidden] { display: none; }
+
+.astillon-beam-clash__indicator {
+  --indicator-color: #ff8997;
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 118px;
+  color: #f8fafc;
+  font: 600 11px/1.25 var(--font-primary, sans-serif);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-shadow: 0 2px 3px #000;
+}
+.astillon-beam-clash__indicator--blue { --indicator-color: #80c7ff; }
+.astillon-beam-clash__die {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--indicator-color);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #334155, #111827 75%);
+  box-shadow: 0 2px 12px #000b, inset 0 0 8px #0008;
+  color: #fff;
+  font: 800 25px/1 var(--font-primary, sans-serif);
+}
+.astillon-beam-clash__pips { display: flex; gap: 5px; }
+.astillon-beam-clash__pips i { width: 9px; height: 9px; border: 1px solid var(--indicator-color); border-radius: 50%; background: #101827; }
+.astillon-beam-clash__pips i.filled { background: var(--indicator-color); box-shadow: 0 0 5px var(--indicator-color); }
+.astillon-beam-clash__indicator-round, .astillon-beam-clash__indicator-remaining { padding: 1px 5px; border-radius: 4px; background: #111827e8; }
+.astillon-beam-clash__indicator-remaining { color: var(--indicator-color); }
+.astillon-beam-clash__indicator[data-state="waiting"] .astillon-beam-clash__die { color: #a3adbd; }
+.astillon-beam-clash__indicator[data-state="won"] { --indicator-color: #f4d57b; }
+.astillon-beam-clash__indicator[data-state="won"] .astillon-beam-clash__die { box-shadow: 0 0 18px #f4d57b80; }
+.astillon-beam-clash__indicator[data-state="lost"] { opacity: 0.7; }
 
 .astillon-beam-clash__score {
   position: absolute;

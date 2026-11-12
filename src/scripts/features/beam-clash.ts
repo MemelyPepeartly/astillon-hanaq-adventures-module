@@ -5,7 +5,8 @@ import {
 } from "./beam-clash-model.js";
 
 const FLAG = "beamClash";
-const REQUEST = "beamClashRequest";
+const REQUEST = "beamClashRequests";
+const REQUEST_SLOTS = ["control", "red", "blue"] as const;
 const SIDES = ["red", "blue"] as const;
 // Database keys retain JB2A's ranged-template alignment metadata. The ranged
 // Beam002 clips have no published internal-loop markers. Both exact 30ft previews
@@ -17,7 +18,7 @@ const PATREON_FILES = {
   blue: "jb2a.ranged.beam.002.03.blue.30ft",
 };
 const FREE_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
-const AURA_FILE = "jb2a.energy_strands.overlay.dark_purple02.01";
+const AURA_FILE = "jb2a.static_electricity.02.dark_purple";
 const RANGED_LOOP = { start: 1500, end: 2100 };
 const RANGED_END = 3033;
 type Intent = {
@@ -25,14 +26,16 @@ type Intent = {
   round?: number; side?: BeamSide;
   redTokenId?: string; blueTokenId?: string; redFile?: string; blueFile?: string;
 };
+type UserIntent = Intent & { id: string };
 type EffectIdentity = { name: string; sceneId: string };
 
 /**
  * Integration: register this ModuleFeature and include styles/beam-clash.css.
  * Macro: await game.modules.get(MODULE_ID).api.beamClash.start();
- * start()/stop()/roll() submit native ChatMessage intents; the elected active GM handles them.
+ * start()/stop()/roll() update bounded request slots on the requesting User document.
+ * The native updateUser origin authenticates the sender; no chat messages are created.
  * No socket payload, client die, or claimed user ID is an authority boundary.
- * Foundry 14.370: ChatMessage.author, Users.activeGM, Scene flags, Roll.evaluate,
+ * Foundry 14.370: User.setFlag/updateUser, Users.activeGM, Scene flags, Roll.evaluate,
  * TokenDocument.getCenterPoint, Canvas.animatePan and standard document/canvas hooks.
  */
 export function createBeamClashFeature(moduleId: string): ModuleFeature {
@@ -58,6 +61,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
   let visualGeneration = 0;
   let pannedClash = "";
   let canvasAvailable = true;
+  let openingEffect: { name: string; clashId: string } | undefined;
   const openedClashes = new Set<string>();
   const pendingSeeks = new Set<number>();
 
@@ -114,7 +118,10 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       // prefix), without mutating JB2A's entries or bundling its Patreon videos.
       const files: Record<string, string> = {};
       for (const color of SIDES) {
-        const path = database.getEntry(PATREON_FILES[color], { softFail: true })?.getFile?.();
+        const entry = database.getEntry(PATREON_FILES[color], { softFail: true });
+        // An exact .30ft lookup may still return a range file whose no-argument
+        // getFile() defaults to 15ft. Other Sequencer versions return a string.
+        const path = typeof entry === "string" ? entry : entry?.getFile?.("30ft");
         const title = color === "red" ? "Red" : "Blue";
         if (typeof path !== "string" || !path.endsWith(`Beam002_03_Regular_${title}_30ft_1600x400.webm`)) return null;
         files[color] = path;
@@ -139,22 +146,46 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     return red && blue && red.id !== blue.id ? [red, blue] : null;
   }
 
-  function authorOf(message: any, initiatingUserId?: string): any {
-    const id = message?.author?.id;
-    // author is Foundry's DocumentAuthorField, received after server document creation.
-    // Recovery has no create-hook origin: require server-managed stats instead. Conservatively
-    // ignore requests subsequently edited by someone else (including a GM); the owner can retry.
-    const origin = initiatingUserId ?? message?._stats?.lastModifiedBy;
+  function authorOf(user: any, initiatingUserId?: string): any {
+    const id = user?.id;
+    // Players can update their own User flags, not another user's. Require the
+    // server update origin too; payload user IDs are never trusted. Recovery
+    // conservatively ignores a User document last edited by somebody else.
+    const origin = initiatingUserId ?? user?._stats?.lastModifiedBy;
     if (!id || !origin || origin !== id) return null;
-    return game.users?.get(id) ?? null;
+    return game.users?.get(id) === user ? user : null;
   }
 
-  async function createIntent(intent: Intent): Promise<any> {
-    // Static text only: token/actor names never enter HTML strings.
-    return foundry.documents.ChatMessage.implementation.create({
-      content: `<p>Beam Clash: ${intent.action === "roll" ? "roll requested" : `${intent.action} requested`}.</p>`,
-      flags: { [moduleId]: { [REQUEST]: intent } },
-    });
+  async function createIntent(intent: Intent): Promise<UserIntent> {
+    const request = { ...intent, id: foundry.utils.randomID() };
+    const slot = intent.action === "roll" ? intent.side! : "control";
+    // Separate dotted slots prevent simultaneous GM rolls for both sides from
+    // overwriting each other. Only three small request records persist per user.
+    await game.user.setFlag(moduleId, `${REQUEST}.${slot}`, request);
+    return request;
+  }
+
+  function changedPath(change: any, path: string[]): boolean {
+    if (!change || typeof change !== "object") return false;
+    for (let count = path.length; count > 0; count -= 1) {
+      const key = path.slice(0, count).join(".");
+      if (Object.prototype.hasOwnProperty.call(change, key)) {
+        return count === path.length || changedPath(change[key], path.slice(count));
+      }
+    }
+    return false;
+  }
+
+  function receiveRequests(user: any, changed: any, userId?: string): void {
+    if (!userId || !authorOf(user, userId)) return;
+    for (const slot of REQUEST_SLOTS) {
+      if (!changedPath(changed, ["flags", moduleId, REQUEST, slot])) continue;
+      const value = user.getFlag(moduleId, REQUEST)?.[slot];
+      if (!value || (slot === "control" ? !["start", "stop"].includes(value.action) : value.action !== "roll" || value.side !== slot)) continue;
+      // Capture at the native hook, before a later update changes this User.
+      const intent = structuredClone(value);
+      void enqueue(() => handleIntent(user, intent, userId)).catch(logError);
+    }
   }
 
   async function start(): Promise<any> {
@@ -179,7 +210,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     if (pending.has(key)) return null;
     pending.add(key);
     try {
-      if (!auraAvailable()) notify("The purple energy-strands overlay is unavailable in this JB2A installation. The clash will still run without it.");
+      if (!auraAvailable()) notify("The purple static-electricity overlay is unavailable in this JB2A installation. The clash will still run without it.");
       return await createIntent({ version: 1, action: "start", sceneId: scene.id, clashId: stateOf(scene)?.id ?? null,
         redTokenId: red.id, blueTokenId: blue.id, redFile, blueFile });
     } finally { pending.delete(key); }
@@ -189,7 +220,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     if (!game.user?.isGM) { notify("Only a GM can stop a clash."); return null; }
     const scene = currentScene();
     const state = stateOf(scene);
-    if (!state || state.status !== "active") return null;
+    if (!state || state.status === "stopped") return null;
     return createIntent({ version: 1, action: "stop", sceneId: scene.id, clashId: state.id });
   }
 
@@ -216,11 +247,10 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
   }
 
   /** Every write, including cleanup, runs on this same active-GM queue. */
-  async function handleIntent(message: any, initiatingUserId?: string, recover = false): Promise<void> {
-    if (!isAuthority() || !message?.id || game.messages?.get(message.id) !== message) return;
-    const intent = message.getFlag(moduleId, REQUEST) as Intent | undefined;
-    if (!intent || intent.version !== 1 || typeof intent.sceneId !== "string") return;
-    const author = authorOf(message, initiatingUserId);
+  async function handleIntent(user: any, intent: UserIntent, initiatingUserId?: string, recover = false): Promise<void> {
+    if (!isAuthority() || !intent || typeof intent.id !== "string" || !intent.id
+      || intent.version !== 1 || typeof intent.sceneId !== "string") return;
+    const author = authorOf(user, initiatingUserId);
     const scene = game.scenes.get(intent.sceneId);
     if (!author || !scene) return;
     const state = stateOf(scene);
@@ -234,7 +264,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       const problem = filesProblem(intent.redFile, intent.blueFile);
       if (problem) { notify(problem); return; }
       const next: BeamClashState = {
-        version: 1, id: message.id, sceneId: scene.id, redTokenId: intent.redTokenId,
+        version: 1, id: intent.id, sceneId: scene.id, redTokenId: intent.redTokenId,
         blueTokenId: intent.blueTokenId, redFile: intent.redFile, blueFile: intent.blueFile,
         status: "active", round: 1, score: 0, revision: 0, red: null, blue: null,
         lastRound: null, winner: null, processed: [],
@@ -242,15 +272,15 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       if (isAuthority()) await scene.setFlag(moduleId, FLAG, next);
       return;
     }
-    if (!state || state.sceneId !== scene.id || state.status !== "active" || state.id !== intent.clashId) return;
+    if (!state || state.sceneId !== scene.id || state.status === "stopped" || state.id !== intent.clashId) return;
     if (intent.action === "stop") {
       if (author.isGM && isAuthority()) await scene.setFlag(moduleId, FLAG, { ...state, status: "stopped", revision: state.revision + 1 });
       return;
     }
     const side = intent.side;
     const pair = tokenPair(scene, state);
-    if (intent.action !== "roll" || !isBeamSide(side) || !Number.isInteger(intent.round)
-      || intent.round !== state.round || state[side] || state.processed.includes(message.id)
+    if (state.status !== "active" || intent.action !== "roll" || !isBeamSide(side) || !Number.isInteger(intent.round)
+      || intent.round !== state.round || state[side] || state.processed.includes(intent.id)
       || !pair || !canSubmitBeamRoll(side, author, pair[side === "red" ? 0 : 1].actor)) return;
     const expectedId = state.id;
     const expectedRevision = state.revision;
@@ -260,21 +290,9 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     if (!isAuthority() || !current || current.id !== expectedId || current.revision !== expectedRevision
       || current.status !== "active" || !tokenPair(scene, current)
       || !canSubmitBeamRoll(side, game.users.get(author.id), scene.tokens.get(side === "red" ? current.redTokenId : current.blueTokenId)?.actor)) return;
-    const next = acceptBeamRoll(current, side, intent.round!, { requestId: message.id, authorId: author.id, total: die.total });
+    const next = acceptBeamRoll(current, side, intent.round!, { requestId: intent.id, authorId: author.id, total: die.total });
     if (!next) return;
     await scene.setFlag(moduleId, FLAG, next);
-    // State is committed before optional chat output, so a chat error cannot reroll a submission.
-    if (isAuthority()) {
-      const nameOf = (side: BeamSide) => String(scene.tokens.get(side === "red" ? next.redTokenId : next.blueTokenId)?.name
-        || (side === "red" ? "Selected token" : "Targeted token"));
-      const outcome = next.status === "finished" && next.winner ? ` ${nameOf(next.winner)} wins the clash!` : "";
-      const content = document.createElement("p");
-      content.textContent = `Beam Clash round ${current.round}: ${nameOf(side)} rolled ${die.total}.${outcome}`;
-      await foundry.documents.ChatMessage.implementation.create({
-        content: content.outerHTML,
-        rolls: [die],
-      });
-    }
   }
 
   async function repairScene(scene: any): Promise<void> {
@@ -292,7 +310,12 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       void enqueue(async () => {
         if (!isAuthority()) return;
         for (const scene of game.scenes.contents) await repairScene(scene);
-        for (const message of [...game.messages.contents]) await handleIntent(message, undefined, true);
+        for (const user of game.users.contents) {
+          const requests = user.getFlag(moduleId, REQUEST);
+          for (const side of SIDES) {
+            if (requests?.[side]?.side === side) await handleIntent(user, structuredClone(requests[side]), undefined, true);
+          }
+        }
       }).catch(logError);
     }, 200);
   }
@@ -305,22 +328,27 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  function clearVisuals(): void {
+  function clearAnimations(): void {
     visualGeneration += 1;
     const old = activeEffect;
     const oldAura = activeAura;
     activeEffect = undefined;
     activeAura = undefined;
+    openingEffect = undefined;
     auraSignature = "";
     effectSignature = "";
-    pannedClash = "";
-    root?.remove();
-    root = undefined;
-    pending.clear();
     for (const frame of pendingSeeks) cancelAnimationFrame(frame);
     pendingSeeks.clear();
     void endEffects(old).catch(logError);
     void endEffects(oldAura).catch(logError);
+  }
+
+  function clearVisuals(): void {
+    clearAnimations();
+    pannedClash = "";
+    root?.remove();
+    root = undefined;
+    pending.clear();
   }
 
   function center(token: any): { x: number; y: number } {
@@ -355,15 +383,23 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         button.style.left = `${screen.x}px`;
         button.style.top = `${screen.y + 12}px`;
       }
+      const indicator = root.querySelector<HTMLElement>(`[data-indicator="${SIDES[i]}"]`);
+      const top = center(token);
+      top.y -= (token.object?.h ?? token.height * scene.grid.size) / 2;
+      const above = screenPoint(top);
+      if (indicator) {
+        indicator.style.left = `${above.x}px`;
+        indicator.style.top = `${above.y - 10}px`;
+      }
     }
-    const midpoint = beamMeetingPoint(center(pair[0]), center(pair[1]), state!.score);
+    const midpoint = beamMeetingPoint(center(pair[0]), center(pair[1]), state!.status === "finished" ? 0 : state!.score);
     const screen = screenPoint(midpoint);
     const score = root.querySelector<HTMLElement>(".astillon-beam-clash__score");
     if (score) { score.style.left = `${screen.x}px`; score.style.top = `${screen.y - 40}px`; }
   }
 
   function renderControls(scene: any, state: BeamClashState | null): void {
-    if (!state || state.status !== "active" || currentScene()?.id !== scene?.id) return;
+    if (!state || state.status === "stopped" || currentScene()?.id !== scene?.id) return;
     const pair = tokenPair(scene, state);
     if (!pair || typeof document === "undefined") return;
     if (!root) {
@@ -390,6 +426,24 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         button.append(icon, copy);
         button.addEventListener("click", () => { void roll(side).catch(logError); });
         root.append(button);
+        const indicator = document.createElement("div");
+        indicator.className = `astillon-beam-clash__indicator astillon-beam-clash__indicator--${side}`;
+        indicator.dataset.indicator = side;
+        indicator.setAttribute("role", "status");
+        const die = document.createElement("span");
+        die.className = "astillon-beam-clash__die";
+        indicator.append(die);
+        const pips = document.createElement("span");
+        pips.className = "astillon-beam-clash__pips";
+        pips.setAttribute("aria-hidden", "true");
+        for (let pip = 0; pip < 3; pip += 1) pips.append(document.createElement("i"));
+        indicator.append(pips);
+        for (const part of ["round", "remaining"]) {
+          const text = document.createElement("span");
+          text.className = `astillon-beam-clash__indicator-${part}`;
+          indicator.append(text);
+        }
+        root.append(indicator);
       }
       const score = document.createElement("div");
       score.className = "astillon-beam-clash__score";
@@ -406,7 +460,8 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       const submitted = state[side];
       const sending = pending.has(`${state.id}:${state.round}:${side}`);
       const allowed = canSubmitBeamRoll(side, game.user, pair[i].actor);
-      button.disabled = !!submitted || sending || !game.users.activeGM || !allowed;
+      button.hidden = state.status === "finished";
+      button.disabled = state.status !== "active" || !!submitted || sending || !game.users.activeGM || !allowed;
       button.dataset.state = submitted ? "rolled" : sending ? "pending" : button.disabled ? "locked" : "ready";
       button.querySelector<HTMLElement>(".astillon-beam-clash__name")!.textContent = pair[i].name;
       button.querySelector<HTMLElement>(".astillon-beam-clash__label")!.textContent = submitted ? `d20: ${submitted.total}` : sending ? "Rolling…" : "Roll d20";
@@ -417,9 +472,27 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       button.title = `GM or this actor's owner: roll for ${pair[i].name}`;
       button.setAttribute("aria-label", `${submitted ? `Rolled ${submitted.total}` : "Roll d20"} for ${pair[i].name}`);
       button.setAttribute("aria-busy", String(sending));
+      const indicator = root.querySelector<HTMLElement>(`[data-indicator="${side}"]`)!;
+      const currentPair = !!state.red || !!state.blue;
+      const result = currentPair ? submitted : state.lastRound?.[side];
+      const round = currentPair || !state.lastRound ? state.round : state.lastRound.round;
+      const lead = state.score * (side === "red" ? 1 : -1);
+      const remaining = 3 - lead;
+      const finished = state.status === "finished";
+      const won = finished && state.winner === side;
+      indicator.dataset.state = finished ? (won ? "won" : "lost") : result ? "rolled" : "waiting";
+      indicator.querySelector<HTMLElement>(".astillon-beam-clash__die")!.textContent = result ? String(result.total) : "—";
+      indicator.querySelectorAll<HTMLElement>(".astillon-beam-clash__pips i").forEach((pip, index) => {
+        pip.classList.toggle("filled", index < Math.max(0, lead));
+      });
+      indicator.querySelector<HTMLElement>(".astillon-beam-clash__indicator-round")!.textContent = `Round ${round}${result ? " · d20" : " · waiting"}`;
+      indicator.querySelector<HTMLElement>(".astillon-beam-clash__indicator-remaining")!.textContent = finished
+        ? won ? "WINNER" : "DEFEATED" : `${remaining} ${remaining === 1 ? "push" : "pushes"} to win`;
+      indicator.setAttribute("aria-label", `${pair[i].name}: ${result ? `rolled ${result.total}` : "waiting to roll"}, round ${round}. ${finished ? won ? "Winner" : "Defeated" : `${remaining} ${remaining === 1 ? "push" : "pushes"} to win`}.`);
     }
     root.querySelector<HTMLElement>(".astillon-beam-clash__score")!.textContent =
-      `Round ${state.round} · ${state.score > 0 ? "+" : ""}${state.score} · First to ±3`;
+      state.status === "finished" ? `${pair[state.winner === "red" ? 0 : 1].name} wins the clash!`
+        : `Round ${state.round} · ${state.score > 0 ? "+" : ""}${state.score} · First to ±3`;
     positionControls();
   }
 
@@ -438,7 +511,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
   }
 
   function renderAura(scene: any, state: BeamClashState, selected: any): void {
-    // Separate lifetime from the beams: score changes must not restart the swirl.
+    // Separate lifetime from the beams: score changes must not restart the overlay.
     // Attachment handles position/scale/visibility; no document flags are stored.
     const signature = JSON.stringify([scene.id, state.id, selected.id]);
     if (signature === auraSignature || !selected.object || !auraAvailable()) return;
@@ -489,8 +562,9 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const scene = currentScene();
     const state = stateOf(scene);
     const pair = state && tokenPair(scene, state);
-    if (!state || state.status !== "active" || state.sceneId !== scene.id || !pair) { clearVisuals(); return; }
+    if (!state || state.status === "stopped" || state.sceneId !== scene.id || !pair) { clearVisuals(); return; }
     renderControls(scene, state);
+    if (state.status === "finished") { clearAnimations(); return; }
     fitView(scene, state, pair);
     // Missing optional dependencies are silent outside start(); controls and shared state still work.
     if (filesProblem(state.redFile, state.blueFile)) return;
@@ -500,12 +574,12 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const signature = JSON.stringify([state.id, state.score, state.redFile, state.blueFile, red, blue]);
     if (signature === effectSignature) return;
     const showOpener = !openedClashes.has(state.id) && state.round === 1 && state.score === 0 && !state.red && !state.blue;
-    openedClashes.add(state.id);
     effectSignature = signature;
     const generation = ++visualGeneration;
     const old = activeEffect;
     const identity = { name: `${effectPrefix}${game.user.id}.${state.id}.${++effectSerial}`, sceneId: scene.id };
     activeEffect = identity;
+    openingEffect = showOpener ? { name: identity.name, clashId: state.id } : undefined;
     void (async () => {
       await endEffects(old);
       if (generation !== visualGeneration || currentScene()?.id !== scene.id) return;
@@ -514,11 +588,11 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       for (const side of SIDES) {
         const file = side === "red" ? state.redFile : state.blueFile;
         const ranged = file === PATREON_FILES[side];
-        const openingFile = ranged && showOpener ? rangedLoopFile(side) : null;
-        const effect = sequence.effect().file(openingFile ?? file);
+        const rangedFile = ranged ? rangedLoopFile(side) : null;
+        const effect = sequence.effect().file(rangedFile ?? file);
         // Range trims are supported even if registering the optional opening
         // wrapper fails. Never fall back to endlessly replaying the launch.
-        if (ranged && !openingFile) effect.timeRange(RANGED_LOOP.start, RANGED_LOOP.end);
+        if (ranged && (!showOpener || !rangedFile)) effect.timeRange(RANGED_LOOP.start, RANGED_LOOP.end);
         // The original energy beam is shared by free and Patreon. Custom keys
         // retain their native colors; only this shared asset needs side tinting.
         if (file === FREE_FILE) effect.tint(side === "red" ? 0xff4040 : 0x4080ff);
@@ -547,9 +621,6 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     ready(): void {
       if (listening) return;
       listening = true;
-      Hooks.on("createChatMessage", (message: any, _options: unknown, userId: string) => {
-        void enqueue(() => handleIntent(message, userId)).catch(logError);
-      });
       Hooks.on("updateScene", (scene: any) => { if (currentScene()?.id === scene.id) redraw(); });
       Hooks.on("canvasReady", () => { canvasAvailable = true; redraw(); recoverAuthority(); });
       Hooks.on("canvasTearDown", () => { canvasAvailable = false; clearVisuals(); });
@@ -560,15 +631,21 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         if (currentScene()?.id === token.parent?.id) redraw();
         void enqueue(() => repairScene(token.parent)).catch(logError);
       });
-      Hooks.on("deleteScene", (scene: any) => { if (activeEffect?.sceneId === scene.id || activeAura?.sceneId === scene.id) clearVisuals(); });
+      Hooks.on("deleteScene", (scene: any) => {
+        if (currentScene()?.id === scene.id || activeEffect?.sceneId === scene.id || activeAura?.sceneId === scene.id) clearVisuals();
+      });
       Hooks.on("updateActor", redraw);
-      Hooks.on("updateUser", () => { redraw(); recoverAuthority(); });
+      Hooks.on("updateUser", (user: any, changed: any, _options: unknown, userId: string) => {
+        if (REQUEST_SLOTS.some(slot => changedPath(changed, ["flags", moduleId, REQUEST, slot]))) receiveRequests(user, changed, userId);
+        else { redraw(); recoverAuthority(); }
+      });
       Hooks.on("userConnected", () => { redraw(); recoverAuthority(); });
       // Source-verified Sequencer hook runs after async loading, before EffectManager.play.
       // Cancel obsolete sequences that finish loading after stop, movement or a scene switch.
       Hooks.on("preCreateSequencerEffect", (data: any) => {
         if (typeof data?.name !== "string" || !data.name.startsWith(`${effectPrefix}${game.user.id}.`)) return;
         if ((data.name !== activeEffect?.name && data.name !== activeAura?.name) || data.sceneId !== currentScene()?.id) return false;
+        if (openingEffect && data.name === openingEffect.name) openedClashes.add(openingEffect.clashId);
       });
       Hooks.on("createSequencerEffect", restoreLoopSeek);
       window.addEventListener("resize", positionControls);

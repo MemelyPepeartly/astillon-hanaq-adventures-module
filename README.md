@@ -44,9 +44,11 @@ Both beam settings default to **auto**. With Patreon enabled, this plays the nat
 
 Without Patreon, auto uses the original `jb2a.energy_beam.normal.bluepink.03.30ft` beam, tinted red/blue, at **2× playback speed**. Enter that key explicitly for both settings if you prefer this fallback with Patreon too. Other custom keys remain supported at 2×, and the previous exact Beam002 reference paths resolve to the same inspected opener/loop behavior. If a client cannot register the optional opening wrapper, it plays the sustained segment directly. End and restart an existing clash after updating. The manifest does not recommend downloading a second, free JB2A collection alongside Patreon.
 
-During the clash, `jb2a.energy_strands.overlay.dark_purple02.01` swirls around the **selected** token (normally Blaster). It attaches to the token, follows its movement and size, and retains its normal speed. The swirl is independent of beam re-aiming, so rolls and score changes do not restart it. If that optional asset is unavailable, the GM gets a setup warning and the clash still runs without the overlay.
+During the clash, `jb2a.static_electricity.02.dark_purple` surrounds the **selected** token (normally Blaster). It attaches to the token, follows its movement and size, and retains its normal speed. The electricity is independent of beam re-aiming, so rolls and score changes do not restart it. If that optional asset is unavailable, the GM gets a setup warning and the clash still runs without the overlay.
 
-Each pair of unmodified d20 rolls moves the shared score one point toward the higher roller; ties do not move it. Red wins at +3, blue at −3. From a red lead of +2, blue needs five net wins. Roll and victory messages use the participants' **token names**, not “Red” or “Blue.” The active GM rolls and adjudicates authenticated chat-document requests; duplicate clicks, stale rounds, and claimed client totals cannot advance the contest. Scene flags restore the clash after reconnecting. **Beam Clash — End**, a winner, or removal of either token cleans up the beams, swirl, and controls.
+Each pair of unmodified d20 rolls moves the shared score one point toward the higher roller; ties do not move it. Red wins at +3, blue at −3. From a red lead of +2, blue needs five net wins. **Small circular indicators above each token** show the latest d20, its round, three lead pips, and pushes remaining to win. The completed pair stays visible until someone rolls the next round; then an unrolled opponent clearly shows “waiting.” Roll buttons remain underneath the tokens.
+
+Beam Clash creates **no chat messages**—not for requests, dice, starting, stopping, or winning. The active GM rolls and adjudicates authenticated native User-flag updates, with three bounded request slots per user. Duplicate clicks, stale rounds, forged sender IDs, and claimed client totals cannot advance the contest. Scene flags restore the indicators after reconnecting. At victory the beams/electricity end, roll buttons hide, and the indicators plus the named winner remain visible. **Beam Clash — End** clears the result (or cancels an active clash); starting another clash replaces it. Removing a participant or leaving the scene also removes the local overlay. Existing chat history from older releases is not deleted. Reload all connected clients after upgrading so everybody uses the new chat-free request protocol.
 
 The NPC reaction suspends a triggering line/beam attack: a red win negates that attack against Blaster only; a blue win resolves it normally. This reaction's trigger, reaction expenditure, and final damage are GM adjudication, not automatic interception of other modules' attacks. The macro is also usable as a general cinematic contest between other tokens. Animation keys can be changed under Module Settings; unavailable assets produce a setup warning before starting.
 
@@ -87,7 +89,9 @@ The editor uses Foundry's native FilePicker and the existing DialogV2 form. Brow
 
 ## Compatibility
 
-Version 0.10.3 plays the Patreon Beam Clash opener once before looping its inspected sustained segment, offers the original beam at 2×, adds the purple energy-strands overlay on the selected token, and names participants in roll and victory messages.
+Version 0.10.4 fixes the missing opener by explicitly resolving the 30ft ranged asset, replaces Beam Clash chat output with circular token indicators, and changes the selected-token overlay to purple static electricity.
+
+Version 0.10.3 introduced the Patreon Beam Clash opener/loop configuration, the original beam at 2×, the purple energy-strands overlay, and named participants in roll and victory messages.
 
 Version 0.10.2 lets GMs roll either Beam Clash side, makes the on-map roll buttons more distinct, and automatically uses the requested native Patreon ranged beams with persistent playback.
 
