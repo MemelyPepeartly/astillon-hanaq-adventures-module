@@ -38,7 +38,9 @@ On Blaster's turn, Flash Mob costs one action and places one 1-HP hype thrall wi
 
 ### Beam Clash
 
-Enable **Sequencer** and **JB2A** (free content is sufficient). As GM, select Blaster (red), target exactly one different character token (blue), and run **Beam Clash — Start**. Both tokens need actors, but the GM can start before the target's owner connects or is assigned. Viewers of that scene pan to frame both participants. Persistent red and blue beams meet at the middle, with on-map d20 buttons visible to everyone. GMs can roll red; only non-GM owners of the target actor can roll blue. If no player owns blue yet, grant Owner permission and have the player connect; they can join the existing clash without restarting it.
+Enable **Sequencer** and either **JB2A Patreon** or **JB2A Free Content**, not both. As GM, select Blaster (red), target exactly one different character token (blue), and run **Beam Clash — Start**. Both tokens need actors, but the GM can start before the target's owner connects or is assigned. Viewers of that scene pan to frame both participants. Persistent red and blue beams meet at the middle, with raised, dice-icon **Roll d20** buttons visible to everyone. **GMs can roll either side**, including on behalf of the player; non-GM users can roll only a side whose actor they own. Other players see disabled controls. Accepted rolls show the die result and wait for the other side; duplicate submissions from the GM and player do not count twice.
+
+Both beam settings default to **auto**. With Patreon enabled, auto selects `jb2a.ranged.beam.002.03.red.30ft` and `jb2a.ranged.beam.002.03.blue.30ft`: the native `Beam002_03_Regular_Red_30ft_1600x400.webm` and `Beam002_03_Regular_Blue_30ft_1600x400.webm` ranged clips. Their launch/impact animation and colors are retained, and Sequencer loops the clips while the clash is active. Free-only installs use the previous tinted energy-beam fallback. Old built-in defaults upgrade automatically; other custom database keys stay unchanged. End and restart an existing clash after updating to select the new assets. The manifest no longer recommends downloading a second, free JB2A collection alongside Patreon.
 
 Each pair of unmodified d20 rolls moves the shared score one point toward the higher roller; ties do not move it. Red wins at +3, blue at −3. From a red lead of +2, blue needs five net wins. The active GM rolls and adjudicates authenticated chat-document requests; duplicate clicks, stale rounds, and claimed client totals cannot advance the contest. Scene flags restore the clash after reconnecting. **Beam Clash — End**, a winner, or removal of either token cleans up the beams and controls.
 
@@ -80,6 +82,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art and color together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.2 lets GMs roll either Beam Clash side, makes the on-map roll buttons more distinct, and automatically uses the requested native Patreon ranged beams with persistent playback.
 
 Version 0.10.1 adds native clickable rolls and links to Blaster's descriptions, a description-only refresh macro for existing actors, and GM-started Beam Clash setup without an online-player prerequisite.
 

@@ -37,8 +37,10 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 Use one GM, one owner of the blue actor, and one non-owner spectator, all viewing the same scene.
 
 - Start from one selected token and one targeted player token. All viewers pan to frame both tokens. Verify actual installed JB2A assets play persistently, **red from selected / blue from target**, meeting at the midpoint.
-- Repeat the start while only the GM is connected, including before blue has an assigned player owner. It must start without an ownership/connection error. Assign blue's Owner permission and connect that player; the blue roll control becomes usable in the existing clash. The GM still cannot roll blue.
-- Verify only the GM can click red and only the target's non-GM owner can click blue. Spectators see disabled controls. Check changing ownership updates the controls.
+- Repeat the start while only the GM is connected, including before blue has an assigned player owner. It must start without an ownership/connection error. The GM can roll both sides. Assign blue's Owner permission and connect that player; they can also roll blue in the existing clash.
+- Verify the GM can click either side, while non-GM players can click only an actor they own (normally the blue player actor). Spectators see disabled controls. Check changing ownership updates the controls, and that a GM/owner race accepts only one roll for blue per round.
+- Check the raised button faces, dice icon, large Roll d20 label, hover/pressed/keyboard-focus feedback, and readable submitted/result/locked states. Buttons must remain aligned while panning and zooming; token names must remain plain text.
+- With only Patreon enabled and both beam settings set to auto (or the old free defaults), start a new clash: verify native red/blue Beam002_03 ranged clips launch from the two characters and persist through complete video loops. Compare the blue asset against `modules/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_Blue_30ft_1600x400.webm`. No tint should change their native colors. Re-aiming after a score change must not leave old beams behind. Also test free-only fallback and a preserved custom database key.
 - Roll one side: wait for the other; do not advance score. Double-click, click from two owners, or repeat an old round request: accept only one roll per side per round.
 - Verify ties keep the score, and opposing wins reverse it one step. From +2, five net blue wins reach −3. At either threshold, a winner is announced and all effects/buttons disappear.
 - Pan/zoom and move a token: buttons stay aligned and beam endpoints follow. End the clash while an animation asset is still loading: no orphan beam may appear afterward.
@@ -54,3 +56,5 @@ Use one GM, one owner of the blue actor, and one non-owner spectator, all viewin
 - [Summons Assistant public API](https://github.com/ChasarooniZ/pf2e-summons-assistant/blob/c99406b145280751898d315556252ea0d53c33db/scripts/api.js)
 - [Summons Assistant summoning pipeline](https://github.com/ChasarooniZ/pf2e-summons-assistant/blob/c99406b145280751898d315556252ea0d53c33db/scripts/summon.js)
 - [PF2e creature-building benchmarks](https://2e.aonprd.com/Rules.aspx?ID=2874)
+- [JB2A ranged-beam mappings](https://github.com/Jules-Bens-Aa/jb2a-databases/blob/17ee6e0d4ce579718e7a578f6cabc67b22d0c76c/jb2a_patreon/scripts/jb2a_sequencer.js)
+- [Sequencer effect API: persistence and stretching](https://github.com/fantasycalendar/FoundryVTT-Sequencer/blob/d8529e70ac91cee705f3dd0803231ca1c147e1e3/docs/api/effect.md)

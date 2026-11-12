@@ -12,6 +12,8 @@ const ROOT = ".astillon-beam-clash";
 const RED_FILE = "jb2a.test.beam.red";
 const BLUE_FILE = "jb2a.test.beam.blue";
 const FREE_DEFAULT_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
+const PATREON_RED = "jb2a.ranged.beam.002.03.red.30ft";
+const PATREON_BLUE = "jb2a.ranged.beam.002.03.blue.30ft";
 const flush = async () => { await setImmediate(); await setImmediate(); };
 
 function state(overrides = {}) {
@@ -25,15 +27,18 @@ function state(overrides = {}) {
 const submission = (requestId, total, authorId = "gm") => ({ requestId, authorId, total });
 
 describe("beam clash rules", () => {
-  test("only GMs roll red and only non-GM owners roll blue", () => {
+  test("GMs can roll either side; other players cannot roll another actor", () => {
     const actor = { testUserPermission: (user, permission) => permission === "OWNER" && user.owns === true };
     assert.equal(canSubmitBeamRoll("red", { isGM: true }, actor), true);
-    assert.equal(canSubmitBeamRoll("red", { isGM: false, owns: true }, actor), false);
-    assert.equal(canSubmitBeamRoll("blue", { isGM: true, owns: true }, actor), false);
+    assert.equal(canSubmitBeamRoll("red", { isGM: false, owns: true }, actor), true);
+    assert.equal(canSubmitBeamRoll("red", { isGM: false, owns: false }, actor), false);
+    assert.equal(canSubmitBeamRoll("blue", { isGM: true, owns: true }, actor), true);
+    assert.equal(canSubmitBeamRoll("blue", { isGM: true, owns: false }, actor), true);
     assert.equal(canSubmitBeamRoll("blue", { isGM: false, owns: true }, actor), true);
     assert.equal(canSubmitBeamRoll("blue", { isGM: false, owns: false }, actor), false);
     assert.equal(canSubmitBeamRoll("blue", { isGM: false, owns: true }, null), false);
     assert.equal(canSubmitBeamRoll("red", null, actor), false);
+    assert.equal(canSubmitBeamRoll("invalid", { isGM: true }, actor), false);
   });
 
   test("a round waits for both dice, ties advance without changing score, and saved input is immutable", () => {
@@ -234,9 +239,9 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   }
   const Sequencer = {
     Database: {
-      entryExists: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE].includes(key),
-      getEntry: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE].includes(key) ? { file: `${key}.webm` } : false,
-      getAllFileEntries: () => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE],
+      entryExists: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE].includes(key),
+      getEntry: (key) => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE].includes(key) ? { file: `${key}.webm` } : false,
+      getAllFileEntries: () => [RED_FILE, BLUE_FILE, FREE_DEFAULT_FILE, PATREON_RED, PATREON_BLUE],
     },
     EffectManager: { async endEffects(filter, broadcast) { ends.push({ filter, broadcast }); } },
   };
@@ -311,7 +316,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.getState().status, "active");
     assert.deepEqual(env.warnings, []);
     assert.equal(env.button("red").disabled, false);
-    assert.equal(env.button("blue").disabled, true);
+    assert.equal(env.button("blue").disabled, false);
   });
 
   test("a clash can be staged before ownership is assigned and its later-connected owner can roll blue", async (t) => {
@@ -411,7 +416,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.game.modules.has("jb2a_patreon"), false);
     for (const key of ["beamClashRedFile", "beamClashBlueFile"]) {
       const registered = env.registrations.get(key);
-      assert.equal(registered.default, FREE_DEFAULT_FILE);
+      assert.equal(registered.default, "auto");
       env.settings.set(key, registered.default);
     }
     await env.feature.api.start();
@@ -437,7 +442,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.ok(env.pans[0].scale > 0 && env.pans[0].scale <= 1.5);
     assert.equal(env.roots().length, 1);
     assert.equal(env.button("red").disabled, false);
-    assert.equal(env.button("blue").disabled, true);
+    assert.equal(env.button("blue").disabled, false);
     assert.equal(env.plays.length, 1);
     assert.deepEqual(env.plays[0].options, { local: true });
     assert.deepEqual(env.plays[0].effects.map((effect) => effect.file), [RED_FILE, BLUE_FILE]);
@@ -453,11 +458,96 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.pans.length, 1);
   });
 
+  for (const configured of ["auto", FREE_DEFAULT_FILE, "reference-path"]) {
+    test(`Patreon ${configured} chooses the requested ranged files with native color and persistence`, async t => {
+      const env = setup(t);
+      env.game.modules.set("jb2a_patreon", { active: true });
+      env.game.modules.set("JB2A_DnD5e", { active: false });
+      for (const [side, color] of [["Red", "Red"], ["Blue", "Blue"]]) {
+        env.settings.set(`beamClash${side}File`, configured === "reference-path"
+          ? `modules/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm` : configured);
+      }
+      await env.feature.api.start(); await flush();
+      assert.deepEqual(env.warnings, []);
+      assert.deepEqual(env.plays[0].effects.map(e => e.file), [PATREON_RED, PATREON_BLUE]);
+      for (const effect of env.plays[0].effects) {
+        assert.equal(effect.persist, true);
+        assert.equal(effect.temporary, true);
+        assert.equal(effect.tint, undefined, "do not recolor the actual red/blue artwork");
+        assert.deepEqual(effect.target, { x: 450, y: 250 });
+      }
+      assert.deepEqual(env.plays[0].options, { local: true });
+    });
+  }
+
+  test("explicit custom database choices are preserved with Patreon installed", async t => {
+    const env = setup(t);
+    env.game.modules.set("jb2a_patreon", { active: true });
+    await env.feature.api.start(); await flush();
+    assert.deepEqual(env.plays[0].effects.map(e => e.file), [RED_FILE, BLUE_FILE]);
+  });
+
+  test("GM can roll for blue without player ownership and cannot duplicate the owner's accepted roll", async t => {
+    const env = setup(t, { initial: state() });
+    env.blue.actor.testUserPermission = user => user.id === "owner";
+    env.totals.push(18, 6);
+    const button = env.button("blue");
+    assert.equal(button.tagName, "BUTTON");
+    assert.equal(button.disabled, false);
+    assert.match(button.getAttribute("aria-label"), /Roll d20 for Blue/);
+    assert.ok(button.querySelector("svg.astillon-beam-clash__icon"));
+    assert.equal(button.querySelector(".astillon-beam-clash__label").textContent, "Roll d20");
+    assert.equal(button.querySelector(".astillon-beam-clash__hint").textContent, "GM · roll for player");
+    button.click(); await flush();
+    env.request("blue", "owner"); await flush();
+    assert.equal(env.dice.length, 1);
+    assert.equal(env.getState().blue.authorId, "gm");
+    assert.equal(button.dataset.state, "rolled");
+    assert.equal(button.querySelector(".astillon-beam-clash__label").textContent, "d20: 18");
+    assert.equal(button.disabled, true);
+    env.button("red").click(); await flush();
+    assert.equal(env.dice.length, 2);
+    assert.equal(env.getState().score, -1);
+    assert.equal(env.getState().round, 2);
+    assert.equal(button.dataset.state, "ready");
+  });
+
+  test("a secondary GM can submit blue for the active GM to adjudicate", async t => {
+    const env = setup(t, { initial: state(), userId: "gm-two" });
+    const request = await env.feature.api.roll("blue"); await flush();
+    assert.ok(request);
+    assert.equal(env.dice.length, 0);
+    env.game.user = env.game.users.get("gm");
+    env.emit("createChatMessage", request, {}, "gm-two"); await flush();
+    assert.equal(env.getState().blue.authorId, "gm-two");
+    assert.equal(env.dice.length, 1);
+  });
+
+  test("when both sides are player characters, each owner can roll only their own side", async t => {
+    const env = setup(t, { initial: state() });
+    env.red.actor.testUserPermission = (user, permission) => user.id === "outsider" && permission === "OWNER";
+    env.game.user = env.game.users.get("outsider");
+    env.emit("updateActor", env.red.actor);
+    assert.equal(env.button("red").disabled, false);
+    assert.equal(env.button("blue").disabled, true);
+    assert.equal(await env.feature.api.roll("blue"), null);
+    const request = await env.feature.api.roll("red");
+    assert.ok(request);
+    env.game.user = env.game.users.get("gm");
+    env.request("blue", "outsider");
+    env.request("red", "owner");
+    env.emit("createChatMessage", request, {}, "outsider");
+    await flush();
+    assert.equal(env.dice.length, 1);
+    assert.equal(env.getState().red.authorId, "outsider");
+    assert.equal(env.getState().blue, null);
+  });
+
   test("authoritative document author and current actor ownership override forged identities and totals", async (t) => {
     const env = setup(t, { initial: state() });
     env.totals.push(7);
     env.request("red", "owner", { userId: "gm", total: 20 });
-    env.request("blue", "gm", { userId: "owner", total: 20 });
+    env.request("blue", "gm", { userId: "owner", total: 20 }, { origin: "outsider" });
     env.request("blue", "outsider", { userId: "owner", total: 20 });
     env.request("blue", "unknown-user", { userId: "owner", total: 20 });
     env.request("blue", "owner", {}, { origin: "outsider" });

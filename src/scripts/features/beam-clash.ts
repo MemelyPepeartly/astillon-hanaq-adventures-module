@@ -7,13 +7,14 @@ import {
 const FLAG = "beamClash";
 const REQUEST = "beamClashRequest";
 const SIDES = ["red", "blue"] as const;
-// Free JB2A asset; Sequencer's own persistent-link tutorial uses this beam family:
-// https://github.com/fantasycalendar/FoundryVTT-Sequencer/blob/master/docs/tutorials/basic-linked.md
-// https://github.com/Jules-Bens-Aa/JB2A_DnD5e/blob/main/scripts/jb2a_sequencer.js
-const DEFAULT_FILES = {
-  red: "jb2a.energy_beam.normal.bluepink.03.30ft",
-  blue: "jb2a.energy_beam.normal.bluepink.03.30ft",
+// Database keys retain JB2A's ranged-template alignment metadata. These are the
+// user's Beam002_03_Regular_{Red,Blue}_30ft_1600x400.webm files, not tinted stand-ins.
+// Verified: Jules-Bens-Aa/jb2a-databases @ 17ee6e0, jb2a_patreon/scripts/jb2a_sequencer.js.
+const PATREON_FILES = {
+  red: "jb2a.ranged.beam.002.03.red.30ft",
+  blue: "jb2a.ranged.beam.002.03.blue.30ft",
 };
+const FREE_FILE = "jb2a.energy_beam.normal.bluepink.03.30ft";
 type Intent = {
   version: 1; action: "start" | "stop" | "roll"; sceneId: string; clashId: string | null;
   round?: number; side?: BeamSide;
@@ -69,9 +70,25 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       try {
         if (key?.startsWith("jb2a.") && sequencer().Database.getEntry(key, { softFail: true })) continue;
       } catch { /* Report one actionable start warning instead of failing module startup. */ }
-      return `The ${side} animation key is unavailable. In Module Settings, set Beam Clash ${side} beam to an installed jb2a key from Sequencer's Database Viewer. The default energy beam is included in JB2A Free Content.`;
+      return `The ${side} animation key is unavailable. In Module Settings, set Beam Clash ${side} beam to auto or an installed jb2a key from Sequencer's Database Viewer. Auto uses the Patreon ranged beam when installed, or the free energy beam otherwise.`;
     }
     return null;
+  }
+
+  function selectedFile(side: BeamSide): string {
+    const configured = String(game.settings.get(moduleId, setting(side)) ?? "").trim();
+    // The previous built-in default may already have been saved by Foundry. Upgrade
+    // that default to the requested Patreon beam without changing other custom keys.
+    if (!configured || configured === "auto" || configured === FREE_FILE) {
+      return game.modules?.get("jb2a_patreon")?.active ? PATREON_FILES[side] : FREE_FILE;
+    }
+    // Accept the exact reference paths too, but resolve them to database keys so
+    // the source/impact offsets are retained when stretching to the clash point.
+    const color = side === "red" ? "Red" : "Blue";
+    if (configured === `modules/jb2a_patreon/Library/Generic/RangedSpell/Beam/Beam002_03_Regular_${color}_30ft_1600x400.webm`) {
+      return PATREON_FILES[side];
+    }
+    return configured;
   }
 
   function currentScene(): any {
@@ -115,8 +132,8 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     if (red?.parent?.id !== scene.id || blue?.parent?.id !== scene.id || red.id === blue.id || !red.actor || !blue.actor) {
       notify("Choose two different tokens on this scene, each with an actor."); return null;
     }
-    const redFile = String(game.settings.get(moduleId, setting("red")) ?? "").trim();
-    const blueFile = String(game.settings.get(moduleId, setting("blue")) ?? "").trim();
+    const redFile = selectedFile("red");
+    const blueFile = selectedFile("blue");
     const problem = filesProblem(redFile, blueFile);
     if (problem) { notify(problem); return null; }
     if (stateOf(scene)?.status === "active") { notify("This scene already has a clash. Stop it before starting another."); return null; }
@@ -142,7 +159,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const state = stateOf(scene);
     if (!isBeamSide(side) || !state || state.status !== "active") return null;
     const pair = tokenPair(scene, state);
-    if (!pair || !canSubmitBeamRoll(side, game.user, pair[1].actor)) return null;
+    if (!pair || !canSubmitBeamRoll(side, game.user, pair[side === "red" ? 0 : 1].actor)) return null;
     if (!game.users.activeGM) { notify("A GM must be connected to adjudicate rolls."); return null; }
     const key = `${state.id}:${state.round}:${side}`;
     if (pending.has(key) || state[side]) return null;
@@ -195,7 +212,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const pair = tokenPair(scene, state);
     if (intent.action !== "roll" || !isBeamSide(side) || !Number.isInteger(intent.round)
       || intent.round !== state.round || state[side] || state.processed.includes(message.id)
-      || !pair || !canSubmitBeamRoll(side, author, pair[1].actor)) return;
+      || !pair || !canSubmitBeamRoll(side, author, pair[side === "red" ? 0 : 1].actor)) return;
     const expectedId = state.id;
     const expectedRevision = state.revision;
     const die = await new foundry.dice.Roll("1d20").evaluate({ allowInteractive: false });
@@ -203,7 +220,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const current = stateOf(scene);
     if (!isAuthority() || !current || current.id !== expectedId || current.revision !== expectedRevision
       || current.status !== "active" || !tokenPair(scene, current)
-      || !canSubmitBeamRoll(side, game.users.get(author.id), scene.tokens.get(current.blueTokenId)?.actor)) return;
+      || !canSubmitBeamRoll(side, game.users.get(author.id), scene.tokens.get(side === "red" ? current.redTokenId : current.blueTokenId)?.actor)) return;
     const next = acceptBeamRoll(current, side, intent.round!, { requestId: message.id, authorId: author.id, total: die.total });
     if (!next) return;
     await scene.setFlag(moduleId, FLAG, next);
@@ -309,6 +326,19 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         button.type = "button";
         button.className = `astillon-beam-clash__roll astillon-beam-clash__roll--${side}`;
         button.dataset.side = side;
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("class", "astillon-beam-clash__icon");
+        icon.setAttribute("viewBox", "0 0 32 34");
+        icon.innerHTML = '<path d="M16 1 30 9v16L16 33 2 25V9Z M16 1 6 24h20L16 1 M2 9l4 15-4 1m28-16-4 15 4 1M6 24l10 9 10-9"/><text x="16" y="21" text-anchor="middle">20</text>';
+        icon.setAttribute("aria-hidden", "true");
+        const copy = document.createElement("span");
+        copy.className = "astillon-beam-clash__copy";
+        for (const part of ["name", "label", "hint"]) {
+          const text = document.createElement("span");
+          text.className = `astillon-beam-clash__${part}`;
+          copy.append(text);
+        }
+        button.append(icon, copy);
         button.addEventListener("click", () => { void roll(side).catch(logError); });
         root.append(button);
       }
@@ -324,10 +354,20 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     for (let i = 0; i < SIDES.length; i += 1) {
       const side = SIDES[i];
       const button = root.querySelector<HTMLButtonElement>(`[data-side="${side}"]`)!;
-      const waiting = !!state[side] || pending.has(`${state.id}:${state.round}:${side}`);
-      button.disabled = waiting || !game.users.activeGM || !canSubmitBeamRoll(side, game.user, pair[1].actor);
-      button.textContent = `${side === "red" ? "Red" : "Blue"} · ${pair[i].name} · ${state[side] ? `d20: ${state[side]!.total}` : waiting ? "Waiting…" : "Roll d20"}`;
-      button.title = side === "red" ? "GM only" : "Non-GM actor owners only";
+      const submitted = state[side];
+      const sending = pending.has(`${state.id}:${state.round}:${side}`);
+      const allowed = canSubmitBeamRoll(side, game.user, pair[i].actor);
+      button.disabled = !!submitted || sending || !game.users.activeGM || !allowed;
+      button.dataset.state = submitted ? "rolled" : sending ? "pending" : button.disabled ? "locked" : "ready";
+      button.querySelector<HTMLElement>(".astillon-beam-clash__name")!.textContent = pair[i].name;
+      button.querySelector<HTMLElement>(".astillon-beam-clash__label")!.textContent = submitted ? `d20: ${submitted.total}` : sending ? "Rolling…" : "Roll d20";
+      button.querySelector<HTMLElement>(".astillon-beam-clash__hint")!.textContent = submitted ? "Waiting for other roll"
+        : sending ? "Submitting roll" : !game.users.activeGM ? "Waiting for GM"
+          : !allowed ? "Owner / GM only"
+            : side === "blue" && game.user.isGM ? "GM · roll for player" : "Click to push the beam";
+      button.title = `GM or this actor's owner: roll for the ${side} character`;
+      button.setAttribute("aria-label", `${submitted ? `Rolled ${submitted.total}` : "Roll d20"} for ${pair[i].name}`);
+      button.setAttribute("aria-busy", String(sending));
     }
     root.querySelector<HTMLElement>(".astillon-beam-clash__score")!.textContent =
       `Round ${state.round} · ${state.score > 0 ? "+" : ""}${state.score} · First to ±3`;
@@ -372,9 +412,12 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       const meeting = beamMeetingPoint(red, blue, state.score);
       const sequence = new globals.Sequence({ moduleName: moduleId });
       for (const side of SIDES) {
-        sequence.effect().file(side === "red" ? state.redFile : state.blueFile)
-          .tint(side === "red" ? 0xff4040 : 0x4080ff)
-          .atLocation(side === "red" ? red : blue).stretchTo(meeting)
+        const file = side === "red" ? state.redFile : state.blueFile;
+        const effect = sequence.effect().file(file);
+        // Preserve the native launch/impact animation and colors of the ranged
+        // Patreon clips. Only the shared single-color free fallback needs tinting.
+        if (file === FREE_FILE) effect.tint(side === "red" ? 0xff4040 : 0x4080ff);
+        effect.atLocation(side === "red" ? red : blue).stretchTo(meeting)
           .name(identity.name).persist().temporary();
       }
       // A persistent sequence's promise may remain pending for its whole lifetime; do not await it.
@@ -391,8 +434,8 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       for (const side of SIDES) {
         game.settings.register(moduleId, setting(side), {
           name: `Beam Clash ${side} beam`,
-          hint: "Installed JB2A key from Sequencer's Database Viewer. The default is included in free JB2A and tinted red/blue.",
-          scope: "world", config: true, type: String, default: DEFAULT_FILES[side],
+          hint: "auto uses the Patreon Beam002_03 red/blue ranged clips when installed, with a tinted free fallback. Or enter an installed JB2A database key.",
+          scope: "world", config: true, type: String, default: "auto",
         });
       }
     },

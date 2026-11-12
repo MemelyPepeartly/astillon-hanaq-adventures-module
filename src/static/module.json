@@ -31,8 +31,7 @@
     ],
     "recommends": [
       { "id": "pf2e-summons-assistant", "type": "module", "reason": "Flash Mob uses Summons Assistant's thrall placement and lifecycle." },
-      { "id": "sequencer", "type": "module", "reason": "Beam Clash uses persistent beam animations." },
-      { "id": "JB2A_DnD5e", "type": "module", "reason": "Beam Clash uses JB2A beam assets. The Patreon JB2A package is also supported." }
+      { "id": "sequencer", "type": "module", "reason": "Beam Clash uses persistent beam animations. Enable either your JB2A Patreon collection or JB2A Free Content separately." }
     ]
   },
   "url": "https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module",

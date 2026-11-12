@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.1. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.2. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
 
 ## Menacing
 

@@ -42,11 +42,11 @@ export function readBeamClash(value: any): BeamClashState | null {
   return value;
 }
 
-/** GM identity never grants access to blue, even when the GM owns that actor. */
-export function canSubmitBeamRoll(side: BeamSide, user: any, blueActor: any): boolean {
-  if (!user) return false;
-  return side === "red" ? user.isGM === true
-    : user.isGM === false && blueActor?.testUserPermission(user, "OWNER") === true;
+/** GMs can roll either side; non-GMs may roll only the actor on that side they own. */
+export function canSubmitBeamRoll(side: BeamSide, user: any, actor: any): boolean {
+  if (!isBeamSide(side) || !user) return false;
+  if (user.isGM === true) return true;
+  return actor?.testUserPermission(user, "OWNER") === true;
 }
 
 /** Pure transition; the caller supplies only a die it evaluated on the authoritative GM. */
