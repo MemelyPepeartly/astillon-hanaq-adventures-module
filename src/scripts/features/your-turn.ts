@@ -72,15 +72,12 @@ function portraitWidth(value: unknown): number {
   return Number.isFinite(width) && width > 0 ? Math.min(1000, Math.max(100, width)) : DEFAULT_PORTRAIT_WIDTH;
 }
 
-/** Normalize resolution, not aspect ratio. The shared slot stays above the name banner. */
-export function fitTurnPortrait(width: number, height: number, targetWidth: number, stageSize: number, framed = false): { width: number; height: number } {
-  const stage = Number.isFinite(stageSize) ? Math.max(0, stageSize) : 0;
-  const maxWidth = Math.min(portraitWidth(targetWidth), stage * 0.64);
-  const maxHeight = stage * 0.72;
-  const padding = framed ? Math.min(16, maxWidth, maxHeight) : 0;
+/** Enforce the configured width, including enlargement; never silently fit it down. */
+export function fitTurnPortrait(width: number, height: number, targetWidth: number, framed = false): { width: number; height: number } {
+  const target = portraitWidth(targetWidth);
+  const padding = framed ? 16 : 0;
   const ratio = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? width / height : 1;
-  const contentWidth = Math.max(0, Math.min(maxWidth - padding, (maxHeight - padding) * ratio));
-  return { width: contentWidth + padding, height: contentWidth / ratio + padding };
+  return { width: target, height: (target - padding) / ratio + padding };
 }
 
 /**
@@ -766,10 +763,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     character.classList.toggle("astillon-yt-sticker", result.mode === "sticker");
     character.classList.add("has-art");
     character.dataset.mode = result.mode;
-    const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
     const fitted = fitTurnPortrait(result.width, result.height,
       Number.parseFloat(root.style.getPropertyValue("--yt-portrait-width")),
-      Number.parseFloat(stage?.style.width ?? "0"), result.mode === "frame");
+      result.mode === "frame");
     character.style.width = `${fitted.width}px`;
     character.style.height = `${fitted.height}px`;
     image.src = result.url;

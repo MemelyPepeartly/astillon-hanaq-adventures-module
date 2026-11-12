@@ -1046,21 +1046,13 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
   });
 
   test("portrait fitting upscales small art and downscales large art without changing proportions", () => {
-    assert.deepEqual(fitTurnPortrait(40, 60, 300, 1000), { width: 300, height: 450 });
-    assert.deepEqual(fitTurnPortrait(800, 1200, 300, 1000), { width: 300, height: 450 });
-    assert.deepEqual(fitTurnPortrait(32, 32, 400, 1000, true), { width: 400, height: 400 });
-    assert.deepEqual(fitTurnPortrait(4096, 4096, 400, 1000, true), { width: 400, height: 400 });
-    const tall = fitTurnPortrait(100, 1000, 400, 600);
-    assert.equal(tall.height, 432);
-    assert.equal(tall.width, 43.2);
-    const wide = fitTurnPortrait(1000, 100, 1000, 600);
-    assert.equal(wide.width, 384);
-    assert.equal(wide.height, 38.4);
-    for (const framed of [false, true]) {
-      const bounded = fitTurnPortrait(100, 1000, 1000, 600, framed);
-      assert.ok(bounded.width <= 384 && bounded.height <= 432);
-    }
-    assert.deepEqual(fitTurnPortrait(32, 32, 400, 0, true), { width: 0, height: 0 });
+    assert.deepEqual(fitTurnPortrait(40, 60, 300), { width: 300, height: 450 });
+    assert.deepEqual(fitTurnPortrait(800, 1200, 300), { width: 300, height: 450 });
+    assert.deepEqual(fitTurnPortrait(32, 32, 400, true), { width: 400, height: 400 });
+    assert.deepEqual(fitTurnPortrait(4096, 4096, 400, true), { width: 400, height: 400 });
+    assert.deepEqual(fitTurnPortrait(100, 1000, 400), { width: 400, height: 4000 });
+    assert.deepEqual(fitTurnPortrait(1000, 100, 1000), { width: 1000, height: 100 });
+    assert.deepEqual(fitTurnPortrait(100, 1000, 1000, true), { width: 1000, height: 9856 });
   });
 
   test("world portrait width affects every art size and cached previews without changing actor data", async t => {
@@ -1110,7 +1102,27 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       await env.feature.api.preview(actor); await flush();
       const root = env.overlays()[0];
       assert.equal(root.style.getPropertyValue("--yt-portrait-width"), `${expected}px`);
-      assert.ok(Number.parseFloat(root.querySelector(".astillon-yt-character").style.width) <= 784 * 0.64);
+      assert.equal(Number.parseFloat(root.querySelector(".astillon-yt-character").style.width), expected);
+    }
+  });
+
+  test("increasing the target to 1000 enlarges small, large, tall, and wide art without backdrop caps", async t => {
+    const env = setup(t, { portraitWidth: 400 });
+    for (const [name, width, height] of [["small", 32, 32], ["large", 2048, 2048], ["tall", 32, 160], ["wide", 160, 32]]) {
+      const img = `icons/width-${name}.webp`;
+      env.imageControl.sizes.set(img, { width, height });
+      const actor = env.makeActor({ img });
+      env.settings.set("yourTurnPortraitWidth", 400);
+      await env.feature.api.preview(actor); await flush();
+      const before = env.overlays()[0].querySelector(".astillon-yt-character");
+      const beforeHeight = Number.parseFloat(before.style.height);
+      assert.equal(before.style.width, "400px");
+      env.settings.set("yourTurnPortraitWidth", 1000);
+      await env.feature.api.preview(actor); await flush();
+      const after = env.overlays()[0].querySelector(".astillon-yt-character");
+      assert.equal(after.style.width, "1000px", `${name} reaches the selected width, even beyond the stage`);
+      assert.ok(Number.parseFloat(after.style.height) > beforeHeight);
+      assert.ok(Math.abs((Number.parseFloat(after.style.height) - 16) / 984 - height / width) < 0.000001);
     }
   });
 
