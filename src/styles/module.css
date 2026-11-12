@@ -53,13 +53,19 @@
   display: none;
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   background: var(--slice-color, var(--turn-theme));
   -webkit-mask-image: var(--slice-url);
   mask-image: var(--slice-url);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
 }
 
 .astillon-yt-layer.can-tint > .astillon-yt-slice {

@@ -13,8 +13,6 @@ const CONFIGURE_ACTION = "astillon-your-turn";
 const INK_ALPHA = 16;
 const OPAQUE_ALPHA = 250;
 const MAX_EDGE = 1024;
-const STAGE_WIDTH_OF_MAP = 0.62;
-const STAGE_HEIGHT_OF_MAP = 0.82;
 
 type SliceSpec = {
   id: string;
@@ -481,9 +479,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.right = `${right}px`;
     root.style.bottom = `${bottom}px`;
     root.style.left = `${left}px`;
-    const usableW = Math.max(280, view.width - left - right);
-    const usableH = Math.max(280, view.height - top - bottom);
-    const stageSize = Math.round(Math.min(usableW * STAGE_WIDTH_OF_MAP, usableH * STAGE_HEIGHT_OF_MAP));
+    const usableH = Math.max(0, view.height - top - bottom);
+    // The demo square spans the usable page height and stays anchored to the lower right.
+    const stageSize = Math.round(usableH > 0 ? usableH : view.height);
     root.style.setProperty("--yt-stage-size", `${stageSize}px`);
     const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
     if (stage) {
@@ -563,7 +561,32 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   }
 
   function sliceUrl(file: string): string {
-    return `modules/${moduleId}/assets/your-turn/${file}`;
+    const path = `modules/${moduleId}/assets/your-turn/${file}`;
+    try {
+      const base = document.baseURI;
+      if (base && /^https?:/i.test(base)) return new URL(path, base).href;
+    } catch {
+      // A module-relative path still resolves in Foundry when no http base is present.
+    }
+    return path;
+  }
+
+  function paintTint(tint: HTMLElement, src: string, color: string): void {
+    const mask = `url("${src}")`;
+    tint.style.setProperty("display", "block", "important");
+    tint.style.setProperty("background-color", color, "important");
+    tint.style.setProperty("--slice-url", mask);
+    tint.style.setProperty("--slice-color", color);
+    tint.style.setProperty("mask-image", mask, "important");
+    tint.style.setProperty("-webkit-mask-image", mask, "important");
+    tint.style.setProperty("mask-size", "100% 100%", "important");
+    tint.style.setProperty("-webkit-mask-size", "100% 100%", "important");
+    tint.style.setProperty("mask-repeat", "no-repeat", "important");
+    tint.style.setProperty("-webkit-mask-repeat", "no-repeat", "important");
+    tint.style.setProperty("mask-position", "center", "important");
+    tint.style.setProperty("-webkit-mask-position", "center", "important");
+    tint.style.setProperty("mask-mode", "alpha", "important");
+    tint.dataset.tintColor = color;
   }
 
   function fitLine(parent: HTMLElement, stagePx: number, fraction: number, maxFont: number): void {
@@ -613,14 +636,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       image.className = "astillon-yt-slice";
       image.alt = "";
       image.draggable = false;
-      image.src = sliceUrl(spec.file);
+      const src = sliceUrl(spec.file);
+      image.src = src;
       piece.append(image);
       if (spec.tint) {
         const tint = document.createElement("div");
         tint.className = "astillon-yt-tint";
-        const src = sliceUrl(spec.file);
-        tint.style.setProperty("--slice-url", `url("${src}")`);
-        tint.style.setProperty("--slice-color", spec.tint === "theme" ? "var(--turn-theme)" : "var(--turn-highlight)");
+        const color = spec.tint === "theme" ? subject.color : turnHighlight(subject.color);
+        paintTint(tint, src, color);
+        image.style.setProperty("display", "none", "important");
         piece.append(tint);
       }
       if (spec.text === "name") {

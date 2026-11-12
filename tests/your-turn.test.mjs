@@ -701,6 +701,20 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(banner.style.zIndex, "60");
     assert.equal(label.style.zIndex, "70");
     const frames = turnIntroFrames(0, 2240, false);
+    const themeTint = root.querySelector("[data-layer='theme'] .astillon-yt-tint");
+    const shardTint = root.querySelector("[data-layer='highlights'] .astillon-yt-tint");
+    const labelTint = root.querySelector("[data-layer='label'] .astillon-yt-tint");
+    assert.equal(themeTint.dataset.tintColor, "#2B8CFF");
+    assert.equal(themeTint.style.backgroundColor, "rgb(43, 140, 255)");
+    assert.match(themeTint.style.cssText, /mask-image:[^;]*02-theme-panel\.png/);
+    assert.match(themeTint.style.cssText, /mask-mode:\s*alpha/);
+    assert.equal(shardTint.dataset.tintColor, turnHighlight("#2B8CFF"));
+    assert.match(shardTint.style.cssText, /03-highlight-shards\.png/);
+    assert.equal(labelTint.dataset.tintColor, turnHighlight("#2B8CFF"));
+    assert.match(labelTint.style.cssText, /06-turn-label-strip\.png/);
+    for (const id of ["backing", "texture", "streaks", "banner"]) {
+      assert.equal(root.querySelector(`[data-layer='${id}'] .astillon-yt-tint`), null);
+    }
     assert.equal(frames[0].transform, "translate(52%, 31%)");
     assert.equal(frames[2].transform, "translate(-1.2%, -.8%)");
     assert.equal(frames[5].transform, "translate(55%, 35%)");
@@ -816,6 +830,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(saturatedPanelColor("#000000"), "#000000");
     assert.notEqual(mixTowardWhite("#2B8CFF", 0.7), "#2B8CFF");
     assert.equal(root.style.getPropertyValue("--yt-scale"), "1");
+    assert.equal(root.querySelector("[data-layer='theme'] .astillon-yt-tint").dataset.tintColor, "#2B8CFF");
 
     env.turnChange(
       env.combat({ combatant: env.combatant({ id: "c2", color: "#ff00aa" }) }),
@@ -825,6 +840,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     [, root] = [null, env.overlays()[0]];
     assert.equal(env.overlays()[0].style.getPropertyValue("--yt-color"), "#FF00AA");
+    assert.equal(env.overlays()[0].querySelector("[data-layer='theme'] .astillon-yt-tint").dataset.tintColor, "#FF00AA");
+    assert.equal(env.overlays()[0].querySelector("[data-layer='highlights'] .astillon-yt-tint").dataset.tintColor, turnHighlight("#FF00AA"));
+    assert.equal(env.overlays()[0].querySelector("[data-layer='label'] .astillon-yt-tint").dataset.tintColor, turnHighlight("#FF00AA"));
   });
 
   test("overlay is on the body, ignores the pointer, and does not dismiss on click", (t) => {
@@ -842,8 +860,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(root.getAttribute("role"), "status");
     assert.equal(root.getAttribute("aria-live"), "polite");
     const stage = root.querySelector(".astillon-yt-stage");
-    assert.equal(stage.style.width, "518px");
-    assert.equal(stage.style.height, "518px");
+    assert.equal(stage.style.width, "784px");
+    assert.equal(stage.style.height, "784px");
     assert.equal(stage.style.transformOrigin, "100% 100%");
     assert.equal(stage.style.transform, "scale(var(--yt-scale))");
     assert.equal(stage.style.right, "0px");
@@ -882,8 +900,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const stage = root.querySelector(".astillon-yt-stage");
     const width = stage.style.width;
     const height = stage.style.height;
-    assert.equal(width, "518px");
-    assert.equal(height, "518px");
+    assert.equal(width, "784px");
+    assert.equal(height, "784px");
     env.setSidebarLeft(1280);
     env.emit("collapseSidebar", { element: env.sidebar }, true);
     assert.equal(env.overlays().length, 1);
@@ -921,8 +939,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c2", round: 1, turn: 2 },
     );
     const next = env.overlays()[0].querySelector(".astillon-yt-stage");
-    assert.equal(next.style.width, "1197px");
-    assert.equal(next.style.height, "1197px");
+    assert.equal(next.style.width, "1460px");
+    assert.equal(next.style.height, "1460px");
   });
 
   test("euclidean outline covers (3, 4) and leaves (4, 4) clear at radius 5", () => {
