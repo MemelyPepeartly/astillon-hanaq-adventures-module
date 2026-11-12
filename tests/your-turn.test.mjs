@@ -3,11 +3,14 @@ import { setImmediate } from "node:timers/promises";
 import test, { describe } from "node:test";
 import { JSDOM } from "jsdom";
 import {
+  TURN_INTRO_MS,
   createYourTurnFeature,
   euclideanOutlineCovers,
   mixTowardWhite,
   renderOutlineMask,
   saturatedPanelColor,
+  turnHighlight,
+  turnIntroFrames,
 } from "../dist/scripts/features/your-turn.js";
 
 const MODULE = "astillon-hanaq-adventures-module";
@@ -533,8 +536,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     const image = env.overlays()[0]?.querySelector(".astillon-yt-character img");
     assert.equal(image?.getAttribute("src"), "/join/icons/routed.webp");
-    assert.ok(env.overlays()[0]?.querySelector(".astillon-yt-panel-accent"));
-    assert.ok(env.overlays()[0]?.querySelector(".astillon-yt-panel-back"));
+    assert.ok(env.overlays()[0]?.querySelector("[data-layer='backing'] img")?.getAttribute("src")?.endsWith("01-dark-backing.png"));
+    assert.ok(env.overlays()[0]?.querySelector("[data-layer='theme'].can-tint .astillon-yt-tint"));
   });
 
   test("preview while disabled does not advance combat or write flags", async (t) => {
@@ -637,8 +640,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c1", round: 1, turn: 1 },
     );
     const first = env.overlays()[0];
-    assert.equal(first.querySelector(".astillon-yt-character"), null);
-    assert.ok(first.querySelector(".astillon-yt-banner"));
+    assert.equal(first.querySelector(".astillon-yt-character.has-art"), null);
+    assert.ok(first.querySelector("[data-layer='banner']"));
     env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Second", id: "c2", actorImg: "icons/second.webp" }) }),
       { combatantId: "c1", round: 1, turn: 1 },
@@ -648,8 +651,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(first.isConnected, false);
     env.imageControl.pending[0]();
     await flush();
-    assert.equal(first.querySelector(".astillon-yt-character"), null);
-    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character"), null);
+    assert.equal(first.querySelector(".astillon-yt-character.has-art"), null);
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character.has-art"), null);
     env.imageControl.pending[1]();
     await flush();
     assert.equal(env.overlays().length, 1);
@@ -657,7 +660,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/second.webp");
   });
 
-  test("YOUR TURN is the banner headline and the name is the smaller line above it", async (t) => {
+  test("the demo slices carry the name and YOUR TURN on the demo timeline", async (t) => {
     const env = setup(t);
     env.turnChange(
       env.combat({ combatant: env.combatant({ name: "Aster" }) }),
@@ -667,21 +670,42 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const [root] = env.overlays();
     const name = root.querySelector(".astillon-yt-name");
     const strip = root.querySelector(".astillon-yt-strip");
-    const text = root.querySelector(".astillon-yt-banner-text");
     assert.equal(name.textContent, "Aster");
     assert.equal(strip.textContent, "YOUR TURN");
-    assert.equal(text.children[0], name);
-    assert.equal(text.children[1], strip);
-    assert.equal(name.classList.contains("astillon-yt-support"), true);
-    assert.equal(strip.classList.contains("astillon-yt-headline"), true);
-    assert.equal(root.querySelector(".astillon-yt-banner-hold").style.animationName, "");
-    assert.match(root.querySelector(".astillon-yt-banner").style.animationName, /astillon-yt-enter-banner/);
-    assert.equal(root.querySelector(".astillon-yt-accent-hold").style.animationName, "");
-    assert.match(root.querySelector(".astillon-yt-panel-accent").style.animationName, /astillon-yt-enter-panels/);
-    assert.equal(root.querySelector(".astillon-yt-slash-hold").style.animationName, "");
-    assert.match(root.querySelector(".astillon-yt-slash").style.animationName, /astillon-yt-enter-panels/);
-    assert.equal(root.querySelector(".astillon-yt-banner-edge-hold").style.animationName, "");
-    assert.match(root.querySelector(".astillon-yt-banner-edge").style.animationName, /astillon-yt-exit-panels/);
+    assert.equal(name.closest("[data-layer]")?.dataset.layer, "banner");
+    assert.equal(strip.closest("[data-layer]")?.dataset.layer, "label");
+    const files = [...root.querySelectorAll(".astillon-yt-slice")].map((image) => image.getAttribute("src"));
+    assert.deepEqual(files, [
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/01-dark-backing.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/02-theme-panel.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/07-halftone-texture.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/03-highlight-shards.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/04-white-speed-streaks.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/05-name-banner.png",
+      "modules/astillon-hanaq-adventures-module/assets/your-turn/06-turn-label-strip.png",
+    ]);
+    const backing = root.querySelector("[data-layer='backing']");
+    const banner = root.querySelector("[data-layer='banner']");
+    const label = root.querySelector("[data-layer='label']");
+    const portrait = root.querySelector("[data-layer='portrait']");
+    assert.equal(backing.dataset.enterMs, "0");
+    assert.equal(backing.dataset.exitMs, "2240");
+    assert.equal(banner.dataset.enterMs, "300");
+    assert.equal(banner.dataset.exitMs, "2050");
+    assert.equal(label.dataset.enterMs, "350");
+    assert.equal(label.dataset.exitMs, "2080");
+    assert.equal(portrait.dataset.enterMs, "150");
+    assert.equal(portrait.dataset.exitMs, "2150");
+    assert.equal(banner.compareDocumentPosition(portrait) & 4, 4);
+    assert.equal(portrait.style.zIndex, "50");
+    assert.equal(banner.style.zIndex, "60");
+    assert.equal(label.style.zIndex, "70");
+    const frames = turnIntroFrames(0, 2240, false);
+    assert.equal(frames[0].transform, "translate(52%, 31%)");
+    assert.equal(frames[2].transform, "translate(-1.2%, -.8%)");
+    assert.equal(frames[5].transform, "translate(55%, 35%)");
+    assert.ok(Math.abs(frames[1].offset - 0) < 0.0001);
+    assert.ok(Math.abs(frames[4].offset - 2240 / TURN_INTRO_MS) < 0.0001);
 
     env.feature.api.cancel();
     env.turnChange(
@@ -692,10 +716,10 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await flush();
     const unknown = env.overlays()[0];
     assert.equal(unknown.querySelector(".astillon-yt-name").textContent, "Someone");
-    assert.equal(unknown.querySelector(".astillon-yt-character"), null);
-    assert.ok(unknown.querySelector(".astillon-yt-slash"));
-    assert.ok(unknown.querySelector(".astillon-yt-panel-sat"));
-    assert.ok(unknown.querySelector(".astillon-yt-banner"));
+    assert.equal(unknown.querySelector(".astillon-yt-character.has-art"), null);
+    assert.ok(unknown.querySelector("[data-layer='streaks']"));
+    assert.ok(unknown.querySelector("[data-layer='theme']"));
+    assert.ok(unknown.querySelector("[data-layer='banner']"));
   });
 
   test("flag art wins, a blank flag uses actor.img, and a blank actor image uses the token", async (t) => {
@@ -786,9 +810,11 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     );
     let [root] = env.overlays();
     assert.equal(root.style.getPropertyValue("--yt-color"), "#2B8CFF");
-    assert.equal(root.style.getPropertyValue("--yt-backing"), "#0B0B12");
-    assert.equal(root.style.getPropertyValue("--yt-light"), mixTowardWhite("#2B8CFF", 0.35));
-    assert.equal(root.style.getPropertyValue("--yt-panel"), saturatedPanelColor("#2B8CFF"));
+    assert.equal(root.style.getPropertyValue("--turn-theme"), "#2B8CFF");
+    assert.equal(root.style.getPropertyValue("--turn-highlight"), turnHighlight("#2B8CFF"));
+    assert.match(turnHighlight("#2B8CFF"), /^rgb\(\d+,\d+,\d+\)$/);
+    assert.equal(saturatedPanelColor("#000000"), "#000000");
+    assert.notEqual(mixTowardWhite("#2B8CFF", 0.7), "#2B8CFF");
     assert.equal(root.style.getPropertyValue("--yt-scale"), "1");
 
     env.turnChange(
@@ -816,8 +842,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(root.getAttribute("role"), "status");
     assert.equal(root.getAttribute("aria-live"), "polite");
     const stage = root.querySelector(".astillon-yt-stage");
-    assert.equal(stage.style.width, "652px");
-    assert.equal(stage.style.height, "721px");
+    assert.equal(stage.style.width, "518px");
+    assert.equal(stage.style.height, "518px");
     assert.equal(stage.style.transformOrigin, "100% 100%");
     assert.equal(stage.style.transform, "scale(var(--yt-scale))");
     assert.equal(stage.style.right, "0px");
@@ -852,18 +878,18 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     );
     const [root] = env.overlays();
     const generation = root.dataset.generation;
-    const delay = root.querySelector(".astillon-yt-slash").style.animationDelay;
+    const enterMs = root.querySelector("[data-layer='backing']").dataset.enterMs;
     const stage = root.querySelector(".astillon-yt-stage");
     const width = stage.style.width;
     const height = stage.style.height;
-    assert.equal(width, "652px");
-    assert.equal(height, "721px");
+    assert.equal(width, "518px");
+    assert.equal(height, "518px");
     env.setSidebarLeft(1280);
     env.emit("collapseSidebar", { element: env.sidebar }, true);
     assert.equal(env.overlays().length, 1);
     assert.equal(env.overlays()[0], root);
     assert.equal(root.dataset.generation, generation);
-    assert.equal(root.querySelector(".astillon-yt-slash").style.animationDelay, delay);
+    assert.equal(root.querySelector("[data-layer='backing']").dataset.enterMs, enterMs);
     assert.equal(root.style.getPropertyValue("--yt-right"), "500px");
     assert.equal(stage.style.width, width);
     assert.equal(stage.style.height, height);
@@ -895,8 +921,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c2", round: 1, turn: 2 },
     );
     const next = env.overlays()[0].querySelector(".astillon-yt-stage");
-    assert.equal(next.style.width, "1510px");
-    assert.equal(next.style.height, "1343px");
+    assert.equal(next.style.width, "1197px");
+    assert.equal(next.style.height, "1197px");
   });
 
   test("euclidean outline covers (3, 4) and leaves (4, 4) clear at radius 5", () => {
@@ -935,7 +961,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(character.classList.contains("astillon-yt-frame"), true);
     assert.equal(character.classList.contains("astillon-yt-sticker"), false);
     assert.equal(image.getAttribute("src"), "icons/opaque.webp");
-    assert.equal(image.style.objectFit, "contain");
+    assert.equal(image.style.objectFit, "");
     assert.equal(image.getAttribute("src").startsWith("blob:"), false);
   });
 
@@ -978,7 +1004,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(character.querySelector("img").getAttribute("src").startsWith("blob:"), true);
   });
 
-  test("reduced motion fades the root and does not stagger layers", (t) => {
+  test("reduced motion uses the demo fade across the same 2.6 seconds", (t) => {
     const env = setup(t, { reduced: true, hold: 1.45 });
     env.turnChange(
       env.combat(),
@@ -986,33 +1012,34 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c1", round: 1, turn: 1 },
     );
     const [root] = env.overlays();
-    assert.match(root.style.animationName, /astillon-yt-fade-in/);
-    assert.match(root.style.animationName, /astillon-yt-fade-out/);
-    assert.deepEqual(durationList(root.style.animationDuration), [400, 400]);
-    assert.deepEqual(durationList(root.style.animationDelay), [0, 400 + 1450]);
-    assert.equal(root.querySelector(".astillon-yt-slash").style.animationName, "none");
-    assert.equal(root.querySelector(".astillon-yt-banner").style.animationName, "none");
-    assert.equal(root.querySelector(".astillon-yt-banner-text").style.animationName, "none");
-    assert.equal(env.scheduled.at(-1), 400 + 1450 + 400);
+    assert.equal(root.dataset.motion, "reduced");
+    const frames = turnIntroFrames(0, 2240, true);
+    assert.deepEqual(frames.map((frame) => frame.opacity), [0, 1, 1, 0]);
+    assert.deepEqual(frames.map((frame) => frame.offset), [0, 0.12, 0.8, 1]);
+    for (const layer of root.querySelectorAll(".astillon-yt-layer")) {
+      assert.equal(layer.dataset.motion, "reduced");
+    }
+    assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
   });
 
-  test("hold changes the removal time and the outro delay", (t) => {
+  test("playback stays on the demo's 2.6 second timeline", (t) => {
     const env = setup(t, { hold: 1.45 });
     env.turnChange(
       env.combat(),
       { combatantId: null, round: 1, turn: 0 },
       { combatantId: "c1", round: 1, turn: 1 },
     );
-    assert.equal(env.scheduled.at(-1), 2600);
-    const firstSlash = secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDelay);
-    const firstText = secondsList(env.overlays()[0].querySelector(".astillon-yt-banner-text").style.animationDelay);
-    const firstBanner = secondsList(env.overlays()[0].querySelector(".astillon-yt-banner").style.animationDelay);
-    assert.equal(firstSlash[0], 0);
-    assert.equal(secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDuration)[0], 0.3);
-    assert.ok(Math.abs(firstBanner[0] - 0.3) < 0.001);
-    assert.ok(Math.abs(secondsList(env.overlays()[0].querySelector(".astillon-yt-banner").style.animationDuration)[0] - 0.3) < 0.001);
-    assert.ok(firstText[0] < firstSlash[1]);
-    assert.ok(Math.abs(firstSlash[1] + 0.3 - 2.6) < 0.02);
+    assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
+    const backing = env.overlays()[0].querySelector("[data-layer='backing']");
+    const label = env.overlays()[0].querySelector("[data-layer='label']");
+    assert.equal(backing.dataset.motion, "demo");
+    assert.equal(backing.dataset.enterMs, "0");
+    assert.equal(label.dataset.enterMs, "350");
+    const normal = turnIntroFrames(300, 2050, false);
+    assert.ok(Math.abs(normal[1].offset - 300 / TURN_INTRO_MS) < 0.0001);
+    assert.ok(Math.abs(normal[2].offset - Math.min(510 / TURN_INTRO_MS, 0.22)) < 0.0001);
+    assert.ok(Math.abs(normal[3].offset - Math.min(550 / TURN_INTRO_MS, 0.24)) < 0.0001);
+    assert.ok(Math.abs(normal[4].offset - 2050 / TURN_INTRO_MS) < 0.0001);
 
     env.settings.set("yourTurnHold", 2);
     env.turnChange(
@@ -1021,9 +1048,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c2", round: 1, turn: 2 },
     );
     assert.equal(env.overlays().length, 1);
-    assert.equal(env.scheduled.at(-1), 600 + 2000 + 550);
-    const secondSlash = secondsList(env.overlays()[0].querySelector(".astillon-yt-slash").style.animationDelay);
-    assert.ok(secondSlash[1] > firstSlash[1]);
+    assert.equal(env.scheduled.at(-1), TURN_INTRO_MS);
+    assert.equal(env.overlays()[0].querySelector("[data-layer='banner']").dataset.exitMs, "2050");
   });
 
   test("editable sheet can preview the draft and save flags", async (t) => {

@@ -7,25 +7,37 @@ const SETTING_HOLD = "yourTurnHold";
 const ART_FLAG = "yourTurnArt";
 const COLOR_FLAG = "yourTurnColor";
 const DEFAULT_COLOR = "#2B8CFF";
-const BACKING_COLOR = "#0B0B12";
 const ROOT_CLASS = "astillon-yt";
 const CONFIGURE_CLASS = "astillon-your-turn-configure";
 const CONFIGURE_ACTION = "astillon-your-turn";
 const INK_ALPHA = 16;
 const OPAQUE_ALPHA = 250;
 const MAX_EDGE = 1024;
-const INTRO_END = 0.6;
-const OUTRO = 0.55;
-const REDUCED_FADE_MS = 400;
-const STAGE_WIDTH_RATIO = 0.78;
-const STAGE_HEIGHT_RATIO = 0.92;
+const STAGE_WIDTH_OF_MAP = 0.62;
+const STAGE_HEIGHT_OF_MAP = 0.82;
 
-const ENTER_PANELS = { name: "astillon-yt-enter-panels", delay: 0, duration: 0.3 };
-const ENTER_CHARACTER = { name: "astillon-yt-enter-character", delay: 0.15, duration: 0.3 };
-const ENTER_BANNER = { name: "astillon-yt-enter-banner", delay: 0.3, duration: 0.3 };
-const EXIT_TEXT = { name: "astillon-yt-exit-text", offset: 0, duration: 0.22 };
-const EXIT_CHARACTER = { name: "astillon-yt-exit-character", offset: 0.16, duration: 0.24 };
-const EXIT_PANELS = { name: "astillon-yt-exit-panels", offset: 0.25, duration: 0.3 };
+type SliceSpec = {
+  id: string;
+  file: string;
+  z: number;
+  enterMs: number;
+  exitMs: number;
+  tint?: "theme" | "highlight";
+  text?: "name" | "label";
+};
+
+const SLICES: SliceSpec[] = [
+  { id: "backing", file: "01-dark-backing.png", z: 10, enterMs: 0, exitMs: 2240 },
+  { id: "theme", file: "02-theme-panel.png", z: 20, enterMs: 45, exitMs: 2220, tint: "theme" },
+  { id: "texture", file: "07-halftone-texture.png", z: 25, enterMs: 70, exitMs: 2200 },
+  { id: "highlights", file: "03-highlight-shards.png", z: 30, enterMs: 90, exitMs: 2180, tint: "highlight" },
+  { id: "streaks", file: "04-white-speed-streaks.png", z: 40, enterMs: 0, exitMs: 2200 },
+  { id: "banner", file: "05-name-banner.png", z: 60, enterMs: 300, exitMs: 2050, text: "name" },
+  { id: "label", file: "06-turn-label-strip.png", z: 70, enterMs: 350, exitMs: 2080, tint: "highlight", text: "label" },
+];
+
+const PORTRAIT_ENTER_MS = 150;
+const PORTRAIT_EXIT_MS = 2150;
 
 type CombatHistory = {
   combatantId?: string | null;
@@ -47,12 +59,6 @@ type Subject = {
   color: string;
 };
 
-type Motion = {
-  name: string;
-  delay: number;
-  duration: number;
-};
-
 type Rgb = { r: number; g: number; b: number };
 
 /**
@@ -63,11 +69,50 @@ export function euclideanOutlineCovers(dx: number, dy: number, radius: number): 
   return dx * dx + dy * dy <= radius * radius;
 }
 
-/** Mix `ratio` of the way from `hex` toward white. `ratio` 0.35 is the light panel. */
+/** Mix `ratio` of the way from `hex` toward white. The demo highlight uses 0.7. */
 export function mixTowardWhite(hex: string, ratio: number): string {
   const rgb = parseHex(hex) ?? parseHex(DEFAULT_COLOR)!;
   const mix = (channel: number) => Math.round(channel + (255 - channel) * ratio);
   return formatHex(mix(rgb.r), mix(rgb.g), mix(rgb.b));
+}
+
+/** Flat highlight fill from the demo: 70% of the way from the theme color toward white. */
+export function turnHighlight(hex: string): string {
+  const rgb = parseHex(mixTowardWhite(hex, 0.7)) ?? parseHex(DEFAULT_COLOR)!;
+  return `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+}
+
+export const TURN_INTRO_MS = 2600;
+
+type TurnKeyframe = {
+  opacity: number;
+  transform?: string;
+  offset: number;
+  easing?: string;
+};
+
+/** The demo's 2.6s layer timeline. Offsets are enter/exit milliseconds over 2600. */
+export function turnIntroFrames(enterMs: number, exitMs: number, reduced: boolean): TurnKeyframe[] {
+  if (reduced) {
+    return [
+      { opacity: 0, offset: 0 },
+      { opacity: 1, offset: 0.12 },
+      { opacity: 1, offset: 0.8 },
+      { opacity: 0, offset: 1 },
+    ];
+  }
+  const entry = enterMs / TURN_INTRO_MS;
+  const end = Math.min((enterMs + 210) / TURN_INTRO_MS, 0.22);
+  const settle = Math.min((enterMs + 250) / TURN_INTRO_MS, 0.24);
+  const exit = exitMs / TURN_INTRO_MS;
+  return [
+    { opacity: 0, transform: "translate(52%, 31%)", offset: 0 },
+    { opacity: 0, transform: "translate(52%, 31%)", offset: entry, easing: "cubic-bezier(.16,.9,.26,1)" },
+    { opacity: 1, transform: "translate(-1.2%, -.8%)", offset: end, easing: "ease-out" },
+    { opacity: 1, transform: "translate(0, 0)", offset: settle },
+    { opacity: 1, transform: "translate(0, 0)", offset: exit, easing: "cubic-bezier(.6,0,.9,.35)" },
+    { opacity: 0, transform: "translate(55%, 35%)", offset: 1 },
+  ];
 }
 
 /** A more saturated, slightly darker panel derived from the theme color. */
@@ -260,20 +305,6 @@ function resolveArtUrl(src: string): string {
   return path;
 }
 
-function seconds(value: number): string {
-  return `${value.toFixed(2)}s`;
-}
-
-function holdMilliseconds(holdSeconds: number): number {
-  return Math.round(holdSeconds * 1000);
-}
-
-function durationMs(holdSeconds: number, reduced: boolean): number {
-  const holdMs = holdMilliseconds(holdSeconds);
-  if (reduced) return REDUCED_FADE_MS + holdMs + REDUCED_FADE_MS;
-  return Math.round(INTRO_END * 1000) + holdMs + Math.round(OUTRO * 1000);
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -304,6 +335,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   let draftForm: HTMLFormElement | null = null;
   const artCache = new Map<string, ArtResult>();
   const liveBlobs = new Set<string>();
+  const motions = new Map<HTMLElement, Animation[]>();
 
   function revokeIfUnused(url: string): void {
     if (!url.startsWith("blob:")) return;
@@ -340,11 +372,6 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   function readScale(): number {
     const value = Number(readSetting(SETTING_SCALE));
     return Number.isFinite(value) ? value : 1;
-  }
-
-  function readHold(): number {
-    const value = Number(readSetting(SETTING_HOLD));
-    return Number.isFinite(value) ? value : 1.45;
   }
 
   function prefersReducedMotion(): boolean {
@@ -456,63 +483,34 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.left = `${left}px`;
     const usableW = Math.max(280, view.width - left - right);
     const usableH = Math.max(280, view.height - top - bottom);
-    const stageW = Math.round(usableW * STAGE_WIDTH_RATIO);
-    const stageH = Math.round(usableH * STAGE_HEIGHT_RATIO);
-    root.style.setProperty("--yt-stage-w", `${stageW}px`);
-    root.style.setProperty("--yt-stage-h", `${stageH}px`);
+    const stageSize = Math.round(Math.min(usableW * STAGE_WIDTH_OF_MAP, usableH * STAGE_HEIGHT_OF_MAP));
+    root.style.setProperty("--yt-stage-size", `${stageSize}px`);
     const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
     if (stage) {
-      stage.style.width = `${stageW}px`;
-      stage.style.height = `${stageH}px`;
+      stage.style.width = `${stageSize}px`;
+      stage.style.height = `${stageSize}px`;
     }
   }
 
   function applyTheme(root: HTMLElement, color: string): void {
     root.style.setProperty("--yt-color", color);
-    root.style.setProperty("--yt-panel", saturatedPanelColor(color));
-    root.style.setProperty("--yt-light", mixTowardWhite(color, 0.35));
-    root.style.setProperty("--yt-backing", BACKING_COLOR);
+    root.style.setProperty("--turn-theme", color);
+    root.style.setProperty("--turn-highlight", turnHighlight(color));
     root.style.setProperty("--yt-scale", String(readScale()));
   }
 
-  function clearMotion(element: HTMLElement): void {
-    element.style.animationName = "none";
-    element.style.animationDuration = "0s";
-    element.style.animationDelay = "0s";
-    element.style.animationFillMode = "none";
-  }
-
-  function applyMotion(element: HTMLElement, enter: Motion | null, exit: Motion | null, reduced: boolean): void {
-    if (reduced) {
-      clearMotion(element);
-      return;
-    }
-    const names: string[] = [];
-    const durations: string[] = [];
-    const delays: string[] = [];
-    const fills: string[] = [];
-    if (enter) {
-      names.push(enter.name);
-      durations.push(seconds(enter.duration));
-      delays.push(seconds(enter.delay));
-      fills.push("both");
-    }
-    if (exit) {
-      names.push(exit.name);
-      durations.push(seconds(exit.duration));
-      delays.push(seconds(exit.delay));
-      fills.push("forwards");
-    }
-    element.style.animationName = names.join(", ");
-    element.style.animationDuration = durations.join(", ");
-    element.style.animationDelay = delays.join(", ");
-    element.style.animationTimingFunction = names.map(() => "cubic-bezier(0.16, 0.84, 0.32, 1)").join(", ");
-    element.style.animationFillMode = fills.join(", ");
-    element.style.animationIterationCount = names.map(() => "1").join(", ");
-  }
-
-  function exitMotion(offset: number, duration: number, name: string, hold: number): Motion {
-    return { name, delay: INTRO_END + hold + offset, duration };
+  function playLayer(root: HTMLElement, layer: HTMLElement, enterMs: number, exitMs: number, reduced: boolean): void {
+    layer.dataset.enterMs = String(enterMs);
+    layer.dataset.exitMs = String(exitMs);
+    layer.dataset.motion = reduced ? "reduced" : "demo";
+    if (typeof layer.animate !== "function") return;
+    const animation = layer.animate(turnIntroFrames(enterMs, exitMs, reduced), {
+      duration: TURN_INTRO_MS,
+      fill: "forwards",
+    });
+    const running = motions.get(root) ?? [];
+    running.push(animation);
+    motions.set(root, running);
   }
 
   function watchSidebar(): void {
@@ -546,6 +544,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const current = overlay;
     overlay = null;
     if (!current) return;
+    for (const animation of motions.get(current) ?? []) {
+      try {
+        animation.cancel();
+      } catch {
+        // The graphic is already leaving.
+      }
+    }
+    motions.delete(current);
     releaseOverlayBlob(current);
     current.remove();
   }
@@ -556,10 +562,34 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     return element;
   }
 
-  function buildOverlay(subject: Subject, gen: number, reduced: boolean, hold: number): HTMLElement {
+  function sliceUrl(file: string): string {
+    return `modules/${moduleId}/assets/your-turn/${file}`;
+  }
+
+  function fitLine(parent: HTMLElement, stagePx: number, fraction: number, maxFont: number): void {
+    const span = parent.querySelector("span");
+    const text = span?.textContent ?? "";
+    const start = stagePx * maxFont;
+    let px = start;
+    try {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      if (context && typeof context.measureText === "function") {
+        context.font = `italic 900 ${start}px Impact, Haettenschweiler, "Arial Narrow", sans-serif`;
+        const measured = context.measureText(text).width;
+        px = Math.min(start, start * ((stagePx * fraction) / Math.max(1, measured)));
+      }
+    } catch {
+      // Keep the demo's maximum size when text measurement is unavailable.
+    }
+    parent.style.fontSize = `${px}px`;
+  }
+
+  function buildOverlay(subject: Subject, gen: number, reduced: boolean): HTMLElement {
     const root = document.createElement("div");
-    root.className = reduced ? `${ROOT_CLASS} astillon-yt-reduced` : ROOT_CLASS;
+    root.className = ROOT_CLASS;
     root.dataset.generation = String(gen);
+    root.dataset.motion = reduced ? "reduced" : "demo";
     root.setAttribute("role", "status");
     root.setAttribute("aria-live", "polite");
     root.style.position = "fixed";
@@ -575,56 +605,64 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     stage.style.transform = "scale(var(--yt-scale))";
     stage.style.pointerEvents = "none";
 
-    const slashHold = layer("astillon-yt-slash-hold");
-    const slash = layer("astillon-yt-slash");
-    slashHold.append(slash);
-    const back = layer("astillon-yt-panel astillon-yt-panel-back");
-    const saturated = layer("astillon-yt-panel astillon-yt-panel-sat");
-    const accentHold = layer("astillon-yt-accent-hold");
-    const accent = layer("astillon-yt-panel astillon-yt-panel-accent");
-    accentHold.append(accent);
-    const light = layer("astillon-yt-panel astillon-yt-panel-light");
-    const bannerHold = layer("astillon-yt-banner-hold");
-    const banner = layer("astillon-yt-banner");
-    const edgeHold = layer("astillon-yt-banner-edge-hold");
-    const edge = layer("astillon-yt-banner-edge");
-    edgeHold.append(edge);
-    const plate = layer("astillon-yt-banner-plate");
-    const text = layer("astillon-yt-banner-text");
-    const name = document.createElement("p");
-    name.className = "astillon-yt-name astillon-yt-support";
-    name.textContent = subject.name;
-    const strip = document.createElement("p");
-    strip.className = "astillon-yt-strip astillon-yt-headline";
-    strip.textContent = game.i18n.localize("ASTILLON.YourTurn.Strip");
-    text.append(name, strip);
-    banner.append(edgeHold, plate, text);
-    bannerHold.append(banner);
-
-    const panelExit = exitMotion(EXIT_PANELS.offset, EXIT_PANELS.duration, EXIT_PANELS.name, hold);
-    const textExit = exitMotion(EXIT_TEXT.offset, EXIT_TEXT.duration, EXIT_TEXT.name, hold);
-    for (const panel of [back, saturated, accent, light, slash]) {
-      applyMotion(panel, ENTER_PANELS, panelExit, reduced);
+    for (const spec of SLICES) {
+      const piece = layer(spec.tint ? "astillon-yt-layer can-tint" : "astillon-yt-layer");
+      piece.dataset.layer = spec.id;
+      piece.style.zIndex = String(spec.z);
+      const image = document.createElement("img");
+      image.className = "astillon-yt-slice";
+      image.alt = "";
+      image.draggable = false;
+      image.src = sliceUrl(spec.file);
+      piece.append(image);
+      if (spec.tint) {
+        const tint = document.createElement("div");
+        tint.className = "astillon-yt-tint";
+        const src = sliceUrl(spec.file);
+        tint.style.setProperty("--slice-url", `url("${src}")`);
+        tint.style.setProperty("--slice-color", spec.tint === "theme" ? "var(--turn-theme)" : "var(--turn-highlight)");
+        piece.append(tint);
+      }
+      if (spec.text === "name") {
+        const name = document.createElement("div");
+        name.className = "astillon-yt-name";
+        const span = document.createElement("span");
+        span.textContent = subject.name;
+        name.append(span);
+        piece.append(name);
+      }
+      if (spec.text === "label") {
+        const strip = document.createElement("div");
+        strip.className = "astillon-yt-strip";
+        const span = document.createElement("span");
+        span.textContent = game.i18n.localize("ASTILLON.YourTurn.Strip");
+        strip.append(span);
+        piece.append(strip);
+      }
+      stage.append(piece);
+      playLayer(root, piece, spec.enterMs, spec.exitMs, reduced);
     }
-    applyMotion(edge, null, panelExit, reduced);
-    applyMotion(plate, null, panelExit, reduced);
-    applyMotion(banner, ENTER_BANNER, null, reduced);
-    applyMotion(text, null, textExit, reduced);
 
-    stage.append(back, saturated, accentHold, light, slashHold, bannerHold);
+    const portrait = layer("astillon-yt-layer");
+    portrait.dataset.layer = "portrait";
+    portrait.style.zIndex = "50";
+    const character = document.createElement("div");
+    character.className = "astillon-yt-character";
+    const portraitImage = document.createElement("img");
+    portraitImage.alt = "";
+    portraitImage.draggable = false;
+    character.append(portraitImage);
+    portrait.append(character);
+    stage.append(portrait);
+    playLayer(root, portrait, PORTRAIT_ENTER_MS, PORTRAIT_EXIT_MS, reduced);
+
     root.append(stage);
     applyInsets(root);
-
-    if (reduced) {
-      const holdMs = holdMilliseconds(hold);
-      root.style.animationName = "astillon-yt-fade-in, astillon-yt-fade-out";
-      root.style.animationDuration = `${REDUCED_FADE_MS}ms, ${REDUCED_FADE_MS}ms`;
-      root.style.animationDelay = `0ms, ${REDUCED_FADE_MS + holdMs}ms`;
-      root.style.animationTimingFunction = "linear, linear";
-      root.style.animationFillMode = "both, forwards";
-      root.style.animationIterationCount = "1, 1";
-    }
-
+    const stagePx = Number.parseInt(stage.style.width, 10) || 0;
+    const name = stage.querySelector<HTMLElement>(".astillon-yt-name");
+    const strip = stage.querySelector<HTMLElement>(".astillon-yt-strip");
+    if (name) fitLine(name, stagePx, 0.65, 0.095);
+    if (strip) fitLine(strip, stagePx, 0.31, 0.043);
     return root;
   }
 
@@ -639,33 +677,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     liveBlobs.add(url);
   }
 
-  function appendCharacter(root: HTMLElement, result: ArtResult, reduced: boolean, hold: number): void {
-    const stage = root.querySelector(".astillon-yt-stage");
-    if (!stage) return;
-    const character = document.createElement("div");
-    character.className = result.mode === "frame"
-      ? "astillon-yt-character astillon-yt-frame"
-      : "astillon-yt-character astillon-yt-sticker";
+  function revealPortrait(root: HTMLElement, result: ArtResult): void {
+    const character = root.querySelector<HTMLElement>(".astillon-yt-character");
+    const image = character?.querySelector("img");
+    if (!character || !image) return;
+    character.classList.toggle("astillon-yt-frame", result.mode === "frame");
+    character.classList.toggle("astillon-yt-sticker", result.mode === "sticker");
+    character.classList.add("has-art");
     character.dataset.mode = result.mode;
-    const image = document.createElement("img");
-    image.alt = "";
     image.src = result.url;
-    image.style.width = "100%";
-    image.style.height = "100%";
-    image.style.maxWidth = "none";
-    image.style.maxHeight = "none";
-    image.style.objectFit = "contain";
-    image.style.objectPosition = "center bottom";
-    character.append(image);
-    const banner = stage.querySelector(".astillon-yt-banner-hold");
-    if (banner) stage.insertBefore(character, banner);
-    else stage.append(character);
-    applyMotion(
-      character,
-      ENTER_CHARACTER,
-      exitMotion(EXIT_CHARACTER.offset, EXIT_CHARACTER.duration, EXIT_CHARACTER.name, hold),
-      reduced,
-    );
     if (result.mode === "sticker") retainBlob(root, result.url);
   }
 
@@ -751,13 +771,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  async function mountArt(root: HTMLElement, art: string[], gen: number, reduced: boolean, hold: number): Promise<void> {
+  async function mountArt(root: HTMLElement, art: string[], gen: number): Promise<void> {
     for (const src of art) {
       if (gen !== generation) return;
       try {
         const prepared = await prepareArt(src);
         if (gen !== generation || overlay !== root) return;
-        appendCharacter(root, prepared, reduced, hold);
+        revealPortrait(root, prepared);
         return;
       } catch {
         // A failed custom path continues down the art chain.
@@ -769,13 +789,11 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const gen = generation + 1;
     generation = gen;
     const reduced = prefersReducedMotion();
-    const hold = readHold();
     removeOverlay();
-    const root = buildOverlay(subject, gen, reduced, hold);
+    const root = buildOverlay(subject, gen, reduced);
     document.body.append(root);
     overlay = root;
     watchSidebar();
-    const duration = durationMs(hold, reduced);
     removeTimer = setTimeout(() => {
       try {
         if (gen !== generation || overlay !== root) return;
@@ -783,8 +801,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       } catch {
         // Removal is cosmetic.
       }
-    }, duration);
-    void mountArt(root, subject.art, gen, reduced, hold).catch(() => {
+    }, TURN_INTRO_MS);
+    void mountArt(root, subject.art, gen).catch(() => {
       // Decode failures stay inside the art chain.
     });
   }
