@@ -83,11 +83,15 @@ Configure Settings includes three per-user controls. **Your Turn Cut-In** is off
 
 Owners and the GM get a Your Turn control on the actor sheet. It opens an editor with an image field, a color, Preview, and Save. Preview plays the current draft even when the setting is off and does not write flags or advance combat. Save stores the image and an #RRGGBB color on the actor. Clearing the image removes that flag. Every client reads those actor flags.
 
+The GM can set **Your Turn Portrait Width (px)** under **Configure Settings → Astillon Hanaq Adventures**. This world-wide setting defaults to **400 px** (100–1000 px) at Your Turn Scale 1. Both small and large source images are resized to the same target width, preserving aspect ratio; unusually tall images or smaller viewports fit down within the cut-in. Portraits are centered above the name banner instead of tiny images sitting behind it. Opaque portraits retain their angular frame without cropping to fill it. Each user's overall cut-in scale still applies. Changes take effect on the next turn or Preview, including already cached art, without changing the source image or actor flags. Transparent margins inside an uploaded image still count as part of that image's width.
+
 At world startup, each client preloads the effective portraits for world actors, scene tokens (including unlinked overrides), and combatants, plus the seven shared animation images. Portrait work is limited to four concurrent preparations and duplicate requests share a cache. Actor/token changes warm new artwork. If a new portrait is not ready yet, playback waits for loading and decoding before starting its full 2.6-second timeline; obsolete turns are discarded. Invalid custom paths fall back to the actor/token art, then Foundry's generic portrait. Unopened compendia are not downloaded.
 
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art and color together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.5 adds the GM-controlled world portrait width and resolution-independent, aspect-preserving portrait sizing for Your Turn cut-ins.
 
 Version 0.10.4 fixes the missing opener by explicitly resolving the 30ft ranged asset, replaces Beam Clash chat output with circular token indicators, and changes the selected-token overlay to purple static electricity.
 

@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.2. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
+Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.5. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
 
 ## Menacing
 
@@ -23,6 +23,7 @@ Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.2. R
 4. In the real actor editor, click **Browse**: Foundry's file browser must open, and choosing an image must populate the path without closing the editor. Change the color and **Preview**: the draft plays without saving. **Save**, close, and reopen: both values persist. Repeat with two different actors' editors open and verify neither editor reads or saves the other's fields. Confirm an actual failed save produces a notification.
 5. Reload GM and player clients with custom art on a world actor, an unlinked scene token, and a combatant. Observe startup image requests in the browser Network panel, or await `game.astillonHanaqAdventures["your-turn"].preload()`. Advance to those actors' first turns: the portrait and shared slices must be ready for the full animation rather than appearing halfway through. No world documents should be written by preloading.
 6. Throttle the network and select a new image. Before it is ready, there must be no empty timed flash-in. Once decoded, its full 2.6-second timeline starts. Advance past that combatant while its image loads, cancel a preview, or leave the scene: no obsolete cut-in may appear later. A broken custom image should fall back without poisoning subsequent valid images. Saving changed artwork on another client should warm it on this client too.
+7. As GM, set **Your Turn Portrait Width (px)** to 400, then 250. Compare the same art exported at 64px and 1024px: at the same user scale both should use the same display width, not their intrinsic size. Repeat with transparent and opaque portraits, a wide image, and a tall image. Preserve proportions, fit within the cut-in, and keep portraits above the banner; opaque art must not be stretched or cropped to fill an unrelated aspect ratio. Width changes should apply to the next cached preview without new downloads or actor edits. Players should receive the world setting but not control it, while their own overall scale remains available. Verify invalid/out-of-range values cannot create an unbounded image. Images with transparent padding can still have a smaller visible subject because the setting measures the full image.
 
 ## Existing content
 

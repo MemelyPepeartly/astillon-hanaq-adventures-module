@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import {
   TURN_INTRO_MS,
   createYourTurnFeature,
+  fitTurnPortrait,
   euclideanOutlineCovers,
   mixTowardWhite,
   renderOutlineMask,
@@ -64,13 +65,14 @@ function durationList(value) {
 }
 
 describe("your turn cut-in", { concurrency: 1 }, () => {
-  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45, route = null } = {}) {
+  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45, portraitWidth = 400, route = null } = {}) {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const callbacks = new Map();
     const settings = new Map([
       ["yourTurnEnabled", enabled],
       ["yourTurnScale", scale],
       ["yourTurnHold", hold],
+      ["yourTurnPortraitWidth", portraitWidth],
     ]);
     const scheduled = [];
     const timerIds = [];
@@ -149,10 +151,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         this.pixels = imageControl.pixels.get(this._src) ?? null;
         const size = imageControl.sizes.get(this._src);
         if (size) {
-          this.naturalWidth = size;
-          this.naturalHeight = size;
-          this.width = size;
-          this.height = size;
+          this.naturalWidth = this.width = typeof size === "number" ? size : size.width;
+          this.naturalHeight = this.height = typeof size === "number" ? size : size.height;
         }
         const run = () => {
           if (this._src.startsWith("fail:")) this.onerror?.(new dom.window.Event("error"));
@@ -1045,6 +1045,75 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(image.getAttribute("src").startsWith("blob:"), false);
   });
 
+  test("portrait fitting upscales small art and downscales large art without changing proportions", () => {
+    assert.deepEqual(fitTurnPortrait(40, 60, 300, 1000), { width: 300, height: 450 });
+    assert.deepEqual(fitTurnPortrait(800, 1200, 300, 1000), { width: 300, height: 450 });
+    assert.deepEqual(fitTurnPortrait(32, 32, 400, 1000, true), { width: 400, height: 400 });
+    assert.deepEqual(fitTurnPortrait(4096, 4096, 400, 1000, true), { width: 400, height: 400 });
+    const tall = fitTurnPortrait(100, 1000, 400, 600);
+    assert.equal(tall.height, 432);
+    assert.equal(tall.width, 43.2);
+    const wide = fitTurnPortrait(1000, 100, 1000, 600);
+    assert.equal(wide.width, 384);
+    assert.equal(wide.height, 38.4);
+    for (const framed of [false, true]) {
+      const bounded = fitTurnPortrait(100, 1000, 1000, 600, framed);
+      assert.ok(bounded.width <= 384 && bounded.height <= 432);
+    }
+    assert.deepEqual(fitTurnPortrait(32, 32, 400, 0, true), { width: 0, height: 0 });
+  });
+
+  test("world portrait width affects every art size and cached previews without changing actor data", async t => {
+    const env = setup(t, { portraitWidth: 320 });
+    for (const [path, size] of [["icons/small.webp", 32], ["icons/large.webp", 2048]]) {
+      env.imageControl.sizes.set(path, size);
+      await env.feature.api.preview(env.makeActor({ img: path })); await flush();
+      const character = env.overlays()[0].querySelector(".astillon-yt-character");
+      assert.equal(character.style.width, "320px");
+      assert.equal(character.style.height, "320px");
+    }
+    const requested = env.imageControl.requested.length;
+    const oldRoot = env.overlays()[0];
+    env.settings.set("yourTurnPortraitWidth", 250);
+    assert.equal(oldRoot.querySelector(".astillon-yt-character").style.width, "320px", "do not resize during a running cut-in");
+    await env.feature.api.preview(env.makeActor({ img: "icons/large.webp" })); await flush();
+    assert.equal(env.imageControl.requested.length, requested, "width changes reuse prepared artwork");
+    assert.equal(env.overlays()[0].querySelector(".astillon-yt-character").style.width, "250px");
+    assert.equal(env.calls.update, 0);
+    assert.equal(env.calls.nextTurn, 0);
+  });
+
+  test("transparent sticker and tainted fallback portraits both obey the same target width", async t => {
+    const env = setup(t, { portraitWidth: 280 });
+    const pixels = new Uint8ClampedArray(24 * 24 * 4);
+    pixels[(12 * 24 + 12) * 4 + 3] = 255;
+    env.imageControl.pixels.set("icons/width-sticker.webp", pixels);
+    env.imageControl.sizes.set("icons/width-sticker.webp", 24);
+    await env.feature.api.preview(env.makeActor({ img: "icons/width-sticker.webp" })); await flush();
+    let character = env.overlays()[0].querySelector(".astillon-yt-character");
+    assert.equal(character.dataset.mode, "sticker");
+    assert.equal(character.style.width, "280px");
+    env.imageControl.tainted.add("icons/width-tainted.webp");
+    env.imageControl.sizes.set("icons/width-tainted.webp", { width: 30, height: 20 });
+    await env.feature.api.preview(env.makeActor({ img: "icons/width-tainted.webp" })); await flush();
+    character = env.overlays()[0].querySelector(".astillon-yt-character");
+    assert.equal(character.dataset.mode, "frame");
+    assert.equal(character.style.width, "280px");
+    assert.equal(Number.parseFloat(character.style.height), 192);
+  });
+
+  test("invalid portrait-width settings use a safe default or supported bound", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ img: "icons/width-safe.webp" });
+    for (const [value, expected] of [[undefined, 400], [null, 400], ["", 400], [NaN, 400], [Infinity, 400], [-1, 400], [0, 400], [50, 100], ["250", 250], [9000, 1000]]) {
+      env.settings.set("yourTurnPortraitWidth", value);
+      await env.feature.api.preview(actor); await flush();
+      const root = env.overlays()[0];
+      assert.equal(root.style.getPropertyValue("--yt-portrait-width"), `${expected}px`);
+      assert.ok(Number.parseFloat(root.querySelector(".astillon-yt-character").style.width) <= 784 * 0.64);
+    }
+  });
+
   test("a tainted getImageData keeps the raw image in the frame", async (t) => {
     const env = setup(t);
     env.imageControl.tainted.add("icons/tainted.webp");
@@ -1317,7 +1386,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(dialog.querySelector("[name=yourTurnArt]").value, "icons/original.webp");
   });
 
-  test("init registers exactly three settings with foundry.data.fields and no portrait setting", async (t) => {
+  test("init registers three per-user controls and one world-wide portrait width, not a world portrait path", async (t) => {
     withFoundryNamespace(
       t,
       {
@@ -1331,12 +1400,12 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       ({ registrations, hooks }) => {
         assert.equal("fields" in foundry, false);
         createYourTurnFeature(MODULE).init();
-        assert.equal(registrations.length, 3);
+        assert.equal(registrations.length, 4);
         assert.equal(registrations.some((entry) => entry.key === "yourTurnPortrait"), false);
         const names = registrations.map((entry) => entry.key);
-        assert.deepEqual(names, ["yourTurnEnabled", "yourTurnScale", "yourTurnHold"]);
+        assert.deepEqual(names, ["yourTurnEnabled", "yourTurnScale", "yourTurnHold", "yourTurnPortraitWidth"]);
         for (const entry of registrations) {
-          assert.equal(entry.data.scope, "user");
+          assert.equal(entry.data.scope, entry.key === "yourTurnPortraitWidth" ? "world" : "user");
           assert.equal(entry.data.config, true);
         }
         const enabled = registrations.find((entry) => entry.key === "yourTurnEnabled");
@@ -1349,6 +1418,10 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         assert.deepEqual(scale.data.type.options, { min: 0.5, max: 1.5, step: 0.05 });
         assert.equal(hold.data.default, 1.45);
         assert.deepEqual(hold.data.type.options, { min: 0.5, max: 4, step: 0.05 });
+        const width = registrations.find((entry) => entry.key === "yourTurnPortraitWidth");
+        assert.equal(width.data.default, 400);
+        assert.ok(width.data.type instanceof NumberFieldStub);
+        assert.deepEqual(width.data.type.options, { min: 100, max: 1000, step: 10 });
         for (const name of [
           "combatTurnChange",
           "collapseSidebar",
@@ -1373,12 +1446,13 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       },
       ({ registrations, hooks }) => {
         createYourTurnFeature(MODULE).init();
-        assert.equal(registrations.length, 3);
+        assert.equal(registrations.length, 4);
         assert.equal(registrations.some((entry) => entry.key === "yourTurnPortrait"), false);
         assert.equal(hooks.some((entry) => entry.name === "combatTurnChange"), true);
         assert.ok(registrations.find((entry) => entry.key === "yourTurnEnabled").data.type instanceof BooleanFieldStub);
         assert.ok(registrations.find((entry) => entry.key === "yourTurnScale").data.type instanceof NumberFieldStub);
         assert.ok(registrations.find((entry) => entry.key === "yourTurnHold").data.type instanceof NumberFieldStub);
+        assert.equal(registrations.find((entry) => entry.key === "yourTurnPortraitWidth").data.scope, "world");
       },
     );
   });

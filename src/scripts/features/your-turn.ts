@@ -4,6 +4,8 @@ const FEATURE_ID = "your-turn";
 const SETTING_ENABLED = "yourTurnEnabled";
 const SETTING_SCALE = "yourTurnScale";
 const SETTING_HOLD = "yourTurnHold";
+const SETTING_PORTRAIT_WIDTH = "yourTurnPortraitWidth";
+const DEFAULT_PORTRAIT_WIDTH = 400;
 const ART_FLAG = "yourTurnArt";
 const COLOR_FLAG = "yourTurnColor";
 const DEFAULT_COLOR = "#2B8CFF";
@@ -51,6 +53,8 @@ type ArtMode = "sticker" | "frame";
 type ArtResult = {
   mode: ArtMode;
   url: string;
+  width: number;
+  height: number;
 };
 
 type Subject = {
@@ -62,6 +66,22 @@ type Subject = {
 type ArtDraft = { art: string; color: string };
 
 type Rgb = { r: number; g: number; b: number };
+
+function portraitWidth(value: unknown): number {
+  const width = Number(value);
+  return Number.isFinite(width) && width > 0 ? Math.min(1000, Math.max(100, width)) : DEFAULT_PORTRAIT_WIDTH;
+}
+
+/** Normalize resolution, not aspect ratio. The shared slot stays above the name banner. */
+export function fitTurnPortrait(width: number, height: number, targetWidth: number, stageSize: number, framed = false): { width: number; height: number } {
+  const stage = Number.isFinite(stageSize) ? Math.max(0, stageSize) : 0;
+  const maxWidth = Math.min(portraitWidth(targetWidth), stage * 0.64);
+  const maxHeight = stage * 0.72;
+  const padding = framed ? Math.min(16, maxWidth, maxHeight) : 0;
+  const ratio = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? width / height : 1;
+  const contentWidth = Math.max(0, Math.min(maxWidth - padding, (maxHeight - padding) * ratio));
+  return { width: contentWidth + padding, height: contentWidth / ratio + padding };
+}
 
 /**
  * Radius-5 regression: 3-4-5 is the disk edge, and one step past it is outside.
@@ -537,6 +557,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.setProperty("--turn-theme", color);
     root.style.setProperty("--turn-highlight", turnHighlight(color));
     root.style.setProperty("--yt-scale", String(readScale()));
+    root.style.setProperty("--yt-portrait-width", `${portraitWidth(readSetting(SETTING_PORTRAIT_WIDTH))}px`);
   }
 
   function playLayer(root: HTMLElement, layer: HTMLElement, enterMs: number, exitMs: number, reduced: boolean): void {
@@ -745,6 +766,12 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     character.classList.toggle("astillon-yt-sticker", result.mode === "sticker");
     character.classList.add("has-art");
     character.dataset.mode = result.mode;
+    const stage = root.querySelector<HTMLElement>(".astillon-yt-stage");
+    const fitted = fitTurnPortrait(result.width, result.height,
+      Number.parseFloat(root.style.getPropertyValue("--yt-portrait-width")),
+      Number.parseFloat(stage?.style.width ?? "0"), result.mode === "frame");
+    character.style.width = `${fitted.width}px`;
+    character.style.height = `${fitted.height}px`;
     image.src = result.url;
     if (result.mode === "sticker") retainBlob(root, result.url);
   }
@@ -799,11 +826,11 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       pixels = context.getImageData(0, 0, drawn.width, drawn.height);
     } catch {
       // A tainted canvas cannot be dilated. Keep the raw image in the angular frame.
-      return { mode: "frame", url: src };
+      return { mode: "frame", url: src, width: drawn.width, height: drawn.height };
     }
 
     if (isOpaqueAlpha(pixels.data, drawn.width * drawn.height)) {
-      return { mode: "frame", url: src };
+      return { mode: "frame", url: src, width: drawn.width, height: drawn.height };
     }
 
     const radius = outlineRadius(drawn.width, drawn.height);
@@ -819,7 +846,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const blob = await canvasToBlob(outlined);
     const create = URL.createObjectURL;
     if (typeof create !== "function") throw new Error("your-turn blob url unavailable");
-    return { mode: "sticker", url: create.call(URL, blob) };
+    return { mode: "sticker", url: create.call(URL, blob), width: outlined.width, height: outlined.height };
   }
 
   function prepareArt(src: string): Promise<ArtResult> {
@@ -859,7 +886,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       return prepared;
     } catch {
       // A portrait that cannot be outlined still has to appear.
-      return { mode: "frame", url: loaded };
+      return { mode: "frame", url: loaded, width: image.naturalWidth || image.width, height: image.naturalHeight || image.height };
     }
   }
 
@@ -1245,6 +1272,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         config: true,
         type: createNumberField({ min: 0.5, max: 4, step: 0.05 }),
         default: 1.45,
+      });
+      game.settings.register(moduleId, SETTING_PORTRAIT_WIDTH, {
+        name: localize("ASTILLON.YourTurn.PortraitWidth"),
+        hint: localize("ASTILLON.YourTurn.PortraitWidthHint"),
+        scope: "world",
+        config: true,
+        type: createNumberField({ min: 100, max: 1000, step: 10 }),
+        default: DEFAULT_PORTRAIT_WIDTH,
       });
 
       Hooks.on("combatTurnChange", onCombatTurnChange);

@@ -10,6 +10,8 @@
       "EnabledHint": "Play a Persona-style cut-in on the map whenever the combat turn changes.",
       "Scale": "Your Turn Scale",
       "ScaleHint": "Size of the cut-in, from half size to one and a half. 1 is the default.",
+      "PortraitWidth": "Your Turn Portrait Width (px)",
+      "PortraitWidthHint": "World-wide target width for every turn portrait at Your Turn Scale 1 (100–1000 px; default 400). Small images enlarge and large images shrink without stretching. Tall portraits and smaller screens fit within the cut-in. Applies to the next turn or preview; each user's overall scale still applies.",
       "Hold": "Your Turn Hold",
       "HoldHint": "Seconds the cut-in stays fully visible before it leaves.",
       "Strip": "YOUR TURN",
