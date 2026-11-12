@@ -29,11 +29,13 @@ The GM or a token owner can toggle it. The token flag is `flags.astillon-hanaq-a
 
 ## Your Turn
 
-Configure Settings includes a per-user **Your Turn Banner** toggle, off by default. When it is on, every change of combatant slides a card out beside the right sidebar for that client: the combatant's portrait and a flashy “{name}'s turn!” The GM and the other players see the same announcement once they enable the setting. Click the card, or wait a few seconds, and it leaves. An optional portrait override replaces your own token or actor image on your turn.
+Configure Settings includes three per-user controls. **Your Turn Cut-In** is off by default. **Your Turn Scale** (0.5–1.5) sizes the graphic, and **Your Turn Hold** (0.5–4 seconds) is how long it stays fully on screen. With the cut-in enabled, each change of combatant, round, or turn plays one announcement for every combatant, including characters this user does not own. The graphic sits on the lower right of the usable map, leaving the left side clear: jagged theme panels, a thick white outline around the portrait, the combatant's name in large italic type, and a smaller YOUR TURN strip. It does not take clicks. The portrait is the actor's Your Turn art, then the same flag on the token's base actor, then the actor image, then the token image. The color is the actor flag, then the base actor, then #2B8CFF.
+
+Owners and the GM get a Your Turn control on the actor sheet. It opens an editor with an image field, a color, Preview, and Save. Preview plays the current draft even when the setting is off and does not write flags or advance combat. Save stores the image and an #RRGGBB color on the actor. Clearing the image removes that flag. Every client reads those actor flags.
 
 ## Compatibility
 
-Version 0.8.1 announces every combatant's turn to each client that has the banner enabled. Version 0.8.0 adds that optional banner. Version 0.7.0 updates Sarsaparilla and the racing macros to Foundry's `DialogV2` and native DOM APIs. Dice evaluation is asynchronous. Menacing supports V14's ID-keyed status registry and V13's array registry. Use a PF2e release compatible with your installed Foundry version.
+Version 0.9.0 replaces the sidebar card with a Persona-style map cut-in. Version 0.8.1 announces every combatant's turn to each client that has the banner enabled. Version 0.8.0 adds that optional banner. Version 0.7.0 updates Sarsaparilla and the racing macros to Foundry's `DialogV2` and native DOM APIs. Dice evaluation is asynchronous. Menacing supports V14's ID-keyed status registry and V13's array registry. Use a PF2e release compatible with your installed Foundry version.
 
 PF2e's V14 status-menu integration was checked against upstream commit [`d695228`](https://github.com/foundryvtt/pf2e/blob/d695228d8763839c8ddaa0166bee325a98c1d24f/src/module/canvas/status-effects.ts). PF2e handles its own conditions and rejects custom ActiveEffects, so Menacing uses a scoped status-control listener and a token flag. It does not patch PF2e classes.
 
