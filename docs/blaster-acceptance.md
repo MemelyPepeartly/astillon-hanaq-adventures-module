@@ -7,33 +7,51 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 ## NPC and compendia
 
 - Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 600, visible skills, three saves, strikes, and linked abilities with no console errors.
-- Open the hype-thrall actor and support effects. Open Hype Fan, Ego Guard, and Paparazzo; ensure their distinct bundled portrait/token artwork resolves and links to all eight macros open the intended macro.
+- Open the hype-thrall actor and support effects. Open Hype Fan, Ego Guard, and Paparazzo; ensure their distinct bundled portrait/token artwork resolves and links to all eleven macros open the intended macro.
 - Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
 - On an existing Blaster with current HP, effects, custom artwork, and GM notes, run **Refresh Sheet Descriptions**. Only shipped ability descriptions should change; repeat it and confirm there are no further writes. Deleted abilities must not be recreated, and ambiguous duplicates must not be overwritten.
 - Expand each charge's ability. Check that all six typed damage links and matching basic saves render, Dazzled and Stupefied 1 open the correct conditions, and the recharge die is rollable. Support links should open this module's correct effects. The manual Beam Clash die must not advance the animated contest. Native Strike controls still handle attack, MAP, and critical damage.
 - Check the 0.10.7 layout: bold Frequency/Area/Requirements/Trigger labels above a horizontal rule, a short Effect, compact choices, and separately labeled Beam Clash outcomes. No long operating notes should appear above the rules in item GM-note blocks. Open the compendium actor's Notes tab for the operating reference. On a world actor, Refresh Sheet Descriptions must shorten the ability text without changing existing actor Notes or item GM notes. Confirm Bolster does not change the duration of higher temporary HP from another source.
 
-## Connected blast
+## Native spells
 
-- Start combat on Blaster's turn. Use the one-action blast: click Blaster's square followed by four other squares. See a connecting preview at every click and four saved line Regions after the fifth. Confirm they are visible from a player client.
+- Freshly import Blaster: verify one Occult Innate Spells entry, DC 40, +32 spell attack, all six listed spells, correct heightened ranks and daily uses. Check Inner Radiance Torrent's casting variants and Chromatic Ray's clickable color outcomes; normal native spell controls must remain functional.
+- Illusory Disguise is at will: use its spell-icon card without daily-use expenditure. Confirm the documented upstream innate-Cast limitation rather than inventing an unsupported at-will flag.
+- Existing world actors are not silently replaced. Refresh Sheet Descriptions must still leave statistics, spell uses, and custom items intact and must not duplicate/import new spells.
+
+## Immediate charged beams
+
+- Use each charge tier: aim with one click from Blaster's center. Confirm one straight 120-foot Region is created, visible to player clients. Clicking nearby or beyond 120 feet changes direction only, not length.
 - Undo with Backspace, cancel with Escape and right-click, and leave the scene mid-placement. None should leave Regions, pointer listeners, or consume the use.
-- Reject a starting point outside Blaster, consecutive duplicate points, and any individual leg over 80 feet. Accept four 80-foot legs (320 feet total) at all three charge levels. Try diagonal turns and verify the scene's distance convention and coverage highlights.
-- Confirm all modes share one use per round; one- and two-action variants work on later turns while the large blast recharges.
+- Clicking Blaster's center must not create a zero-length beam. Test horizontal, vertical, and diagonal aiming on different pixel-size grids. Length remains 120 feet and width remains 1/1/3 squares. A cancelled aim must leave existing areas unchanged.
+- Invoke all charge tiers off-turn, with no combat, and repeatedly in one round. Legacy use/recharge flags must not block invocation; action costs and cooldown are GM-adjudicated. Advancing a turn while choosing points must not cancel placement, but moving/deleting Blaster, leaving the scene, or losing GM authority still must.
 - Verify three-action full width is **three squares**, not three on each side. Attempt movement with drag, ruler, keyboard, and token configuration. It must be blocked until Blaster's next turn, but not after. Verify **Release Blast Root** allows a deliberate GM correction.
 - Advance through a round boundary before Blaster's turn: root remains until that turn. End combat: root stops blocking. Out of combat, advance world time by six seconds.
 - Verify each spectrum's damage and save links; apply saves/damage only once per target even if it occupies multiple segments. Apply the conditional riders manually only on a failed save.
 - Clear areas with the cleanup macro. Other actors' Regions and another Blaster's areas must survive.
 
+## Grand Finale warning and round boundary
+
+- On round R, mark eight points (first on Blaster); reject a leg over 120 feet and accept seven 120-foot legs. Backspace/cancel/scene teardown remove preview/listeners without damaging or replacing the previous saved warning.
+- Confirm seven amber, three-square-wide Regions are visible to all clients. The warning must not change HP, apply conditions, or prevent the party moving through/out of it. Move Blaster after marking: the warning stays fixed.
+- Advance turns within round R: do not fire. Advance to round R+1: fire once at the global round boundary, not Blaster's turn, change the existing Regions to the selected spectrum color, and post one DC 40 basic-save / 24d6 card (22d6 for riders). Resolve each creature once even at overlaps.
+- Fire manually before the due round or outside combat, then advance/reconnect: no second card. Outside-combat marking remains manual-only when a new encounter starts. Duplicate combat hooks and a second GM client must not duplicate resolution.
+- Reconnect while armed, while firing, and after resolution; switch active GM and return to a different scene. Preserve the path/state and avoid duplicate cards. A failed/uncertain write must be recoverable or clearly reported, not silently replayed.
+- Cancel with Clear Grand Finale, delete Blaster's token, or delete the associated combat. The pending plan must not fire later. Ordinary Clear Blast Areas must not cancel a pending Finale; Finale cleanup must not remove ordinary beams or another Blaster's Regions.
+- Complete a new mark: replace only the owner's previous path. Fail scene-flag persistence deliberately: retain the prior plan and remove only newly created warning Regions. Confirm no chat/save action exists before firing.
+
 ## Flash Mob
 
-- As the active GM, run Flash Mob on Blaster's turn. Choose each portrait card on successive turns and confirm the selected named sheet and matching token art are used. Test Surprise Me, keyboard selection, and cancelling the picker without spending the use. Summon one add within 30 feet. Ensure exactly one custom hype-thrall token appears, with 1 HP, helper summoner linkage and a one-minute expiration effect.
-- Cancel the helper placement, then retry: cancellation must not consume the round's use. Verify a fourth simultaneous live add is refused; another Blaster's adds do not count toward this Blaster's limit.
-- Advance the turn, change the active GM, or reach the three-live cap while the picker is open: placement must stop without charging the use.
+- As the active GM, run Flash Mob on any turn and with no combat. Choose each portrait card on successive invocations and confirm the selected named sheet and matching token art are used. Test Surprise Me, keyboard selection, and cancelling the picker without spending the use. Summon one add within 30 feet. Ensure exactly one custom hype-thrall token appears, with 1 HP, helper summoner linkage and a one-minute expiration effect.
+- Cancel the helper placement, then retry: cancellation must leave the tool usable. Verify a fourth simultaneous live add is refused; another Blaster's adds do not count toward this Blaster's limit.
+- Advance the turn/round while the picker is open: placement must still succeed. Change the active GM, change scenes, delete the summoner, or reach the three-live cap instead: placement must stop safely. Old blasterMobUses flags must not block sequential invocations.
 - Confirm all three variants share the live cap, expiry, and support eligibility. Their themed signature routines must not apply a bonus automatically or restrict the other two support choices.
 - Confirm the add has no independent initiative. Command a living owned add within 60 feet; reject another Blaster's add, a dead add, an expired add, and an out-of-range add.
 - Check inspire and guard appear on Blaster's prepared statistics, and bolster gives max(current temporary HP, 10), never additive stacking. Advance to Blaster's next turn and verify support removal, including remaining temporary HP originating from bolster.
+- Command before Blaster's turn, then enter his turn in the same round: support expires. Command during or after his turn: support lasts until his following turn. Outside combat (or with Blaster absent from the active encounter), advance six world-time seconds: remove only marked support, including remaining Bolster-owned HP. Reapply the same support in one round and verify there is one copy, Bolster refreshes to 10, and higher unrelated temporary HP survive.
 - Advance one minute, including with automatic PF2e expired-effect removal disabled: the custom add disappears. Unrelated summons must survive.
 - Disable Summons Assistant and verify the macro gives an actionable dependency warning without creating a substitute actor or token.
+- Simulate helper failure after token creation but before its summoner flag/effects are written. The exact nonce-marked variant must be recognized as placed, receive its missing owner link and expiry, and count toward the cap. Wrong variants, foreign helper owners, and deleted tokens must not be adopted. If a repair write fails, the warning must acknowledge the existing token and other repairs must still be attempted.
 
 ## Beam Clash: three browser clients
 

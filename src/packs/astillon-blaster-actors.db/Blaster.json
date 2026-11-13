@@ -29,7 +29,7 @@
       "img": "icons/svg/lightning.svg",
       "system": {
         "description": {
-          "value": "<p>Whenever Blaster uses Charged Blast, he chooses one spectrum for the entire blast at no additional action cost. The blast gains the trait of its damage type.</p>\n<ul>\n<li><strong>Raw</strong> Fire, cold, electricity, or sonic damage; @Check[reflex|dc:40|basic|traits:magical] save.</li>\n<li><strong>Dazzling Light</strong> Fire damage with 2 fewer dice and the light trait; @Check[reflex|dc:40|basic|traits:magical,fire,light] save. On a failure or critical failure, the target is also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> Mental damage with 2 fewer dice; @Check[will|dc:40|basic|traits:magical,mental] save. On a failure or critical failure, the target is also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>These conditions last until the start of Blaster's next turn, in addition to the basic save's damage.</p>",
+          "value": "<p>Whenever Blaster uses Charged Blast or marks Grand Finale, he chooses one spectrum for the entire blast at no additional action cost. The blast gains the trait of its damage type.</p>\n<ul>\n<li><strong>Raw</strong> Fire, cold, electricity, or sonic damage; @Check[reflex|dc:40|basic|traits:magical] save.</li>\n<li><strong>Dazzling Light</strong> Fire damage with 2 fewer dice and the light trait; @Check[reflex|dc:40|basic|traits:magical,fire,light] save. On a failure or critical failure, the target is also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> Mental damage with 2 fewer dice; @Check[will|dc:40|basic|traits:magical,mental] save. On a failure or critical failure, the target is also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>These conditions last until the start of Blaster's next turn, in addition to the basic save's damage.</p>",
           "gm": ""
         },
         "publication": {
@@ -64,7 +64,7 @@
       "img": "icons/svg/lightning.svg",
       "system": {
         "description": {
-          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> four segments of up to 80 feet each, 1 square wide (5 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a line through five points, beginning in his space. Its four connected segments are each at most 80 feet long and require line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once, even where segments overlap.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[4d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[4d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[4d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[4d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[2d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[2d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast}</p>",
+          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> 120-foot line, 1 square wide (5 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a straight 120-foot beam from his space. The beam requires line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[4d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[4d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[4d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[4d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[2d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[2d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast}</p>",
           "gm": ""
         },
         "publication": {
@@ -107,7 +107,7 @@
       "img": "icons/svg/lightning.svg",
       "system": {
         "description": {
-          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> four segments of up to 80 feet each, 1 square wide (5 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a line through five points, beginning in his space. Its four connected segments are each at most 80 feet long and require line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once, even where segments overlap.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[9d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[9d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[9d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[9d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[7d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[7d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast}</p>",
+          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> 120-foot line, 1 square wide (5 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a straight 120-foot beam from his space. The beam requires line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[9d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[9d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[9d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[9d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[7d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[7d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast}</p>",
           "gm": ""
         },
         "publication": {
@@ -150,7 +150,7 @@
       "img": "icons/svg/lightning.svg",
       "system": {
         "description": {
-          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> four segments of up to 80 feet each, 3 squares wide (15 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a line through five points, beginning in his space. Its four connected segments are each at most 80 feet long and require line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once, even where segments overlap.</p>\n<p>After firing, Blaster can't voluntarily move until the start of his next turn; forced movement is unaffected.</p>\n<p><strong>Recharge</strong> This three-action blast is unavailable for [[/gmr 1d4 #Standing Ovation recharge]]{1d4} full intervening rounds. His one- and two-action blasts remain available.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[18d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[18d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[18d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[18d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[16d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[16d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterUnroot001]{Release Root}</p>",
+          "value": "<p><strong>Frequency</strong> once per round, shared by all Charged Blast variants</p>\n<p><strong>Area</strong> 120-foot line, 3 squares wide (15 feet on a 5-foot grid)</p>\n<hr />\n<p><strong>Effect</strong> Blaster fires a straight 120-foot beam from his space. The beam requires line of effect. Choose one spectrum below and roll damage once. Each creature other than Blaster attempts one save and takes damage only once.</p>\n<p>After firing, Blaster can't voluntarily move until the start of his next turn; forced movement is unaffected.</p>\n<p><strong>Recharge</strong> This three-action blast is unavailable for [[/gmr 1d4 #Standing Ovation recharge]]{1d4} full intervening rounds. His one- and two-action blasts remain available.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[18d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[18d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[18d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[18d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[16d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[16d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterBlast0001]{Place Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterClear0001]{Clear Blast} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterUnroot001]{Release Root}</p>",
           "gm": ""
         },
         "publication": {
@@ -178,6 +178,48 @@
         },
         "actions": {
           "value": 3
+        },
+        "category": "offensive",
+        "frequency": {
+          "max": 1,
+          "per": "round"
+        }
+      }
+    },
+    {
+      "_id": "BlasterFinaleAct",
+      "name": "Grand Finale",
+      "type": "action",
+      "img": "icons/svg/lightning.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Frequency</strong> once per round</p>\n<p><strong>Trigger</strong> A round begins.</p>\n<p><strong>Area</strong> seven connected line segments, each up to 120 feet long and 3 squares wide</p>\n<hr />\n<p><strong>Effect</strong> Blaster marks eight points, beginning in his space, and chooses one Curated Spectrum. The visible path deals no damage yet. At the start of the next round, he blasts the marked path without spending another action. The path stays fixed even if Blaster moves.</p>\n<p>Each creature other than Blaster attempts one save and takes damage only once, even where segments overlap. Roll damage once; resolve line of effect normally.</p>\n<ul>\n<li><strong>Fire</strong> @Damage[24d6[fire]|traits:fire|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire] save).</li>\n<li><strong>Cold</strong> @Damage[24d6[cold]|traits:cold|options:area-damage] (@Check[reflex|dc:40|basic|traits:cold] save).</li>\n<li><strong>Electricity</strong> @Damage[24d6[electricity]|traits:electricity|options:area-damage] (@Check[reflex|dc:40|basic|traits:electricity] save).</li>\n<li><strong>Sonic</strong> @Damage[24d6[sonic]|traits:sonic|options:area-damage] (@Check[reflex|dc:40|basic|traits:sonic] save).</li>\n<li><strong>Dazzling Light</strong> @Damage[22d6[fire]|traits:fire,light|options:area-damage] (@Check[reflex|dc:40|basic|traits:fire,light] save); also @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh]{Dazzled}.</li>\n<li><strong>Psychic Humiliation</strong> @Damage[22d6[mental]|traits:mental|options:area-damage] (@Check[will|dc:40|basic|traits:mental] save); also @UUID[Compendium.pf2e.conditionitems.Item.e1XGnhKNSQIm5IXg]{Stupefied 1}.</li>\n</ul>\n<p>Dazzling Light and Psychic Humiliation impose their conditions only on a failure or critical failure, until the start of Blaster's next turn.</p>\n<hr />\n<p><strong>Foundry</strong> @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMark00001]{Mark Path} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterFire00001]{Fire Now} · @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterWipe00001]{Clear Finale}</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-grand-finale",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [
+            "concentrate",
+            "magical"
+          ],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "free"
+        },
+        "actions": {
+          "value": null
         },
         "category": "offensive",
         "frequency": {
@@ -406,6 +448,547 @@
         "range": null,
         "subjectToMAP": true
       }
+    },
+    {
+      "_id": "BlasterCasting01",
+      "img": "systems/pf2e/icons/default-icons/spellcastingEntry.svg",
+      "name": "Occult Innate Spells",
+      "system": {
+        "autoHeightenLevel": {
+          "value": null
+        },
+        "description": {
+          "value": ""
+        },
+        "prepared": {
+          "flexible": false,
+          "value": "innate"
+        },
+        "proficiency": {
+          "value": 1
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "showSlotlessLevels": {
+          "value": false
+        },
+        "slots": {},
+        "slug": null,
+        "spelldc": {
+          "dc": 40,
+          "value": 32
+        },
+        "tradition": {
+          "value": "occult"
+        }
+      },
+      "type": "spellcastingEntry"
+    },
+    {
+      "_id": "BlasterSpell0001",
+      "img": "icons/magic/fire/beam-jet-stream-embers.webp",
+      "name": "Inner Radiance Torrent",
+      "system": {
+        "area": {
+          "type": "line",
+          "value": 60
+        },
+        "cost": {
+          "value": ""
+        },
+        "counteraction": true,
+        "damage": {
+          "0": {
+            "applyMod": false,
+            "category": null,
+            "formula": "4d4",
+            "kinds": [
+              "damage"
+            ],
+            "type": "force"
+          }
+        },
+        "defense": {
+          "save": {
+            "basic": true,
+            "statistic": "reflex"
+          }
+        },
+        "description": {
+          "value": "<p>You gradually merge several kinds of energy into your cupped hands before firing off a storm of bolts and beams that deal 4d4 force damage to all creatures in a 60-foot line. Creatures in the area must attempt a basic Reflex save. On a critical failure, they're also @UUID[Compendium.pf2e.conditionitems.Item.XgEqL1kFApUbl5Z2] for 1 round. The number of actions you spend when Casting this Spell determines the area. If the line passes through an area of magical darkness or targets a creature affected by magical darkness, <em>inner radiance torrent</em> attempts to counteract the darkness.</p>\n<p><span class=\"action-glyph\">2</span> The line is 60 feet long.</p>\n<p><span class=\"action-glyph\">3</span> The line is 120 feet long.</p>\n<p><strong>Two Rounds</strong> If you spend 3 actions casting the spell, you can avoid finishing the spell and spend another 2 actions on your next turn to empower the spell even further. You can take other actions before finishing this spell, but the spell is lost if you Cast another Spell in between. The line is 120 feet long, the damage dealt by this spell increases by 4d4, and you enter a shining state for 1 minute, causing you to glow with light and deal @Damage[(max(2,@item.rank)-1)[force]|options:area-damage] damage to creatures that end their turn adjacent to you.</p><hr /><p><strong>Heightened (+1)</strong> The initial damage, as well as the additional damage for the 2-round casting time, each increase by 2d4, and the damage to adjacent creatures dealt while in your shining state increases by 1.</p>"
+        },
+        "duration": {
+          "sustained": false,
+          "value": ""
+        },
+        "heightening": {
+          "area": 0,
+          "damage": {
+            "0": "2d4"
+          },
+          "interval": 1,
+          "type": "interval"
+        },
+        "level": {
+          "value": 2
+        },
+        "overlays": {
+          "owbdx5mwkhnfjfe8": {
+            "overlayType": "override",
+            "sort": 2,
+            "system": {
+              "area": {
+                "value": "120"
+              },
+              "damage": {
+                "0": {
+                  "category": null
+                }
+              },
+              "time": {
+                "value": "3"
+              }
+            }
+          },
+          "qrxkquqbapot642g": {
+            "overlayType": "override",
+            "sort": 1,
+            "system": {
+              "damage": {
+                "0": {
+                  "category": null
+                }
+              },
+              "time": {
+                "value": "2"
+              }
+            }
+          },
+          "zzgj6vleao856t2k": {
+            "name": "Inner Radiance Torrent (2 Rounds)",
+            "overlayType": "override",
+            "sort": 3,
+            "system": {
+              "area": {
+                "value": "120"
+              },
+              "damage": {
+                "0": {
+                  "category": null,
+                  "formula": "8d4"
+                }
+              },
+              "heightening": {
+                "damage": {
+                  "0": "4d4"
+                }
+              },
+              "time": {
+                "value": "2 rounds"
+              }
+            }
+          }
+        },
+        "publication": {
+          "license": "ORC",
+          "remaster": true,
+          "title": "Pathfinder Impossible Magic"
+        },
+        "range": {
+          "value": ""
+        },
+        "requirements": "",
+        "ritual": null,
+        "rules": [],
+        "target": {
+          "value": ""
+        },
+        "time": {
+          "value": "2 to 2 rounds"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "divine",
+            "occult"
+          ],
+          "value": [
+            "concentrate",
+            "force",
+            "light",
+            "manipulate"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 8,
+          "value": "BlasterCasting01",
+          "uses": {
+            "value": 1,
+            "max": 1
+          }
+        }
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.eSEmqOBuywoJ6tYd"
+      }
+    },
+    {
+      "_id": "BlasterSpell0002",
+      "img": "icons/magic/lightning/bolt-beam-strike-blue.webp",
+      "name": "Chromatic Ray",
+      "system": {
+        "area": null,
+        "cost": {
+          "value": ""
+        },
+        "counteraction": false,
+        "damage": {},
+        "defense": {
+          "save": {
+            "basic": false,
+            "statistic": "fortitude"
+          }
+        },
+        "description": {
+          "value": "<p>You send out a ray of colored light streaming toward your enemy, with a magical effect depending on the ray's color. Make a spell attack roll. If you hit, roll [[/r 1d4]]{1d4} to see which beam you cast. If the ray deals damage, that damage is doubled on a critical hit. Any additional traits that apply to a ray are listed in parentheses just after the name of the color.</p>\n<ol>\n<li><strong>Red</strong> (fire) The ray deals @Damage[30[fire]] damage to the target.</li>\n<li><strong>Orange</strong> (acid) The ray deals @Damage[40[acid]] damage to the target.</li>\n<li><strong>Yellow</strong> (electricity) The ray deals @Damage[50[electricity]] damage to the target.</li>\n<li><strong>Green</strong> (poison) The ray deals @Damage[25[poison]] damage to the target, and the target must succeed at a Fortitude save or be @UUID[Compendium.pf2e.conditionitems.Item.MIRkyAjyBeXivMa7]{Enfeebled 1} for 1 minute (@UUID[Compendium.pf2e.conditionitems.Item.MIRkyAjyBeXivMa7]{Enfeebled 2} on a critical failure).</li>\n</ol>\n<hr />\n<p><strong>Heightened (6th)</strong> The damage for @Damage[40[fire]]{Red}, @Damage[50[acid]]{Orange}, @Damage[60[electricity]]{Yellow}, and @Damage[35[poison]]{Green} each increase by 10. Roll [[/r 1d8]]{1d8} to determine the ray's color, using the results for 1-4 above and the results for 5-8 below.</p>\n<ol start=\"5\">\n<li><strong>Blue</strong> The ray has the effect of the @UUID[Compendium.pf2e.spells-srd.Item.znv4ECL7ZtuiagtA] spell. On a critical hit, the target is @UUID[Compendium.pf2e.conditionitems.Item.i3OJZU2nk64Df3xm]{Clumsy 1} as long as it's @UUID[Compendium.pf2e.conditionitems.Item.xYTAsEpcJE1Ccni3] by the <em>flesh to stone</em> effect.</li>\n<li><strong>Indigo</strong> (emotion, incapacitation, mental) The ray has the effect of the @UUID[Compendium.pf2e.spells-srd.Item.LiGbewa9pO0yjbsY] spell. On a critical hit, it has the effect of @UUID[Compendium.pf2e.spells-srd.Item.8kJbiBEjMWG4VUjs] instead.</li>\n<li><strong>Violet</strong> The target is @UUID[Compendium.pf2e.conditionitems.Item.xYTAsEpcJE1Ccni3] for 1 minute. It must also succeed at a will save or be teleported 120 feet directly away from you (if there isn't room for it to appear there, it appears in the nearest open space); this is a teleportation effect.</li>\n<li><strong>Intense Color</strong> The target is @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh] until the end of your next turn, or @UUID[Compendium.pf2e.conditionitems.Item.XgEqL1kFApUbl5Z2] if your attack roll was a critical hit. Roll again and add the effects of another color (rerolling results of 8).</li>\n</ol>"
+        },
+        "duration": {
+          "sustained": false,
+          "value": ""
+        },
+        "level": {
+          "value": 4
+        },
+        "publication": {
+          "license": "OGL",
+          "remaster": false,
+          "title": "Pathfinder Secrets of Magic"
+        },
+        "range": {
+          "value": "30 feet"
+        },
+        "requirements": "",
+        "rules": [],
+        "target": {
+          "value": "1 creature"
+        },
+        "time": {
+          "value": "2"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "arcane",
+            "occult"
+          ],
+          "value": [
+            "attack",
+            "concentrate",
+            "light",
+            "manipulate"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 7,
+          "value": "BlasterCasting01",
+          "uses": {
+            "value": 1,
+            "max": 1
+          }
+        }
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.Hb8GdAhP0zBCv3zU"
+      }
+    },
+    {
+      "_id": "BlasterSpell0003",
+      "img": "systems/pf2e/icons/spells/hypnotic-pattern.webp",
+      "name": "Hypnotize",
+      "system": {
+        "area": {
+          "type": "burst",
+          "value": 10
+        },
+        "cost": {
+          "value": ""
+        },
+        "counteraction": false,
+        "damage": {},
+        "defense": {
+          "save": {
+            "basic": false,
+            "statistic": "will"
+          }
+        },
+        "description": {
+          "value": "<p>You create a cloud of mesmerizing patterns and colors that hovers in the air. Creatures are @UUID[Compendium.pf2e.conditionitems.Item.TkIyaNPgTZFBCCuh] while inside the cloud. In addition, a creature must attempt a Will saving throw if it is inside the cloud when you cast it, when it enters the cloud, when it ends its turn within the cloud, or if it uses a @UUID[Compendium.pf2e.actionspf2e.Item.BlAOM2X92SI6HMtJ] or Interact action on the cloud. A creature currently @UUID[Compendium.pf2e.conditionitems.Item.AdPVz7rbaVSRxHFg] by hypnotize doesn't attempt new saves.</p>\n<p><strong>Success</strong> The target is unaffected.</p>\n<p><strong>Failure</strong> The target is fascinated by the cloud.</p>\n<p><strong>Critical Failure</strong> The target is fascinated by the cloud. While it remains fascinated, it can't use reactions.</p>"
+        },
+        "duration": {
+          "sustained": true,
+          "value": "1 minute"
+        },
+        "level": {
+          "value": 3
+        },
+        "publication": {
+          "license": "ORC",
+          "remaster": true,
+          "title": "Pathfinder Player Core"
+        },
+        "range": {
+          "value": "120 feet"
+        },
+        "requirements": "",
+        "rules": [],
+        "target": {
+          "value": ""
+        },
+        "time": {
+          "value": "2"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "arcane",
+            "occult"
+          ],
+          "value": [
+            "illusion",
+            "manipulate",
+            "subtle",
+            "visual"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 3,
+          "value": "BlasterCasting01",
+          "uses": {
+            "value": 1,
+            "max": 1
+          }
+        }
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.K2WpC3FFoHrqX9Q5"
+      }
+    },
+    {
+      "_id": "BlasterSpell0004",
+      "img": "systems/pf2e/icons/spells/suggestion.webp",
+      "name": "Suggestion",
+      "system": {
+        "area": null,
+        "cost": {
+          "value": ""
+        },
+        "counteraction": false,
+        "damage": {},
+        "defense": {
+          "save": {
+            "basic": false,
+            "statistic": "will"
+          }
+        },
+        "description": {
+          "value": "<p>Your honeyed words are difficult for creatures to resist. You suggest a course of action to the target, which must be phrased in such a way as to seem like a logical course of action to the target and can't be self-destructive or obviously against the target's self-interest. The target must attempt a Will save.</p>\n<hr />\n<p><strong>Critical Success</strong> The target is unaffected and knows you tried to control it.</p>\n<p><strong>Success</strong> The target is unaffected.</p>\n<p><strong>Failure</strong> The target immediately follows your suggestion. The spell has a duration of 1 minute, or until the target has completed a finite suggestion or the suggestion becomes self-destructive or has other obvious negative effects.</p>\n<p><strong>Critical Failure</strong> As failure, but the base duration is 1 hour.</p>\n<hr />\n<p><strong>Heightened (8th)</strong> You can target up to 10 creatures.</p>"
+        },
+        "duration": {
+          "sustained": false,
+          "value": "varies"
+        },
+        "heightening": {
+          "levels": {
+            "8": {
+              "target": {
+                "value": "10 creatures"
+              }
+            }
+          },
+          "type": "fixed"
+        },
+        "level": {
+          "value": 4
+        },
+        "publication": {
+          "license": "ORC",
+          "remaster": true,
+          "title": "Pathfinder Player Core"
+        },
+        "range": {
+          "value": "30 feet"
+        },
+        "requirements": "",
+        "rules": [],
+        "target": {
+          "value": "1 creature"
+        },
+        "time": {
+          "value": "2"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "arcane",
+            "occult"
+          ],
+          "value": [
+            "concentrate",
+            "incapacitation",
+            "linguistic",
+            "manipulate",
+            "mental",
+            "subtle"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 9,
+          "value": "BlasterCasting01",
+          "uses": {
+            "value": 1,
+            "max": 1
+          }
+        }
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.qwlh6aDgi86U3Q7H"
+      }
+    },
+    {
+      "_id": "BlasterSpell0005",
+      "img": "icons/magic/defensive/illusion-evasion-echo-purple.webp",
+      "name": "Mirror Image",
+      "system": {
+        "area": null,
+        "cost": {
+          "value": ""
+        },
+        "counteraction": false,
+        "damage": {},
+        "defense": null,
+        "description": {
+          "value": "<p>Three illusory images of you swirl about your space, potentially causing those who attack you to hit one of the images instead of you. Any attack that would hit you has a random chance of hitting one of your images instead of you. If all three images remain, there is a 1 in 4 chance of hitting you (1 on [[/r 1d4]]). With two images remaining, there is a 1 in 3 chance of hitting you (1-2 on [[/r 1d6]]). With only one image, the chances are 1 in 2 (1-3 on [[/r 1d6]]).</p>\n<p>Once an image is hit, it is destroyed. If an attack roll fails to hit your AC but doesn't critically fail, it destroys an image but has no additional effect (even if the attack would normally have an effect on a failure). If an attack roll is a critical success and would hit one of the images, one of the images is destroyed and the attack roll becomes a success against you. Once all the images are destroyed, the spell ends.</p>\n<p>@UUID[Compendium.pf2e.spell-effects.Item.0PO5mFRhh9HxGAtv]</p>"
+        },
+        "duration": {
+          "sustained": false,
+          "value": "1 minute"
+        },
+        "level": {
+          "value": 2
+        },
+        "publication": {
+          "license": "OGL",
+          "remaster": false,
+          "title": "Pathfinder Core Rulebook"
+        },
+        "range": {
+          "value": ""
+        },
+        "requirements": "",
+        "rules": [],
+        "target": {
+          "value": ""
+        },
+        "time": {
+          "value": "2"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "arcane",
+            "occult"
+          ],
+          "value": [
+            "concentrate",
+            "illusion",
+            "manipulate",
+            "visual"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 2,
+          "value": "BlasterCasting01",
+          "uses": {
+            "value": 3,
+            "max": 3
+          }
+        }
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.j8vIoIEWElvpwkcI"
+      }
+    },
+    {
+      "_id": "BlasterSpell0006",
+      "img": "systems/pf2e/icons/spells/illusory-disguise.webp",
+      "name": "Illusory Disguise (At Will)",
+      "system": {
+        "area": null,
+        "cost": {
+          "value": ""
+        },
+        "counteraction": false,
+        "damage": {},
+        "defense": null,
+        "description": {
+          "value": "<p>You create an illusion that causes the target to appear as another creature of the same body shape, and with roughly similar height (within 6 inches) and weight (within 50 pounds). The disguise is typically good enough to hide their identity, but not to impersonate a specific individual. The spell changes their appearance and voice, but not mannerisms. You can change the appearance of its clothing and worn items, such as making its armor look like a dress. Held items are unaffected, and any worn item removed from the creature returns to its true appearance.</p>\n<p>Casting <em>illusory disguise</em> counts as setting up a disguise for the @UUID[Compendium.pf2e.actionspf2e.Item.AJstokjdG6iDjVjE] use of Deception; it ignores any circumstance penalties the target might take for disguising itself as a dissimilar creature, gives a +4 status bonus to Deception checks to prevent others from seeing through the disguise, and lets the target add its level to such Deception checks even if untrained. You can Dismiss this spell.</p>\n<hr />\n<p><strong>Heightened (3rd)</strong> The target can appear as any creature of the same size, even a specific individual. You must have seen an individual to replicate its appearance, and must have heard its voice to replicate its voice.</p>\n<p><strong>Heightened (4th)</strong> You can target up to 10 willing creatures. If you target multiple creatures, you can choose a different disguise for each target, but none can impersonate a specific individual. You can Dismiss each disguise individually or all collectively.</p>\n<p><strong>Heightened (7th)</strong> As 4th, but you can choose disguises that impersonate specific individuals. You must have seen an individual to replicate its appearance, and must have heard its voice to replicate its voice.</p>\n<p>@UUID[Compendium.pf2e.spell-effects.Item.3Ktyd5F9lOPo4myk]</p>"
+        },
+        "duration": {
+          "sustained": false,
+          "value": "1 hour"
+        },
+        "level": {
+          "value": 1
+        },
+        "publication": {
+          "license": "ORC",
+          "remaster": true,
+          "title": "Pathfinder Player Core"
+        },
+        "range": {
+          "value": "30 feet"
+        },
+        "requirements": "",
+        "rules": [],
+        "target": {
+          "value": "1 willing creature"
+        },
+        "time": {
+          "value": "2"
+        },
+        "traits": {
+          "rarity": "common",
+          "traditions": [
+            "arcane",
+            "occult"
+          ],
+          "value": [
+            "concentrate",
+            "illusion",
+            "manipulate",
+            "visual"
+          ]
+        },
+        "location": {
+          "heightenedLevel": 3,
+          "value": "BlasterCasting01"
+        },
+        "slug": "illusory-disguise"
+      },
+      "type": "spell",
+      "_stats": {
+        "compendiumSource": "Compendium.pf2e.spells-srd.Item.i35dpZFI7jZcRoBo"
+      }
     }
   ],
   "system": {
@@ -469,7 +1052,7 @@
       },
       "blurb": "A theatrical artillery villain who needs every battle to applaud him.",
       "publicNotes": "<p>Blaster announces every attack as his definitive masterpiece. He craves adulation, treats followers as disposable props, and manipulates rivals into playing to his audience. His grandiosity conceals a fragile ego: defiance and public embarrassment provoke ostentatious retaliation.</p>",
-      "privateNotes": "<p>Fictional Dark Triad characterization: narcissistic entitlement, calculated manipulation, and callous exploitation. Use these as villain motives, not as a real-world diagnosis. Telegraph the three-action blast and make his attention-seeking behavior readable. Low Will (+27) lets ordinary @UUID[Compendium.pf2e.actionspf2e.Item.2u915NdUyQan6uKF]{Demoralize} and other Will-targeting tactics threaten his composure; no extra ego-vulnerability subsystem is required.</p><p>To update an existing Blaster after a module update, select his token and run @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterText00001]{Refresh Sheet Descriptions}. This replaces matched shipped ability descriptions only; it does not reset HP, stats, artwork, effects, or other items.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<h3>Charged Blast</h3>\n<p>Choose the listed action cost in the shared blast tool. Click five waypoints, starting inside Blaster's occupied square. Each of the four segments has its own 80-foot limit; the complete path can reach 320 feet. All charge levels use this same per-segment limit. The macro creates native Regions and a save/damage card; HP and condition application remain manual. Without the macro, draw the same connected path manually.</p>\n<p>All variants share one use per round, including extra actions or turns. They use saving throws, not attack rolls; multiple-attack penalty does not apply. Clear Blast removes only displayed areas, without resetting use, recharge, or root.</p>\n<h3>Full Charge</h3>\n<p>Recharge becomes ready in the firing round + the d4 result + 1. A result of 1 in round 4 is ready in round 6. Release Root does not restore a blast use or bypass recharge.</p>\n<h3>Curated Spectrum</h3>\n<p>The matching Charged Blast entry provides each spectrum's typed damage and save links. Choose one option; a condition link opens its entry but does not apply or expire it. Apply HP changes and riders manually. The selected spectrum alone supplies damage-type traits; normal immunities, weaknesses, and resistances apply.</p>\n<h3>Flash Mob</h3>\n<p>Choose Hype Fan, Ego Guard, Paparazzo, or Surprise Me in the Flash Mob picker, then place one token. All variants can use all three support options; their signature routines are thematic preferences, not restrictions. Summoning and commanding have separate once-per-round uses and each cost 1 action. Dead thralls no longer count toward the live cap or qualify for commands; remove their tokens. Automatic cleanup removes marked tokens at expiration, not immediately at 0 HP.</p>\n<p>For manual placement, use one unlinked thrall token, record its owner and summon time, and apply @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterExpiry001]{Thrall Expiration} to the thrall only. With Summons Assistant active, retain its summoner linkage.</p>\n<h3>Command Flash Mob</h3>\n<p>Apply the chosen effect to Blaster, not the thrall, with Blaster as origin. Status bonuses and temporary HP do not stack with other bonuses of the same type. Paying extra actions does not allow another command that round.</p>\n<p>Without the macro, pay the action, check ownership, range and whether the thrall is alive, then apply exactly one linked effect to Blaster. Remove an earlier copy before reapplying; track expiry manually if encounter time is not advancing.</p>\n<h3>Beam Clash</h3>\n<p>The GM selects Blaster and targets the foe before running Start Clash. Use the on-map roll buttons for the automated contest. The inline d20 is a manual fallback and does not submit to the tracker.</p>\n<p>The trigger, reaction expenditure, once-per-round use, suspension of the incoming effect, and final resolution are GM adjudication. This is a custom contest, not a counteract check. End Clash cancels an active contest without a winner or refunding its cost; the triggering effect remains for GM adjudication. It also clears an already-finished result.</p>\n<h3>Strikes</h3>\n<p>Use the native Strike controls for attacks, normal multiple-attack penalty, and critical damage. This projectile has a 60-foot range increment. It neither uses Curated Spectrum or its riders nor spends or refreshes Charged Blast or its recharge.</p><p>Use the native Strike controls for attacks, normal multiple-attack penalty, and critical damage. Reach is 5 feet. Curated Spectrum and its riders do not apply.</p>\n<h3>Support Effects</h3>\n<p>Apply to Blaster, not the thrall. Multiple copies and other status bonuses to the same statistic do not stack. This does not change DCs or Beam Clash's unmodified dice.</p>\n<p>PF2e's damage pipeline includes the damage modifier. For a raw roll outside that pipeline, add the bonus once to the whole blast before basic-save adjustments, never once per segment.</p><p>Apply to Blaster, not the thrall. Multiple copies and other status bonuses to AC do not stack.</p><p>Apply to Blaster, not the thrall. This grants temporary HP once on creation; it never refreshes automatically. A new grant costs another Command Flash Mob action. Remove the old effect before reapplying, and do not clear temporary HP belonging to another source.</p>\n<h3>Thrall Expiration</h3>\n<p>Apply only to the thrall; do not drag it onto Blaster. Runtime supplies origin and Summons Assistant linkage. The helper can delete the token when this marker is removed; its automatic expiry setting controls that path. The module separately removes its marked thralls after 60 world-time seconds, even when automatic effect removal is disabled. With no runtime, track expiry and remove the token manually. This marker grants no actions, attacks, bonuses, or replenishing resources.</p>",
+      "privateNotes": "<p>Fictional Dark Triad characterization: narcissistic entitlement, calculated manipulation, and callous exploitation. Use these as villain motives, not as a real-world diagnosis. Telegraph the three-action blast and make his attention-seeking behavior readable. Low Will (+27) lets ordinary @UUID[Compendium.pf2e.actionspf2e.Item.2u915NdUyQan6uKF]{Demoralize} and other Will-targeting tactics threaten his composure; no extra ego-vulnerability subsystem is required.</p><p>To update an existing Blaster after a module update, select his token and run @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterText00001]{Refresh Sheet Descriptions}. This replaces matched shipped ability descriptions only; it does not reset HP, stats, artwork, effects, or other items. Import a fresh Blaster from the compendium to receive the spellcasting entry and six spells; Refresh Sheet Descriptions does not add them.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<p>The GM can invoke Flash Mob, Command Flash Mob, and Charged Blast at any time, with or without combat. These macros do not enforce turns, once-per-round limits, or recharge. Adjudicate the listed action costs, frequencies, and recharge. The macros still enforce the three-living-thrall cap and their ranges.</p>\n<h3>Charged Blast</h3>\n<p>Choose the listed action cost in the shared blast tool, then click a direction from Blaster to place one straight 120-foot beam. One and two actions use a one-square width; three actions use a three-square full width. The macro creates a native Region and a save/damage card; HP and condition application remain manual.</p>\n<p>Adjudicate the shared once-per-round use across all variants, including extra actions or turns. They use saving throws, not attack rolls; multiple-attack penalty does not apply. Clear Blast removes only displayed areas; it does not release the root or change the printed frequency or recharge.</p>\n<h3>Grand Finale</h3>\n<p>Use Mark Grand Finale at the start of a round. Click eight points, starting in Blaster's space; every leg can be up to 120 feet. Amber warning Regions are harmless and visible to the party for that round. The active GM fires the stored path at the next global round boundary, not on Blaster's turn. Movement after marking does not move or retarget it. A new completed mark replaces only this Blaster's prior finale; cancelling placement leaves the old one intact.</p>\n<p>Outside combat, the path is manual-only. Fire Grand Finale provides a GM override at any time; Clear Grand Finale cancels the saved path and removes its warning/fired Regions. Clear Blast Areas handles only immediate charged beams. The selected spectrum is fixed when marking. Firing posts one save/damage card and does not change HP or apply conditions automatically. It does not spend a Charged Blast use, impose its root, or roll its recharge.</p>\n<h3>Full Charge</h3>\n<p>Track recharge manually: it becomes ready in the firing round + the d4 result + 1. A result of 1 in round 4 is ready in round 6. The three-action blast prevents voluntary movement until the start of Blaster's next turn, even when fired off-turn. Release Root clears only this movement restriction.</p>\n<h3>Curated Spectrum</h3>\n<p>The matching Charged Blast entry provides each spectrum's typed damage and save links. Choose one option; a condition link opens its entry but does not apply or expire it. Apply HP changes and riders manually. The selected spectrum alone supplies damage-type traits; normal immunities, weaknesses, and resistances apply.</p>\n<h3>Flash Mob</h3>\n<p>Choose Hype Fan, Ego Guard, Paparazzo, or Surprise Me in the Flash Mob picker, then place one token. All variants can use all three support options; their signature routines are thematic preferences, not restrictions. Summoning and commanding retain separate once-per-round frequencies and each cost 1 action, adjudicated by the GM. Dead thralls no longer count toward the live cap or qualify for commands; remove their tokens. Automatic cleanup removes marked tokens at expiration, not immediately at 0 HP.</p>\n<p>For manual placement, use one unlinked thrall token, record its owner and summon time, and apply @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterExpiry001]{Thrall Expiration} to the thrall only. With Summons Assistant active, retain its summoner linkage.</p>\n<h3>Command Flash Mob</h3>\n<p>Apply the chosen effect to Blaster, not the thrall, with Blaster as origin. Status bonuses and temporary HP do not stack with other bonuses of the same type. The GM adjudicates the once-per-round frequency. Command support ends at the start of Blaster's next turn, even later in the same round after an off-turn command, or after 6 world-time seconds without combat.</p>\n<p>Without the macro, pay the action, check ownership, range and whether the thrall is alive, then apply exactly one linked effect to Blaster. Remove an earlier copy before reapplying; track expiry manually if encounter time is not advancing.</p>\n<h3>Beam Clash</h3>\n<p>The GM selects Blaster and targets the foe before running Start Clash. Use the on-map roll buttons for the automated contest. The inline d20 is a manual fallback and does not submit to the tracker.</p>\n<p>The trigger, reaction expenditure, once-per-round use, suspension of the incoming effect, and final resolution are GM adjudication. This is a custom contest, not a counteract check. End Clash cancels an active contest without a winner or refunding its cost; the triggering effect remains for GM adjudication. It also clears an already-finished result.</p>\n<h3>Innate Spells</h3>\n<p>Use the native spell controls (DC 40, spell attack +32). Illusory Disguise is at will; click its spell icon to post the native spell card without spending a use. PF2e 8.7.0 labels this at-will spell but its Cast button still expends an innate use. Hypnotize remains rank 3: it has no incapacitation trait or heightened benefit. Suggestion is rank 9 and retains its heightened multi-target option.</p>\n<h3>Strikes</h3>\n<p>Use the native Strike controls for attacks, normal multiple-attack penalty, and critical damage. This projectile has a 60-foot range increment. It neither uses Curated Spectrum or its riders nor spends or refreshes Charged Blast or its recharge.</p><p>Use the native Strike controls for attacks, normal multiple-attack penalty, and critical damage. Reach is 5 feet. Curated Spectrum and its riders do not apply.</p>\n<h3>Support Effects</h3>\n<p>Apply to Blaster, not the thrall. Multiple copies and other status bonuses to the same statistic do not stack. This does not change DCs or Beam Clash's unmodified dice.</p>\n<p>PF2e's damage pipeline includes the damage modifier. For a raw roll outside that pipeline, add the bonus once to the whole blast before basic-save adjustments, never once per segment.</p><p>Apply to Blaster, not the thrall. Multiple copies and other status bonuses to AC do not stack.</p><p>Apply to Blaster, not the thrall. This grants temporary HP once on creation; it never refreshes automatically. A new grant costs another Command Flash Mob action. Remove the old effect before reapplying, and do not clear temporary HP belonging to another source.</p>\n<h3>Thrall Expiration</h3>\n<p>Apply only to the thrall; do not drag it onto Blaster. Runtime supplies origin and Summons Assistant linkage. The helper can delete the token when this marker is removed; its automatic expiry setting controls that path. The module separately removes its marked thralls after 60 world-time seconds, even when automatic effect removal is disabled. With no runtime, track expiry and remove the token manually. This marker grants no actions, attacks, bonuses, or replenishing resources.</p>",
       "publication": {
         "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
         "authors": "",

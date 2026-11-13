@@ -23,6 +23,6 @@ export function thrallPickerContent(moduleId: string): string {
       </label>`).join("")}
     </div>
     <label class="aha-thrall-random"><input type="radio" name="variant" value="random"> Surprise me — randomly choose one of the three</label>
-    <p class="aha-thrall-limits">1 action · 1 summon per round · 3 living thralls maximum · 1 HP · lasts 1 minute.<br>All three can Inspire, Guard, or Bolster when commanded; choosing a look grants no free support.</p>
+    <p class="aha-thrall-limits">GM tool: usable at any time, in or out of combat. Action costs and frequency are GM-adjudicated.<br>3 living thralls maximum · 1 HP · lasts 1 minute.<br>All three can Inspire, Guard, or Bolster when commanded; choosing a look grants no free support.</p>
   </div>`;
 }

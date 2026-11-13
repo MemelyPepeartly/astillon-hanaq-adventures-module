@@ -2,30 +2,35 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate } from "node:timers/promises";
 import { JSDOM } from "jsdom";
-import { BLAST_TIERS, lineShapes, isBlastRooted } from "../dist/scripts/features/blaster-model.js";
+import { BLAST_TIERS, FINALE, lineShapes, isBlastRooted } from "../dist/scripts/features/blaster-model.js";
 import { createBlasterFeature } from "../dist/scripts/features/blaster.js";
 
 const MODULE = "astillon-hanaq-adventures-module";
-const points = [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 250, y: 150 }, { x: 350, y: 150 }];
-const maximumLegPoints = [{ x: 50, y: 50 }, { x: 1650, y: 50 }, { x: 50, y: 50 }, { x: 1650, y: 50 }, { x: 50, y: 50 }];
-test("five waypoints produce four native line shapes with three-square full width", () => {
-  const shapes = lineShapes(points, 100, 3);
-  assert.equal(shapes.length, 4);
-  assert.deepEqual(shapes.map(s => s.width), [300, 300, 300, 300]);
-  assert.deepEqual(shapes.map(s => s.rotation), [0, 90, 0, 0]);
-  assert.ok(shapes.every(s => s.length === 100 && s.type === "line"));
-  assert.throws(() => lineShapes([points[0], ...points.slice(0, 4)], 100, 1), /different squares/);
-  assert.throws(() => lineShapes(points.slice(0, 4), 100, 1), /five/);
+const origin = { x: 50, y: 50 };
+const aim = { x: 150, y: 50 };
+const points = [origin, aim, { x: 150, y: 150 }, { x: 250, y: 150 }, { x: 350, y: 150 }, { x: 350, y: 250 }, { x: 450, y: 250 }, { x: 550, y: 250 }];
+
+test("two through eight waypoints retain native line geometry and full three-square width", () => {
+  for (let count = 2; count <= 8; count++) {
+    const shapes = lineShapes(points.slice(0, count), 100, 3);
+    assert.equal(shapes.length, count - 1);
+    assert.deepEqual(shapes.map(s => s.width), Array(count - 1).fill(300));
+    assert.deepEqual(shapes.map(s => s.rotation), [0, 90, 0, 0, 90, 0, 0].slice(0, count - 1));
+    assert.ok(shapes.every(s => s.length === 100 && s.type === "line"));
+  }
+  assert.throws(() => lineShapes([origin, origin], 100, 1), /different squares/);
+  assert.throws(() => lineShapes([origin], 100, 1));
+  assert.throws(() => lineShapes([...points, { x: 650, y: 250 }], 100, 1));
   assert.throws(() => lineShapes([{ x: NaN, y: 0 }, ...points.slice(1)], 100, 1), /Invalid/);
-  assert.equal(BLAST_TIERS[2].dice, 9);
 });
 
-test("all charge tiers allow 80 feet per leg while retaining damage and width", () => {
+test("normal tiers use 120 feet with unchanged damage and width, and Grand Finale has separate constants", () => {
   assert.deepEqual(Object.values(BLAST_TIERS).map(({ range, dice, width }) => ({ range, dice, width })), [
-    { range: 80, dice: 4, width: 1 },
-    { range: 80, dice: 9, width: 1 },
-    { range: 80, dice: 18, width: 3 },
+    { range: 120, dice: 4, width: 1 },
+    { range: 120, dice: 9, width: 1 },
+    { range: 120, dice: 18, width: 3 },
   ]);
+  assert.deepEqual(FINALE, { name: "Grand Finale", pointCount: 8, range: 120, width: 3, dice: 24, dc: 40 });
 });
 
 test("root survives intervening turns and round boundary but ends on next own turn", () => {
@@ -51,22 +56,25 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
   const flags = { blasterRole: "blaster" };
   const tokenFlags = {};
   const actor = {
-    uuid: "Actor.blaster", getFlag: (_m, key) => flags[key],
+    uuid: "Actor.blaster", isOwner: true, getFlag: (_m, key) => flags[key],
     setFlag: async (_m, key, value) => { flags[key] = value; },
     getRollData: () => ({}),
   };
   const tokenDoc = {
-    id: "blaster", x: 0, y: 0, width: 1, height: 1, actor,
+    id: "blaster", x: 0, y: 0, width: 1, height: 1, actor, isOwner: true,
+    getCenterPoint() { return { x: this.x + this.width * canvas.grid.size / 2, y: this.y + this.height * canvas.grid.size / 2 }; },
     getFlag: (_m, key) => tokenFlags[key],
     setFlag: async (_m, key, value) => { tokenFlags[key] = value; },
     unsetFlag: async (_m, key) => { delete tokenFlags[key]; },
   };
-  const token = { id: "blaster", name: "Blaster", actor, document: tokenDoc };
+  const token = { id: "blaster", name: "Blaster", actor, document: tokenDoc, get center() { return tokenDoc.getCenterPoint(); } };
+  let regionId = 0;
   const scene = {
     id: "scene", tokens: new Map([[token.id, tokenDoc]]), regions,
+    getFlag: () => undefined,
     createEmbeddedDocuments: async (type, sources) => {
       assert.equal(type, "Region");
-      const docs = sources.map((data, i) => ({ ...data, id: String(i), getFlag: (_m, key) => data.flags[MODULE]?.[key] }));
+      const docs = sources.map(data => ({ ...data, id: String(regionId++), getFlag: (_m, key) => data.flags[MODULE]?.[key] }));
       regions.push(...docs); return docs;
     },
     deleteEmbeddedDocuments: async (_type, ids) => { for (const id of ids) { const i = regions.findIndex(r => r.id === id); if (i >= 0) regions.splice(i, 1); } },
@@ -92,7 +100,7 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
       app: { canvas: view, screen: { width: 2000, height: 1000 } },
       stage: { toGlobal: p => p, toLocal: p => p, scale: { x: 1 } },
       grid: {
-        isSquare: true, size: 100, units: "ft",
+        isSquare: true, size: 100, distance: 5, units: "ft",
         getCenterPoint: p => ({ x: Math.floor(p.x / 100) * 100 + 50, y: Math.floor(p.y / 100) * 100 + 50 }),
         measurePath: path => {
           assert.equal(path.length, 2, "Measure each leg independently through the public grid API");
@@ -120,67 +128,89 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
 }
 
 for (const charge of [1, 2, 3]) {
-  test(`${charge} action tier accepts four 80-foot legs totaling 320 feet with valid hover feedback`, async t => {
-    const env = setup(t, { charge });
-    const pending = env.feature.api.blast(); await setImmediate();
-    const prompt = document.createElement("div");
-    prompt.innerHTML = env.prompts[0].content;
-    const options = [...prompt.querySelectorAll('select[name="charge"] option')];
-    assert.equal(options.length, 3);
-    assert.ok(options.every(option => option.textContent.includes("80 ft per leg")));
-    assert.match(prompt.textContent, /Five clicks create four connected legs, each up to 80 ft/);
-    env.click(maximumLegPoints[0]);
-    for (const [i, point] of maximumLegPoints.slice(1).entries()) {
-      env.move(point);
-      assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff4433");
-      assert.match(document.querySelector(".aha-blast-instructions").textContent, /80 ft per leg · Next leg: 80\/80 ft/);
-      env.click(point);
-      if (i < 3) assert.match(document.querySelector(".aha-blast-instructions").textContent, /Last leg: 80\/80 ft/);
-    }
-    await pending;
-    assert.deepEqual(env.warnings, []);
-    assert.deepEqual(env.errors, []);
-    assert.equal(env.regions.length, 4);
-    assert.deepEqual(env.regions.map(r => r.shapes[0].length / 20), [80, 80, 80, 80]);
-    assert.equal(env.regions.reduce((total, r) => total + r.shapes[0].length / 20, 0), 320);
-    assert.ok(env.measurements.length > 0);
-    assert.ok(env.measurements.every(path => path.length === 2));
-    assert.ok(env.regions.every(r => r.shapes[0].width === (charge === 3 ? 300 : 100)));
-    assert.equal(env.messages.length, 1);
-    assert.ok(env.messages[0].content.includes(`${BLAST_TIERS[charge].dice}d6[fire]`));
-    assert.equal(env.flags.blastUse.round, 1);
-    assert.equal(env.flags.blastUse.readyRound, charge === 3 ? 4 : undefined);
-    assert.equal(env.tokenFlags.blastRoot?.round, charge === 3 ? 1 : undefined);
-  });
+  for (const [distance, target] of [["near", aim], ["beyond 120 feet", { x: 3650, y: 50 }]]) {
+    test(`${charge} action tier auto-originates one fixed 120-foot line from a single ${distance} aim click`, async t => {
+      const env = setup(t, { charge });
+      const pending = env.feature.api.blast(); await setImmediate();
+      const prompt = document.createElement("div");
+      prompt.innerHTML = env.prompts[0].content;
+      const options = [...prompt.querySelectorAll('select[name="charge"] option')];
+      assert.equal(options.length, 3);
+      assert.ok(options.every(option => option.textContent.includes("120 ft")));
+      assert.doesNotMatch(prompt.textContent, /five clicks|four connected legs|80 ft/i);
+      env.move(target);
+      const preview = document.querySelector(".aha-blast-preview polyline");
+      assert.equal(preview.getAttribute("stroke"), "#ff4433");
+      assert.equal(Number(preview.getAttribute("stroke-width")), charge === 3 ? 300 : 100);
+      const previewPoints = preview.getAttribute("points").trim().split(/\s+/).map(point => point.split(",").map(Number));
+      assert.deepEqual(previewPoints, [[50, 50], [2450, 50]]);
+      assert.equal(env.regions.length, 0);
+      env.click(target);
+      await pending;
+      assert.deepEqual(env.warnings, []);
+      assert.deepEqual(env.errors, []);
+      assert.equal(env.regions.length, 1);
+      const shape = env.regions[0].shapes[0];
+      assert.equal(shape.length, 120 * canvas.grid.size / canvas.grid.distance);
+      assert.equal(shape.width, charge === 3 ? 300 : 100);
+      assert.equal(shape.rotation, 0);
+      assert.equal(env.messages.length, 1);
+      assert.ok(env.messages[0].content.includes(`${BLAST_TIERS[charge].dice}d6[fire]`));
+      assert.match(env.messages[0].content, /120(?: ft|-foot)/);
+      assert.equal(env.flags.blastUse.round, 1);
+      assert.equal(env.flags.blastUse.readyRound, charge === 3 ? 4 : undefined);
+      assert.equal(env.tokenFlags.blastRoot?.round, charge === 3 ? 1 : undefined);
+      assert.equal(document.querySelector(".aha-blast-preview"), null);
+      assert.equal(document.querySelector(".aha-blast-instructions"), null);
+    });
+  }
+}
 
-  test(`${charge} action tier rejects an 85-foot last leg even after three short legs`, async t => {
-    const env = setup(t, { charge });
+for (const distance of [5, 10]) {
+  test(`diagonal aiming uses fixed pixel length on a ${distance}-foot grid independently of path measurement`, async t => {
+    const env = setup(t);
+    env.globals.canvas.grid.distance = distance;
+    env.globals.canvas.grid.measurePath = () => ({ distance: 180 });
     const pending = env.feature.api.blast(); await setImmediate();
-    for (const point of points.slice(0, 4)) env.click(point);
-    const tooFar = { x: 1950, y: 150 };
-    env.move(tooFar);
-    assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff2222");
-    assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 85\/80 ft/);
-    env.click(tooFar);
-    assert.equal(env.warnings.at(-1), "Each leg cannot exceed 80 ft.");
-    assert.match(document.querySelector(".aha-blast-instructions").textContent, /4\/5 points/);
-    assert.equal(env.regions.length, 0);
-    assert.equal(env.flags.blastUse, undefined);
-    assert.equal(env.tokenFlags.blastRoot, undefined);
-    env.click(points[4]); await pending;
+    env.click({ x: 150, y: 150 });
+    await pending;
     assert.deepEqual(env.errors, []);
-    assert.equal(env.regions.length, 4);
+    assert.deepEqual(env.warnings, []);
+    assert.equal(env.regions.length, 1);
+    const shape = env.regions[0].shapes[0];
+    assert.ok(Math.abs(shape.length - 120 * 100 / distance) < 0.000001);
+    assert.equal(shape.rotation, 45);
+    assert.equal(shape.width, 300);
   });
 }
 
-test("placement commits exactly four regions, one chat card and shared cooldown; clear removes only own areas", async t => {
+for (const centerSource of ["token", "document fallback"]) {
+  test(`normal aim starts at the selected large token's ${centerSource} center`, async t => {
+    const env = setup(t, { charge: 1 });
+    const token = env.globals.canvas.tokens.controlled[0];
+    Object.assign(token.document, { x: 200, y: 400, width: 2, height: 2 });
+    if (centerSource === "document fallback") delete token.center;
+    else Object.defineProperty(token, "center", { value: { x: 325, y: 525 } });
+    const center = centerSource === "token" ? { x: 325, y: 525 } : { x: 300, y: 500 };
+    const pending = env.feature.api.blast(); await setImmediate();
+    env.move({ x: 650, y: 550 });
+    const previewPoints = document.querySelector(".aha-blast-preview polyline").getAttribute("points").trim().split(/\s+/).map(point => point.split(",").map(Number));
+    assert.deepEqual(previewPoints[0], [center.x, center.y]);
+    assert.ok(Math.abs(Math.hypot(previewPoints[1][0] - center.x, previewPoints[1][1] - center.y) - 2400) < 0.000001);
+    env.click({ x: 650, y: 550 });
+    await pending;
+    assert.deepEqual(env.errors, []);
+    assert.equal(env.regions.length, 1);
+  });
+}
+
+test("placement commits one region, one chat card and recharge metadata; clear removes only own blast areas", async t => {
   const env = setup(t, { mode: "humiliation" });
   const pending = env.feature.api.blast(); await setImmediate();
-  env.click(points[0]); assert.equal(env.regions.length, 0);
-  for (const p of points.slice(1)) env.click(p);
+  env.click(aim);
   await pending;
   assert.deepEqual(env.errors, []);
-  assert.equal(env.regions.length, 4);
+  assert.equal(env.regions.length, 1);
   assert.ok(env.regions.every(r => r.shapes[0].width === 300 && r.flags.pf2e.areaShape === "line"));
   assert.equal(env.messages.length, 1);
   assert.match(env.messages[0].content, /16d6\[mental\]/);
@@ -189,48 +219,28 @@ test("placement commits exactly four regions, one chat card and shared cooldown;
   assert.match(env.messages[0].content, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.e1XGnhKNSQIm5IXg\]\{Stupefied 1\}/);
   assert.equal(env.flags.blastUse.readyRound, 4);
   assert.equal(env.tokenFlags.blastRoot.round, 1);
+  assert.match(env.messages[0].content, /recharge \(reference\): 2 full rounds; available round 4/);
+  assert.match(env.messages[0].content, /Adjudicate recharge from the sheet/);
   env.regions.push({ id: "other", getFlag: () => ({ tokenId: "other-token" }) });
+  env.regions.push({ id: "finale", getFlag: (_m, key) => key === "blast" ? undefined : { tokenId: "blaster" } });
   await env.feature.api.clearBlast();
-  assert.deepEqual(env.regions.map(r => r.id), ["other"]);
-  await env.feature.api.blast();
-  assert.match(env.errors.at(-1), /already been used/);
+  assert.deepEqual(env.regions.map(r => r.id), ["other", "finale"]);
+  const repeated = env.feature.api.blast(); await setImmediate();
+  env.click(aim);
+  await repeated;
+  assert.deepEqual(env.errors, []);
+  assert.equal(env.regions.length, 3);
+  assert.equal(env.messages.length, 2);
 });
 
-test("cancel and undo leave no templates, cooldown or root and remove listeners", async t => {
-  const env = setup(t);
-  const pending = env.feature.api.blast(); await setImmediate();
-  env.click(maximumLegPoints[0]); env.click(maximumLegPoints[1]);
-  env.move({ x: 1750, y: 50 });
-  assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 5\/80 ft/);
-  env.key("Backspace");
-  assert.match(document.querySelector(".aha-blast-instructions").textContent, /1\/5/);
-  assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 85\/80 ft/);
-  assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff2222");
-  env.move(maximumLegPoints[1]);
-  assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff4433");
-  env.key("Backspace");
-  assert.match(document.querySelector(".aha-blast-instructions").textContent, /0\/5.*Click Blaster's square first/);
-  env.click(maximumLegPoints[1]);
-  assert.match(env.warnings.at(-1), /first waypoint/);
-  assert.match(document.querySelector(".aha-blast-instructions").textContent, /0\/5/);
-  env.click(maximumLegPoints[0]); env.click(maximumLegPoints[1]);
-  env.key("Escape"); await pending;
-  assert.equal(env.regions.length, 0);
-  assert.equal(env.flags.blastUse, undefined);
-  assert.equal(env.tokenFlags.blastRoot, undefined);
-  assert.equal(document.querySelector(".aha-blast-preview"), null);
-  assert.equal(document.querySelector(".aha-blast-instructions"), null);
-  assert.equal(env.callbacks.get("canvasTearDown").length, 0);
-  assert.equal(env.callbacks.get("canvasPan").length, 0);
-});
-
-for (const cancel of ["right-click", "api"]) {
-  test(`${cancel} cancels a path exceeding 80 feet in total without spending the blast`, async t => {
+for (const cancel of ["Escape", "right-click", "api"]) {
+  test(`${cancel} cancels an aimed normal blast without metadata and removes preview listeners`, async t => {
     const env = setup(t);
     const pending = env.feature.api.blast(); await setImmediate();
-    for (const point of maximumLegPoints.slice(0, 3)) env.click(point);
-    assert.match(document.querySelector(".aha-blast-instructions").textContent, /3\/5/);
-    if (cancel === "right-click") env.click(maximumLegPoints[2], 2);
+    env.move({ x: 450, y: 350 });
+    assert.ok(document.querySelector(".aha-blast-preview"));
+    if (cancel === "Escape") env.key("Escape");
+    else if (cancel === "right-click") env.click(aim, 2);
     else env.feature.api.cancelPlacement();
     await pending;
     assert.deepEqual(env.errors, []);
@@ -241,33 +251,173 @@ for (const cancel of ["right-click", "api"]) {
     assert.equal(document.querySelector(".aha-blast-instructions"), null);
     assert.equal(env.callbacks.get("canvasTearDown").length, 0);
     assert.equal(env.callbacks.get("canvasPan").length, 0);
+    env.click(aim);
+    assert.equal(env.regions.length, 0);
   });
 }
 
-test("invalid origin and overlong leg are rejected; scene teardown cancels placement", async t => {
+test("clicking the auto-origin does not commit a zero-length blast; scene teardown cancels aiming", async t => {
   const env = setup(t, { charge: 1 });
   const pending = env.feature.api.blast(); await setImmediate();
-  env.click(points[2]); assert.match(env.warnings.at(-1), /first waypoint/);
-  env.click(points[0]); env.click({ x: 1950, y: 50 });
-  assert.match(env.warnings.at(-1), /cannot exceed/);
+  env.click(origin);
+  assert.ok(document.querySelector(".aha-blast-preview"));
+  assert.equal(env.regions.length, 0);
   env.callbacks.get("canvasTearDown")[0](); await pending;
   assert.equal(env.regions.length, 0);
+  assert.equal(env.flags.blastUse, undefined);
+  assert.equal(document.querySelector(".aha-blast-preview"), null);
 });
 
-test("changed turn aborts commit; non-GM cannot create blast", async t => {
+for (const charge of [1, 2, 3]) {
+  for (const timing of ["off turn", "no combat"]) {
+    test(`${charge} action blast can be used repeatedly ${timing}, ignoring previous use and recharge`, async t => {
+      const env = setup(t, { charge });
+      if (timing === "no combat") env.globals.game.combat = null;
+      else env.combat.combatant.tokenId = "player";
+      env.flags.blastUse = { combatId: "combat", round: 1, rechargeCombatId: "combat", readyRound: 99, readyTime: 9999 };
+      for (let invocation = 1; invocation <= 2; invocation++) {
+        const pending = env.feature.api.blast(); await setImmediate();
+        assert.ok(document.querySelector(".aha-blast-preview"));
+        env.click(aim);
+        await pending;
+        assert.deepEqual(env.errors, []);
+        assert.equal(env.regions.length, invocation);
+        assert.equal(env.messages.length, invocation);
+      }
+      assert.equal(env.flags.blastUse.combatId, timing === "no combat" ? null : "combat");
+      assert.ok(env.regions.every(r => r.shapes[0].width === (charge === 3 ? 300 : 100)));
+      assert.match(env.prompts[0].content, /Adjudicate action costs, frequency, and recharge from the sheet/);
+      if (charge === 3) {
+        assert.equal(env.tokenFlags.blastRoot.combatId, timing === "no combat" ? null : "combat");
+        assert.equal(isBlastRooted(env.tokenFlags.blastRoot, env.globals.game.combat, "blaster", 0), true);
+        if (timing === "no combat") assert.doesNotMatch(env.messages[0].content, /available round/);
+      } else assert.equal(env.tokenFlags.blastRoot, undefined);
+    });
+  }
+}
+
+for (const change of ["turn", "round", "ended", "deleted", "replaced"]) {
+  for (const phase of ["picking", "recharge roll"]) {
+    test(`combat ${change} during ${phase} allows completion with current commit metadata`, async t => {
+      const env = setup(t);
+      let finishRoll;
+      if (phase === "recharge roll") {
+        env.globals.foundry.dice.Roll = class {
+          async evaluate() { await new Promise(resolve => { finishRoll = resolve; }); this.total = 2; return this; }
+        };
+      }
+      const pending = env.feature.api.blast(); await setImmediate();
+      if (phase === "recharge roll") { env.click(aim); await setImmediate(); }
+      if (change === "turn") { env.combat.turn = 1; env.combat.combatant.tokenId = "player"; }
+      if (change === "round") { env.combat.round = 2; env.combat.turn = 1; env.combat.combatant.tokenId = "player"; }
+      if (change === "ended") env.combat.started = false;
+      if (change === "deleted") env.globals.game.combat = null;
+      if (change === "replaced") env.globals.game.combat = { ...env.combat, id: "new-combat", round: 7, turn: 2 };
+      env.globals.game.time.worldTime = 42;
+      if (phase === "recharge roll") finishRoll();
+      else env.click(aim);
+      await pending;
+      assert.deepEqual(env.errors, []);
+      assert.equal(env.regions.length, 1);
+      assert.equal(env.messages.length, 1);
+      const current = env.globals.game.combat?.started ? env.globals.game.combat : null;
+      assert.deepEqual(env.flags.blastUse, {
+        combatId: current?.id ?? null, round: current?.round ?? 0, rechargeCombatId: current?.id ?? null,
+        readyRound: (current?.round ?? 0) + 3, readyTime: 60,
+      });
+      assert.deepEqual(env.tokenFlags.blastRoot, {
+        combatId: current?.id ?? null, round: current?.round ?? 0, turn: current?.turn ?? 0, expires: 48,
+      });
+      assert.ok(env.regions.every(r => r.shapes[0].width === 300 && r.flags.pf2e.areaShape === "line"));
+    });
+  }
+}
+
+const invalidations = [
+  ["GM authority loss", env => { env.globals.game.user.isGM = false; }, /Only the GM/],
+  ["active GM change", env => { env.globals.game.users.activeGM.id = "other-gm"; }, /active GM/],
+  ["token ownership loss", env => { env.scene.tokens.get("blaster").isOwner = false; }, /must own/],
+  ["actor ownership loss", env => { env.scene.tokens.get("blaster").actor.isOwner = false; }, /must own/],
+  ["selection change", env => { env.globals.canvas.tokens.controlled = [{ ...env.globals.canvas.tokens.controlled[0], id: "another-blaster" }]; }, /scene or selected token changed/],
+  ["token movement", env => { env.scene.tokens.get("blaster").x = 100; }, /scene or selected token changed/],
+  ["token deletion", env => { env.scene.tokens.delete("blaster"); }, /scene or selected token changed/],
+  ["scene change", env => { env.globals.canvas.scene = { id: "another-scene" }; }, /scene or selected token changed/],
+];
+
+for (const [label, invalidate, expected] of invalidations) {
+  for (const phase of ["dialog", "placement", "recharge roll"]) {
+    test(`${label} during ${phase} still aborts without spending or creating a blast`, async t => {
+      const env = setup(t);
+      t.mock.method(console, "error", () => {});
+      let finishDialog, finishRoll;
+      if (phase === "dialog") env.globals.foundry.applications.api.DialogV2.prompt = () => new Promise(resolve => { finishDialog = resolve; });
+      if (phase === "recharge roll") env.globals.foundry.dice.Roll = class {
+        async evaluate() { await new Promise(resolve => { finishRoll = resolve; }); this.total = 2; return this; }
+      };
+      const pending = env.feature.api.blast(); await setImmediate();
+      if (phase === "recharge roll") { env.click(aim); await setImmediate(); }
+      invalidate(env);
+      if (phase === "dialog") finishDialog({ charge: 3, mode: "fire" });
+      else if (phase === "recharge roll") finishRoll();
+      else env.click(aim);
+      await pending;
+      assert.match(env.errors.at(-1), expected);
+      assert.equal(env.regions.length, 0);
+      assert.equal(env.messages.length, 0);
+      assert.equal(env.flags.blastUse, undefined);
+      assert.equal(env.tokenFlags.blastRoot, undefined);
+      assert.equal(document.querySelector(".aha-blast-preview"), null);
+    });
+  }
+}
+
+test("non-GM cannot open the blast dialog", async t => {
+  const env = setup(t, { isGM: false });
+  t.mock.method(console, "error", () => {});
+  await env.feature.api.blast();
+  assert.match(env.errors.at(-1), /Only the GM/);
+  assert.equal(env.prompts.length, 0);
+});
+
+test("busy guard rejects concurrent invocation but releases after cancellation", async t => {
   const env = setup(t);
   const pending = env.feature.api.blast(); await setImmediate();
-  for (const p of points.slice(0, 4)) env.click(p);
-  env.combat.turn = 1; env.click(points[4]); await pending;
-  assert.match(env.errors.at(-1), /turn changed/);
+  await env.feature.api.blast();
+  assert.match(env.warnings.at(-1), /Finish or cancel/);
+  assert.equal(env.prompts.length, 1);
+  env.feature.api.cancelPlacement(); await pending;
+  const retry = env.feature.api.blast(); await setImmediate();
+  env.click(aim);
+  await retry;
+  assert.equal(env.regions.length, 1);
+  assert.deepEqual(env.errors, []);
+});
+
+test("normal blasts and Finale share the picker busy guard and cancel API", async t => {
+  const env = setup(t);
+  const api = env.feature.api;
+  for (const name of ["markFinale", "fireFinale", "clearFinale"]) assert.equal(typeof api[name], "function");
+  const marked = api.markFinale(); await setImmediate();
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /0\/8 points/);
+  await api.blast();
+  assert.match(env.warnings.at(-1), /Finish or cancel/);
+  assert.equal(env.prompts.length, 1);
+  api.cancelPlacement();
+  assert.equal(await marked, false);
   assert.equal(env.regions.length, 0);
-  env.globals.game.user.isGM = false;
-  await env.feature.api.blast(); assert.match(env.errors.at(-1), /Only the GM/);
+  assert.equal(document.querySelector(".aha-blast-preview"), null);
+  const normal = api.blast(); await setImmediate();
+  assert.equal(await api.markFinale(), false);
+  assert.match(env.warnings.at(-1), /Finish or cancel/);
+  assert.equal(env.prompts.length, 2);
+  env.click(aim); await normal;
+  assert.equal(env.regions.length, 1);
+  assert.deepEqual(env.errors, []);
 });
 
 test("actual movement hooks prevent rooted movement, allow GM forced moves, and clear on next own turn", async t => {
   const env = setup(t);
-  env.feature.ready(); await setImmediate();
+  await env.feature.ready();
   env.tokenFlags.blastRoot = { combatId: "combat", round: 1, turn: 0, expires: 6 };
   const token = env.scene.tokens.get("blaster");
   const preMove = env.callbacks.get("preMoveToken").at(-1);
@@ -287,14 +437,39 @@ test("actual movement hooks prevent rooted movement, allow GM forced moves, and 
 
 test("failed bookkeeping rolls back only just-created areas and never leaves Blaster rooted", async t => {
   const env = setup(t);
+  t.mock.method(console, "error", () => {});
   env.scene.tokens.get("blaster").actor.setFlag = async () => { throw new Error("simulated failed actor write"); };
   const pending = env.feature.api.blast(); await setImmediate();
-  for (const p of points) env.click(p);
+  env.click(aim);
   await pending;
   assert.equal(env.regions.length, 0);
   assert.equal(env.tokenFlags.blastRoot, undefined);
   assert.equal(env.messages.length, 0);
   assert.match(env.errors.at(-1), /failed actor write/);
+});
+
+test("failed repeated blast preserves the previous root, use metadata and areas", async t => {
+  const env = setup(t);
+  t.mock.method(console, "error", () => {});
+  const first = env.feature.api.blast(); await setImmediate();
+  env.click(aim);
+  await first;
+  const previousRoot = structuredClone(env.tokenFlags.blastRoot);
+  const previousUse = structuredClone(env.flags.blastUse);
+  const previousRegions = [...env.regions];
+  env.scene.tokens.get("blaster").actor.setFlag = async () => { throw new Error("simulated failed actor write"); };
+  env.combat.turn = 1;
+  env.combat.combatant.tokenId = "player";
+  env.globals.game.time.worldTime = 3;
+  const repeated = env.feature.api.blast(); await setImmediate();
+  env.click(aim);
+  await repeated;
+  assert.match(env.errors.at(-1), /failed actor write/);
+  assert.deepEqual(env.regions, previousRegions);
+  assert.deepEqual(env.tokenFlags.blastRoot, previousRoot);
+  assert.deepEqual(env.flags.blastUse, previousUse);
+  assert.equal(isBlastRooted(env.tokenFlags.blastRoot, env.combat, "blaster", 3), true);
+  assert.equal(env.messages.length, 1);
 });
 
 test("refresh updates only matched ability descriptions, preserving actor state and custom items", async t => {

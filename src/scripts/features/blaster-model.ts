@@ -1,11 +1,12 @@
 export type Point = { x: number; y: number };
 export type Charge = 1 | 2 | 3;
-/** Range limits each of the four legs between five waypoints independently. */
+/** Immediate blasts are straight lines of this fixed length. */
 export const BLAST_TIERS = {
-  1: { name: "Snapshot", dice: 4, range: 80, width: 1 },
-  2: { name: "Spotlight", dice: 9, range: 80, width: 1 },
-  3: { name: "Standing Ovation", dice: 18, range: 80, width: 3 },
+  1: { name: "Snapshot", dice: 4, range: 120, width: 1 },
+  2: { name: "Spotlight", dice: 9, range: 120, width: 1 },
+  3: { name: "Standing Ovation", dice: 18, range: 120, width: 3 },
 } as const;
+export const FINALE = { name: "Grand Finale", pointCount: 8, range: 120, width: 3, dice: 24, dc: 40 } as const;
 export const BLAST_MODES = {
   fire: { label: "Fire", damage: "fire", save: "reflex", penalty: 0, color: "#ff4433", rider: "" },
   cold: { label: "Cold", damage: "cold", save: "reflex", penalty: 0, color: "#55ccff", rider: "" },
@@ -18,8 +19,8 @@ export type BlastMode = keyof typeof BLAST_MODES;
 
 /** Pixels throughout: V14 LineShapeData dimensions are pixels, not scene distance units. */
 export function lineShapes(points: Point[], gridSize: number, width: number) {
-  if (points.length !== 5 || !Number.isFinite(gridSize) || gridSize <= 0 || ![1, 3].includes(width)) {
-    throw new Error("A blast needs five waypoints and a valid square grid.");
+  if (points.length < 2 || points.length > 8 || !Number.isFinite(gridSize) || gridSize <= 0 || ![1, 3].includes(width)) {
+    throw new Error("A blast needs two to eight waypoints and a valid square grid.");
   }
   if (points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) throw new Error("Invalid waypoint.");
   return points.slice(1).map((point, i) => {

@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterWipe00001",
+  "name": "Blaster — Clear Grand Finale",
+  "type": "script",
+  "img": "icons/magic/light/beam-rays-red-small.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.clearFinale) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.clearFinale();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

@@ -381,7 +381,6 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(summoned.texture.src, selected.img);
     assert.equal(summoned.actor.getFlag(MODULE, "blasterVariant"), selected.variant);
     assert.notEqual(summoned.actor.uuid, group.specific_uuids[0]);
-    assert.equal(env.uses().flashMob, "Combat.combat1:1");
     assert.equal(env.calls.chat.some((message) => JSON.stringify(message.flags ?? {}).includes(CREATE_THRALL)), false);
     assert.equal(env.callbacks.get("createToken")?.size ?? 0, 0);
   });
@@ -420,7 +419,6 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     env.state.dialogBehavior = async () => null;
     assert.equal(await env.api.flashMob(), false);
     assert.equal(env.calls.helper.length, 0);
-    assert.equal(env.uses()?.flashMob, undefined);
   });
 
   for (const invalid of ["missing doc", "wrong role", "wrong variant"]) {
@@ -434,15 +432,13 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       if (invalid === "wrong variant") packed.flags[MODULE].blasterVariant = "hype-fan";
       assert.equal(await env.api.flashMob(), false);
       assert.equal(env.calls.helper.length, 0);
-      assert.equal(env.uses()?.flashMob, undefined);
     });
   }
 
-  for (const change of ["turn", "gm", "cap"]) {
+  for (const change of ["gm", "cap"]) {
     test(`Flash Mob revalidates ${change} after waiting on the picker`, async (t) => {
       const env = setup(t);
       env.state.dialogBehavior = async (options) => {
-        if (change === "turn") env.combat.round = 2;
         if (change === "gm") env.game.users.activeGM.id = "otherGM";
         if (change === "cap") { env.ownThrall(); env.ownThrall(); env.ownThrall(); }
         const form = globalThis.document.createElement("form");
@@ -452,11 +448,23 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       };
       assert.equal(await env.api.flashMob(), false);
       assert.equal(env.calls.helper.length, 0);
-      assert.equal(env.uses()?.flashMob, undefined);
     });
   }
 
-  for (const invalid of ["not GM", "secondary GM", "not PF2e", "no selected token", "multiple controlled tokens", "wrong role", "no combat", "other turn", "ambiguous actor tokens"]) {
+  test("Flash Mob allows round changes while the picker is open", async (t) => {
+    const env = setup(t);
+    env.state.dialogBehavior = async (options) => {
+      env.combat.round = 2;
+      const form = globalThis.document.createElement("form");
+      form.innerHTML = options.content;
+      for (const radio of form.querySelectorAll('input[type="radio"][name="variant"]')) radio.checked = radio.value === THRALLS[0].variant;
+      return options.ok.callback(new globalThis.window.Event("click"), { form });
+    };
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.calls.helper.length, 1);
+  });
+
+  for (const invalid of ["not GM", "secondary GM", "not PF2e", "no selected token", "multiple controlled tokens", "wrong role", "ambiguous actor tokens"]) {
     test(`Flash Mob refuses ${invalid} without invoking the helper`, async (t) => {
       const env = setup(t);
       if (invalid === "not GM") env.game.user.isGM = false;
@@ -465,12 +473,22 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       if (invalid === "no selected token") env.canvas.tokens.controlled = [];
       if (invalid === "multiple controlled tokens") env.canvas.tokens.controlled.push(env.token());
       if (invalid === "wrong role") env.selected.actor.flags[MODULE].blasterRole = "hype-thrall";
-      if (invalid === "no combat") env.game.combat = null;
-      if (invalid === "other turn") env.combat.combatant = { tokenId: "somebodyElse", actor: env.actor() };
       if (invalid === "ambiguous actor tokens") env.token({ actor: env.selected.actor });
       assert.equal(await env.api.flashMob(), false);
       assert.equal(env.calls.helper.length, 0);
-      assert.equal(env.uses(), undefined);
+    });
+  }
+
+  for (const mode of ["no combat", "unstarted combat", "unrelated combat"]) {
+    test(`Flash Mob can run with ${mode}`, async (t) => {
+      const env = setup(t);
+      if (mode === "no combat") env.game.combat = null;
+      if (mode === "unstarted combat") env.combat.started = false;
+      if (mode === "unrelated combat") {
+        env.combat.scene = { id: "other-scene" };
+        env.combat.sceneId = "other-scene";
+      }
+      assert.equal(await env.api.flashMob(), true);
     });
   }
 
@@ -495,10 +513,9 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     };
     assert.equal(await env.api.flashMob(), false);
     assert.equal(env.calls.helper.length, 0);
-    assert.equal(env.uses()?.flashMob, undefined);
   });
 
-  test("simultaneous clicks share a lock and the successful use remains spent across API instances", async (t) => {
+  test("simultaneous clicks share a per-Blaster lock while sequential summons remain available until cap", async (t) => {
     const env = setup(t);
     const started = deferred();
     const finish = deferred();
@@ -509,16 +526,17 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(env.calls.helper.length, 1);
     finish.resolve();
     assert.equal(await first, true);
-    assert.equal(await createBlasterSummons(MODULE).flashMob(), false);
-    assert.equal(env.calls.helper.length, 1);
+    assert.equal(await createBlasterSummons(MODULE).flashMob(), true);
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(await env.api.flashMob(), false);
+    assert.equal(env.calls.helper.length, 3);
   });
 
-  test("the helper's null-token cancellation bug releases the lock without charging the round", async (t) => {
+  test("the helper's null-token cancellation bug releases the lock", async (t) => {
     t.mock.method(console, "debug", () => {});
     const env = setup(t);
     env.state.helperBehavior = async () => { throw new TypeError("Cannot read properties of null (reading 'actor')"); };
     assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.uses()?.flashMob, undefined);
     assert.equal(env.callbacks.get("createToken")?.size ?? 0, 0);
     env.state.helperBehavior = null;
     assert.equal(await env.api.flashMob(), true);
@@ -529,12 +547,11 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     const env = setup(t);
     env.state.helperBehavior = async () => undefined;
     assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.uses()?.flashMob, undefined);
     env.state.helperBehavior = null;
     assert.equal(await env.api.flashMob(), true);
   });
 
-  test("a created token remains a spent use when helper post-processing later throws", async (t) => {
+  test("a created token is still treated as success when helper post-processing later throws", async (t) => {
     t.mock.method(console, "warn", () => {});
     const env = setup(t);
     env.state.helperBehavior = async (payload, place) => {
@@ -542,50 +559,46 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       throw new Error("Helper post-summon failed after placement");
     };
     assert.equal(await env.api.flashMob(), true);
-    assert.equal(env.uses().flashMob, "Combat.combat1:1");
-    assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.calls.helper.length, 1);
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.calls.helper.length, 2);
   });
 
-  test("failed use persistence cannot skip expiration repair or allow another summon", async (t) => {
+  test("partial helper placement repair still recognizes the placed nonce-marked token", async (t) => {
     const env = setup(t);
     let summoned;
-    env.selected.document.setFlag = async (_scope, key) => {
-      assert.equal(key, "blasterMobUses");
-      throw new Error("Use flag write failed");
-    };
     env.state.helperBehavior = async (payload) => {
       const details = payload.summonDetailsGroup[0];
       const partialActor = env.actor({ role: "hype-thrall", hp: 20 });
       mergeObject(partialActor, details.modifications);
+      delete partialActor.flags?.[HELPER];
       partialActor.system.attributes.hp.value = 20;
       summoned = env.token({ actor: partialActor, flags: details.tokenModifications.flags });
       await env.emit("createToken", summoned.document, {}, env.game.user.id);
       throw new Error("Helper failed before adding its expiration effect");
     };
-    await env.api.flashMob();
+    assert.equal(await env.api.flashMob(), true);
     assert.ok(summoned);
+    assert.equal(summoned.actor.getFlag(HELPER, "summoner")?.uuid, env.selected.actor.uuid);
+    assert.equal(summoned.actor.getFlag(MODULE, "blasterVariant"), THRALLS[0].variant);
     assert.ok(summoned.actor.items.find((item) => item.system.slug === "effect-thrall-expiration-date"));
     assert.equal(summoned.actor.system.attributes.hp.value, 1);
-    assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.calls.helper.length, 1);
+    env.state.helperBehavior = null;
+    assert.equal(await env.api.flashMob(), true);
   });
 
   test("scene token lookup recovers a successful summon when the creation hook is missed", async (t) => {
     const env = setup(t);
     env.state.emitCreation = false;
     assert.equal(await env.api.flashMob(), true);
-    assert.equal(env.uses().flashMob, "Combat.combat1:1");
   });
 
-  test("an unrelated token created during placement cannot turn cancellation into a spent use", async (t) => {
+  test("an unrelated token created during placement cannot turn cancellation into success", async (t) => {
     const env = setup(t);
     env.state.helperBehavior = async () => {
       const unrelated = env.ownThrall();
       await env.emit("createToken", unrelated.document, {}, env.game.user.id);
     };
     assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.uses()?.flashMob, undefined);
   });
 
   test("the three-thrall limit counts only live summons owned by this Blaster", async (t) => {
@@ -608,14 +621,64 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(await env.api.flashMob(), true);
   });
 
-  test("helper mutation does not contaminate the next round's effect payload", async (t) => {
+  test("helper mutation does not contaminate subsequent effect payloads", async (t) => {
     const env = setup(t);
     assert.equal(await env.api.flashMob(), true);
-    env.combat.round = 2;
     assert.equal(await env.api.flashMob(), true);
     const [first, second] = env.calls.helper;
     assert.notEqual(first.payload.summonDetailsGroup[0].itemsToAdd, second.payload.summonDetailsGroup[0].itemsToAdd);
     assert.deepEqual(second.details[0].itemsToAdd.map((item) => item.system.slug), first.details[0].itemsToAdd.map((item) => item.system.slug));
+  });
+
+  test("legacy blasterMobUses flags do not block Flash Mob or Command Mob", async (t) => {
+    const env = setup(t);
+    await env.selected.document.setFlag(MODULE, "blasterMobUses", { flashMob: "Combat.old:1", commandMob: "Combat.old:1" });
+    assert.equal(await env.api.flashMob(), true);
+    const thrall = env.ownThrall();
+    env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
+    assert.equal(await env.api.commandMob(), true);
+  });
+
+  test("Flash Mob recovery rejects foreign helper-link thralls and wrong-variant placed actors", async (t) => {
+    const env = setup(t);
+    env.state.helperBehavior = async (payload) => {
+      const details = payload.summonDetailsGroup[0];
+      const good = env.actor({ role: "hype-thrall", hp: 20 });
+      mergeObject(good, details.modifications);
+      good.flags[HELPER] = { summoner: { uuid: "Actor.foreign" } };
+      env.token({ actor: good, flags: details.tokenModifications.flags });
+
+      const wrongVariant = env.actor({ role: "hype-thrall", hp: 20 });
+      mergeObject(wrongVariant, details.modifications);
+      wrongVariant.flags[MODULE].blasterVariant = "not-a-pack-variant";
+      delete wrongVariant.flags?.[HELPER];
+      env.token({ actor: wrongVariant, flags: details.tokenModifications.flags });
+      await env.emit("createToken", wrongVariant.token, {}, env.game.user.id);
+    };
+    assert.equal(await env.api.flashMob(), false);
+    assert.equal(env.calls.warnings.some((msg) => msg.includes("No hype thrall was placed")), true);
+  });
+
+  test("Flash Mob warns as placed when helper-link repair fails but still attempts HP/expiry repair", async (t) => {
+    const env = setup(t);
+    let summoned;
+    let setFlagAttempts = 0;
+    env.state.helperBehavior = async (payload) => {
+      const details = payload.summonDetailsGroup[0];
+      const partialActor = env.actor({ role: "hype-thrall", hp: 20 });
+      mergeObject(partialActor, details.modifications);
+      delete partialActor.flags?.[HELPER];
+      partialActor.setFlag = async () => { setFlagAttempts += 1; throw new Error("setFlag failed"); };
+      summoned = env.token({ actor: partialActor, flags: details.tokenModifications.flags });
+      await env.emit("createToken", summoned.document, {}, env.game.user.id);
+      throw new Error("helper follow-up failed");
+    };
+    assert.equal(await env.api.flashMob(), true);
+    assert.ok(summoned);
+    assert.equal(setFlagAttempts > 0, true);
+    assert.equal(summoned.actor.system.attributes.hp.value, 1);
+    assert.ok(summoned.actor.items.find((item) => item.system.slug === "effect-thrall-expiration-date"));
+    assert.equal(env.calls.warnings.some((msg) => msg.includes("A thrall was placed") && msg.includes("could not be fully repaired")), true);
   });
 
   test("Command Mob chooses a specific own thrall and applies the actual Inspire effect to Blaster", async (t) => {
@@ -629,22 +692,26 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     const created = env.calls.itemCreates.find((entry) => entry.actor === env.selected.actor)?.sources[0];
     assert.ok(created);
     assert.deepEqual(created.system.rules, packEffect("inspire").system.rules);
+    assert.equal(created.system.duration.value, 1);
+    assert.equal(created.system.duration.unit, "rounds");
     assert.equal(created.system.context.origin.actor, env.selected.actor.uuid);
     assert.equal(created.flags[MODULE].commandMobSource.thrallUuid, selectedThrall.document.uuid);
+    assert.equal(created.flags[MODULE].commandMobSource.combatUuid, env.combat.uuid);
+    assert.equal(created.flags[MODULE].commandMobSource.round, env.combat.round);
+    assert.equal(created.flags[MODULE].commandMobSource.turn, env.combat.turn);
+    assert.equal(created.flags[MODULE].commandMobSource.expiresAt, null);
     assert.equal(env.selected.actor.items.size, 1);
     assert.equal(selectedThrall.actor.items.size, 1);
-    assert.equal(env.uses().commandMob, "Combat.combat1:1");
-    assert.equal(await env.api.commandMob(), false);
+    assert.equal(await env.api.commandMob(), true);
   });
 
-  for (const change of ["cancel", "range", "round", "ownership", "dead"]) {
-    test(`Command Mob revalidates ${change} after its dialog and does not charge an invalid command`, async (t) => {
+  for (const change of ["cancel", "range", "ownership", "dead"]) {
+    test(`Command Mob revalidates ${change} after its dialog and does not apply invalid support`, async (t) => {
       const env = setup(t);
       const thrall = env.ownThrall();
       env.state.dialogBehavior = async () => {
         if (change === "cancel") return null;
         if (change === "range") thrall.distance = 65;
-        if (change === "round") env.combat.round = 2;
         if (change === "ownership") thrall.actor.flags[HELPER].summoner.uuid = "Actor.someoneElse";
         if (change === "dead") thrall.actor.system.attributes.hp.value = 0;
         return { thrallUuid: thrall.document.uuid, support: "guard" };
@@ -652,9 +719,18 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       assert.equal(await env.api.commandMob(), false);
       assert.equal(env.calls.dialogs.length, 1);
       assert.equal(env.calls.itemCreates.length, 0);
-      assert.equal(env.uses()?.commandMob, undefined);
     });
   }
+
+  test("Command Mob allows round changes while the dialog is open", async (t) => {
+    const env = setup(t);
+    const thrall = env.ownThrall();
+    env.state.dialogBehavior = async () => {
+      env.combat.round = 2;
+      return { thrallUuid: thrall.document.uuid, support: "guard" };
+    };
+    assert.equal(await env.api.commandMob(), true);
+  });
 
   test("out-of-range and foreign summons are absent from the command choices", async (t) => {
     const env = setup(t);
@@ -678,7 +754,6 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     env.state.dialogBehavior = async () => ({ thrallUuid: foreign.document.uuid, support: "guard" });
     assert.equal(await env.api.commandMob(), false);
     assert.equal(env.calls.itemCreates.length, 0);
-    assert.equal(env.uses()?.commandMob, undefined);
   });
 
   test("a pending command dialog prevents duplicate commands and concurrent Flash Mob", async (t) => {
@@ -782,5 +857,124 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       env.emit("updateCombat", env.combat, { round: 2 }, {}, env.game.user.id),
     ]);
     assert.equal(env.calls.itemDeletes.filter((entry) => entry.actor === env.selected.actor).length, 1);
+  });
+
+  test("off-turn summon and command are allowed; support expires on Blaster's next turn in the same round", async t => {
+    const env = setup(t);
+    const blasterTurn = env.combat.combatant;
+    env.combat.combatant = { token: { uuid: "Scene.scene1.Token.other" }, initiative: 40 };
+    assert.equal(await env.api.flashMob(), true);
+    const thrall = env.scene.tokens.find(token => token.actor.getFlag(MODULE, "blasterRole") === "hype-thrall");
+    env.state.choice = { thrallUuid: thrall.uuid, support: "tempHP" };
+    assert.equal(await env.api.commandMob(), true);
+    const created = env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0];
+    assert.equal(created.system.start.initiative, blasterTurn.initiative);
+    assert.equal(created.flags[MODULE].commandMobSource.turn, 0);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
+    await env.api.ready();
+    assert.equal(env.selected.actor.items.size, 1);
+    env.combat.turn = 1;
+    env.combat.combatant = blasterTurn;
+    await env.emit("combatTurnChange", env.combat, {}, {});
+    await env.api.ready();
+    assert.equal(env.selected.actor.items.size, 0);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+  });
+
+  for (const timing of ["no combat", "unstarted", "unrelated scene", "not a combatant"]) {
+    test(`Command Mob uses a six-world-second fallback with ${timing}`, async t => {
+      const env = setup(t);
+      const thrall = env.ownThrall();
+      if (timing === "no combat") env.game.combat = null;
+      if (timing === "unstarted") env.combat.started = false;
+      if (timing === "unrelated scene") env.combat.scene = { id: "other-scene" };
+      if (timing === "not a combatant") env.combat.combatants.clear();
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+      const source = env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0];
+      assert.deepEqual(source.system.duration, { value: 1, unit: "rounds", expiry: "turn-start", sustained: false });
+      assert.equal(source.system.start.initiative, null);
+      assert.equal(source.flags[MODULE].commandMobSource.combatUuid, null);
+      assert.equal(source.flags[MODULE].commandMobSource.expiresAt, 106);
+      const unrelated = await env.selected.actor.createEmbeddedDocuments("Item", [packEffect("guard")]);
+      await env.api.ready();
+      env.game.time.worldTime = 105;
+      await env.emit("updateWorldTime", 105);
+      assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
+      env.game.time.worldTime = 106;
+      await env.emit("updateWorldTime", 106);
+      await env.api.ready();
+      assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+      assert.deepEqual(env.selected.actor.items.contents.map(item => item.id), [unrelated[0].id]);
+    });
+  }
+
+  test("repeated Bolster refreshes its own HP without stacking effects or clearing a higher unrelated pool", async t => {
+    const env = setup(t);
+    const thrall = env.ownThrall();
+    env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+    assert.equal(await env.api.commandMob(), true);
+    const firstSource = env.selected.actor.system.attributes.hp.tempSource;
+    env.selected.actor.system.attributes.hp.temp = 4;
+    assert.equal(await env.api.commandMob(), true);
+    assert.equal(env.selected.actor.items.size, 1);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
+    assert.notEqual(env.selected.actor.system.attributes.hp.tempSource, firstSource);
+    env.selected.actor.system.attributes.hp.temp = 20;
+    env.selected.actor.system.attributes.hp.tempSource = "unrelated-higher-source";
+    assert.equal(await env.api.commandMob(), true);
+    assert.equal(env.selected.actor.items.size, 1);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, "unrelated-higher-source");
+    await env.api.ready();
+    env.combat.round = 2;
+    await env.emit("combatTurnChange", env.combat, {}, {});
+    await env.api.ready();
+    assert.equal(env.selected.actor.items.size, 0);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, "unrelated-higher-source");
+  });
+
+  for (const action of ["flashMob", "commandMob"]) {
+    for (const change of ["scene", "actor ownership", "GM"]) {
+      test(`${action} still rejects ${change} changes while its dialog is open`, async t => {
+        const env = setup(t);
+        const thrall = env.ownThrall();
+        env.state.dialogBehavior = async () => {
+          if (change === "scene") env.canvas.scene = { id: "elsewhere", tokens: new Collection() };
+          if (change === "actor ownership") env.selected.actor.isOwner = false;
+          if (change === "GM") env.game.user.isGM = false;
+          return action === "flashMob" ? "hype-fan" : { thrallUuid: thrall.document.uuid, support: "guard" };
+        };
+        assert.equal(await env.api[action](), false);
+        assert.equal(env.calls.helper.length, 0);
+        assert.equal(env.calls.itemCreates.length, 0);
+      });
+    }
+  }
+
+  test("recovered placement counts toward the cap and receives timed cleanup", async t => {
+    const env = setup(t);
+    env.ownThrall(); env.ownThrall();
+    let recovered;
+    env.state.helperBehavior = async payload => {
+      const details = payload.summonDetailsGroup[0];
+      const partial = env.actor({ role: "hype-thrall", hp: 20 });
+      mergeObject(partial, details.modifications);
+      delete partial.flags[HELPER];
+      recovered = env.token({ actor: partial, flags: details.tokenModifications.flags });
+      await env.emit("createToken", recovered.document, {}, env.game.user.id);
+      throw new Error("Placed before helper owner linkage");
+    };
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(await env.api.flashMob(), false);
+    assert.equal(env.calls.helper.length, 1);
+    assert.match(env.calls.warnings.at(-1), /three live/);
+    await env.api.ready();
+    env.game.time.worldTime += 60;
+    await env.emit("updateWorldTime", env.game.time.worldTime);
+    await env.api.ready();
+    assert.equal(env.scene.tokens.has(recovered.id), false);
+    assert.equal(env.scene.tokens.has(env.selected.id), true);
   });
 });

@@ -14,23 +14,37 @@ Blaster's portrait and prototype token both use the world asset `common/portrait
 
 ### Charged Blast
 
-Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then click five squares, starting in Blaster's square. The four connecting segments form one blast; **each leg can be up to 80 feet**, independently (up to 320 feet overall). A live preview shows the current leg's distance; Backspace undoes a point, and Escape or right-click cancels without creating areas or spending a use. On the fifth click, four native V14 line Regions are saved and shared with the scene.
+Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then **click once to aim** from Blaster. The preview and placed native line Region are always **120 feet long**, regardless of how close or far away the aiming click is. There is no waypoint sequence for these immediate beams. Escape or right-click cancels without creating an area.
 
-| Actions | Mode | Damage | Each leg | Full width |
+| Actions | Mode | Damage | Length | Full width |
 | --- | --- | --- | --- | --- |
-| 1 | Snapshot | 4d6 | 80 feet | 1 square |
-| 2 | Spotlight | 9d6 | 80 feet | 1 square |
-| 3 | Standing Ovation | 18d6 | 80 feet | 3 squares |
+| 1 | Snapshot | 4d6 | 120 feet | 1 square |
+| 2 | Spotlight | 9d6 | 120 feet | 1 square |
+| 3 | Standing Ovation | 18d6 | 120 feet | 3 squares |
 
-All modes share one use per round. Standing Ovation roots Blaster until the start of his next turn and cannot be used for the next **1d4 full rounds**; smaller blasts remain available on later turns. The macro reports the ready round. Outside combat the tool can be previewed normally, with a six-second root and world-time recharge. Within combat, use it on Blaster's turn.
+The sheet's rules give all modes one shared use per round and Standing Ovation a **1d4-full-round recharge**. These are **GM-adjudicated, not macro locks**: Charged Blast can be invoked at any time, in or out of combat, including repeatedly in a round. The macro reports the recharge guidance and still applies the three-action movement root until Blaster's next turn (six world-time seconds outside combat); Release Blast Root remains available for GM correction.
 
 Curated Spectrum selects fire, cold, electricity, or sonic with a DC 40 basic Reflex save. Dazzling light uses fire with two fewer damage dice and dazzles on a failed save; psychic humiliation uses mental damage with two fewer dice, a basic Will save, and stupefied 1 on a failed save. Conditions last one round. The chat card supplies PF2e save/damage links. Resolve saves, HP, condition application, cover, and line of effect normally; each creature is affected **once**, even where segments overlap, and Blaster is excluded. The tool does not debit PF2e actions automatically.
 
-Each charge's sheet description also has six labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Recharge has an inline GM die, and Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. The custom macro remains the correct way to place the five-point area.
+Each charge's sheet description also has six labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Recharge has an inline GM die, and Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. Use the macro to aim these straight beams and preserve the selected full width.
 
 The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigger**, and **Effect** labels, horizontal separators, compact spectrum/support choices, and separate Beam Clash outcomes. Long operating instructions live under **Foundry Operating Notes** on the compendium NPC's Notes tab, not in the ability summaries. Existing world Blasters get the shorter rules text by selecting their token and running **Blaster — Refresh Sheet Descriptions** after updating/reloading. This preserves their HP, statistics, artwork, effects, item GM notes, and actor Notes; consult the compendium Notes for the new operating reference. Newly summoned/imported hype thralls and support effects also use the concise source descriptions.
 
-**Clear Blast Areas** removes only the selected Blaster's areas. **Release Blast Root** is a GM adjudication tool for forced movement or corrections; clearing areas does not refund a use or end the root. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
+**Clear Blast Areas** removes only the selected Blaster's immediate beam areas, not Grand Finale's warning/fired path. **Release Blast Root** is a GM adjudication tool for forced movement or corrections; clearing areas does not refund a use or end the root. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
+
+### Grand Finale — delayed path
+
+**Blaster — Mark Grand Finale** is a separate free-action tool. At the start of a round, choose a spectrum and click **eight points**, starting in Blaster's square. This makes seven connected legs, each up to **120 feet**, with a **three-square full width**. Backspace undoes a point; Escape/right-click cancels. The amber warning Regions are shared with the party and deal **no damage** while they reposition.
+
+At the **start of the following global round**, the active GM resolves the saved path: its color changes to the chosen spectrum and one clickable **DC 40 basic save / 24d6 damage** card appears (22d6 for the condition-bearing spectra). The path stays fixed even if Blaster moves. Each creature is affected once across all seven legs; HP, saves, and riders remain manual. It costs no further action, root, or Charged Blast recharge when firing.
+
+- **Fire Grand Finale** fires the saved path manually, including outside combat or as a GM timing override.
+- **Clear Grand Finale** cancels the saved blast and removes only that Blaster's finale Regions.
+- Completing a new mark replaces that Blaster's prior finale. Cancelling a new placement keeps the previous warning intact.
+- Out-of-combat marking is manual-only; it does not silently arm itself when a later encounter starts.
+- Reconnecting and duplicate combat hooks must not produce another firing card for an already resolved plan.
+
+Fresh imports include the new free action. Existing world Blasters need **Grand Finale** copied from the updated compendium actor; Refresh Sheet Descriptions updates existing abilities only. Import the three new macros from **Blaster — Encounter Macros**.
 
 ### Flash Mob
 
@@ -38,7 +52,22 @@ Enable [PF2e Summons Assistant](https://github.com/ChasarooniZ/pf2e-summons-assi
 
 The macro first opens a portrait-card picker for **Hype Fan**, **Ego Guard**, or **Paparazzo**, plus **Surprise Me** for a random choice. Each has its own themed NPC sheet and bundled transparent token/portrait. Pick a card, click **Place Thrall**, then select its map position through Summons Assistant. Cancel either step without spending the use. Their signature routines highlight Inspire, Guard, and Bolster respectively, but all three retain all three support choices; no bonus is granted just by summoning.
 
-On Blaster's turn, Flash Mob costs one action and places one 1-HP hype thrall within 30 feet, once per round, up to three live thralls belonging to that Blaster. The adds last one minute and have no autonomous turns. **Command Flash Mob** costs one action, once per round: choose a live add within 60 feet to inspire Blaster (+1 status to attacks, damage, and saves against fear), guard him (+1 status AC), or bolster him (10 non-stacking temporary HP). Support expires at the start of Blaster's next turn. The effects are also in the support compendium. Use unlinked NPC tokens if multiple Blasters are on the scene, since the helper selects an actor's first active token.
+**Flash Mob and Command Flash Mob are GM tools usable at any time**, including outside combat, on another creature's turn, or repeatedly in the same round. They do not enforce the sheet's one-action/once-per-round rules; the GM adjudicates those. Flash Mob places one 1-HP add within 30 feet, up to three living owned thralls, with a one-minute lifetime and no independent turn. Command Flash Mob chooses a live owned add within 60 feet to Inspire (+1 status to attacks, damage, and fear saves), Guard (+1 status AC), or Bolster (10 non-stacking temporary HP). Support expires at Blaster's next turn, including later in the same round after an off-turn command; without an active encounter containing Blaster it lasts six world-time seconds. Reapplying the same support refreshes that module-owned effect without stacking copies or deleting unrelated temporary HP. Use unlinked NPC tokens if multiple Blasters are on the scene, since the helper selects an actor's first active token.
+
+### Signature spells
+
+Blaster also has **Occult Innate Spells**, DC **40**, spell attack **+32**:
+
+| Spell | Rank | Uses |
+| --- | --- | --- |
+| Inner Radiance Torrent | 8 | 1/day |
+| Chromatic Ray | 7 | 1/day |
+| Suggestion | 9 | 1/day |
+| Hypnotize | 3 | 1/day |
+| Mirror Image | 2 | 3/day |
+| Illusory Disguise | 3 | At will |
+
+These use native PF2e spell cards, damage, saves, casting variants, and heightened ranks. Their normal spell rules apply independently of Charged Blast and Curated Spectrum. Use the spell icon for Illusory Disguise's card without expending a daily use; PF2e's innate Cast button still tracks uses for non-cantrips. Freshly import Blaster for the complete spellcasting section, or copy that section/spells into an existing world actor. **Refresh Sheet Descriptions does not add missing spells or overwrite actor statistics.**
 
 ### Beam Clash
 
@@ -96,6 +125,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art, color, and sound together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.10 replaces the immediate charged-blast path with a one-click straight 120-foot beam, adds the free-action eight-point Grand Finale warning that fires next round, adds six native occult spells, removes hard combat/turn/frequency/recharge macro gates, and repairs partial summon placement recovery. Import the three new Grand Finale macros. Existing world actors need the new spellcasting section and Grand Finale ability copied from a fresh compendium Blaster; Refresh Sheet Descriptions updates existing descriptions only. Reload connected clients after updating. Automated tests and isolated browser previews pass; multiplayer live-world acceptance remains separate.
 
 Version 0.10.9 gives each charged-blast leg an independent 80-foot limit, adds optional per-actor Your Turn sound stingers, and bundles Hype Fan, Ego Guard, and Paparazzo sheets/artwork with a Flash Mob selection window. Existing Blasters can use Refresh Sheet Descriptions for the updated range text. Reload all connected clients after updating; new summons use the selected variant, while existing world actors and tokens are not replaced.
 

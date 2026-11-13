@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterFire00001",
+  "name": "Blaster — Fire Grand Finale",
+  "type": "script",
+  "img": "icons/magic/light/beam-rays-red-small.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.fireFinale) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.fireFinale();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

@@ -11,14 +11,12 @@ const SUPPORT_IDS = {
 
 type Support = keyof typeof SUPPORT_IDS;
 type Action = "flashMob" | "commandMob";
-type Context = { token: any; actor: any; combat: any; round: number; stamp: string };
+type Context = { token: any; actor: any };
 
-/** Summons Assistant owns placement; this adapter owns Blaster's action limits and support. */
+/** GM-operated placement/support tools. Action costs and frequency are adjudicated at the table. */
 export function createBlasterSummons(moduleId: string) {
   const pending = new Set<string>();
   const backgroundJobs = new Set<Promise<void>>();
-  // Retain successful uses even if persistence fails, to avoid offering a second summon.
-  const used = new Map<string, string>();
   let supportCleanup = Promise.resolve();
   let registered = false;
   let cleaning = false;
@@ -33,7 +31,7 @@ export function createBlasterSummons(moduleId: string) {
 
   function context(input?: any): Context | null {
     if (!game.user?.isGM) { warn("Only a GM can use Blaster's mob actions."); return null; }
-    // A single authenticated writer prevents two GM clients racing the cap/use flag.
+    // A single authenticated writer prevents two GM clients racing placement and the live cap.
     if (game.users?.activeGM?.id !== game.user.id) {
       warn("Use the primary (active) GM to operate Blaster's mob actions."); return null;
     }
@@ -56,12 +54,7 @@ export function createBlasterSummons(moduleId: string) {
       warn("Blaster has ambiguous active tokens. Use an unlinked Blaster token before summoning or commanding.");
       return null;
     }
-    const combat = game.combat;
-    if (!combat?.started || combat.scene?.id !== token.parent.id ||
-        combat.combatant?.token?.uuid !== token.uuid) {
-      warn("Use this one-action ability during the selected Blaster's combat turn."); return null;
-    }
-    return { token, actor, combat, round: combat.round, stamp: `${combat.uuid}:${combat.round}` };
+    return { token, actor };
   }
 
   function stillCurrent(ctx: Context) {
@@ -69,9 +62,20 @@ export function createBlasterSummons(moduleId: string) {
     return game.user?.isGM && game.users?.activeGM?.id === game.user.id &&
       active.length === 1 && tokenDocument(active[0])?.uuid === ctx.token.uuid &&
       ctx.actor.isOwner && flag(ctx.actor, "blasterRole") === "blaster" &&
-      canvas.scene?.id === ctx.token.parent.id && sceneTokens().some((token) => token.uuid === ctx.token.uuid) &&
-      game.combat?.uuid === ctx.combat.uuid && game.combat.started &&
-      game.combat.round === ctx.round && game.combat.combatant?.token?.uuid === ctx.token.uuid;
+      canvas.scene?.id === ctx.token.parent.id && sceneTokens().some((token) => token.uuid === ctx.token.uuid);
+  }
+
+  function supportTiming(ctx: Context) {
+    const combat = game.combat;
+    const combatant = combat?.started && combat.scene?.id === ctx.token.parent.id
+      ? contents(combat.combatants).find((entry) => entry.token?.uuid === ctx.token.uuid) : null;
+    return {
+      combatUuid: combatant ? combat.uuid : null,
+      round: combatant ? combat.round : null,
+      turn: combatant ? combat.turn : null,
+      expiresAt: combatant ? null : game.time.worldTime + 6,
+      initiative: combatant?.initiative ?? null,
+    };
   }
 
   function isOwnedThrall(token: any, ctx: Context) {
@@ -104,24 +108,14 @@ export function createBlasterSummons(moduleId: string) {
       ...(source.system.context ?? {}),
       origin: { actor: ctx.actor.uuid, token: ctx.token.uuid, item: null },
     };
-    source.system.start = { value: game.time.worldTime, initiative: ctx.combat.combatant.initiative };
+    source.system.start = { value: game.time.worldTime, initiative: supportTiming(ctx).initiative };
     return source;
-  }
-
-  async function recordUse(ctx: Context, action: Action) {
-    used.set(`${ctx.token.uuid}:${action}`, ctx.stamp);
-    await ctx.token.setFlag(moduleId, "blasterMobUses", {
-      ...(flag(ctx.token, "blasterMobUses") ?? {}), [action]: ctx.stamp,
-    });
   }
 
   async function run(action: Action, input: any, perform: (ctx: Context) => Promise<boolean>) {
     const ctx = context(input);
     if (!ctx) return false;
     if (pending.has(ctx.token.uuid)) return warn("A mob action is already in progress for this Blaster.");
-    if (used.get(`${ctx.token.uuid}:${action}`) === ctx.stamp || flag(ctx.token, "blasterMobUses")?.[action] === ctx.stamp) {
-      return warn("This Blaster has already used that action this round.");
-    }
     pending.add(ctx.token.uuid);
     try { return await perform(ctx); }
     catch (error) {
@@ -160,8 +154,8 @@ export function createBlasterSummons(moduleId: string) {
         throw new Error("Hype thrall expiration must use the helper slug and grant no attacks.");
       }
       expiry.system.duration = { value: 1, unit: "minutes", expiry: "turn-start", sustained: false };
-      if (!stillCurrent(ctx)) return warn("Blaster's turn changed before placement began; no use was spent.");
-      if (liveThralls(ctx).length >= 3) return warn("This Blaster now has three live hype thralls; no use was spent.");
+      if (!stillCurrent(ctx)) return warn("The scene, selected Blaster, or GM authority changed before placement.");
+      if (liveThralls(ctx).length >= 3) return warn("This Blaster now has three live hype thralls.");
       const nonce = foundry.utils.randomID();
       const owner = {
         ownerActorUuid: ctx.actor.uuid, ownerTokenUuid: ctx.token.uuid, nonce, variant: variant.key,
@@ -208,32 +202,47 @@ export function createBlasterSummons(moduleId: string) {
       finally { Hooks.off("createToken", hook); }
       // Also recover creation when a hook was missed or helper post-processing failed.
       allTokens().forEach(remember);
-      const tokens = [...created.values()].filter((token) => isOwnedThrall(token, ctx));
+      // TCAL can overwrite actor update flags, and the helper restores summoner
+      // linkage only AFTER adding effects. Recover our exact marked placement
+      // without requiring a flag that failed post-processing may never have saved.
+      const existing = new Set(allTokens().map((token) => token.uuid));
+      const tokens = [...created.values()].filter((token) => {
+        const marker = flag(token, "blasterSummon");
+        const summoner = token.actor?.getFlag(ASSISTANT, "summoner");
+        return existing.has(token.uuid) && token.parent?.id === ctx.token.parent.id &&
+          token.actor?.type === "npc" && isHype(token) && flag(token.actor, "blasterVariant") === variant.key &&
+          marker?.nonce === nonce && marker.ownerActorUuid === ctx.actor.uuid && marker.ownerTokenUuid === ctx.token.uuid &&
+          (!summoner?.uuid || summoner.uuid === ctx.actor.uuid);
+      });
       if (!tokens.length) {
         if (failure) console.debug(`${moduleId} | Flash Mob placement ended without a token`, failure);
-        return warn("No hype thrall was placed; Flash Mob is still available this round.");
+        return warn("No hype thrall was placed. You can run Flash Mob again.");
       }
-      // Charge before further writes: failure after successful placement must not allow duplicates.
-      let persistenceFailed = false;
-      try { await recordUse(ctx, "flashMob"); }
-      catch (error) {
-        persistenceFailed = true;
-        console.error(`${moduleId} | Thrall placed but use flag could not be saved`, error);
-      }
+      let repairFailed = false;
       for (const token of tokens) {
+        if (token.actor.getFlag(ASSISTANT, "summoner")?.uuid !== ctx.actor.uuid) {
+          try { await token.actor.setFlag(ASSISTANT, "summoner", {
+            uuid: ctx.actor.uuid, id: ctx.actor.id, signature: ctx.actor.signature,
+          }); }
+          catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall owner-link repair`, error); }
+        }
         // Placement may take time; the minute starts when a token actually exists.
-        await token.setFlag(moduleId, "blasterSummon", {
+        try { await token.setFlag(moduleId, "blasterSummon", {
           ...owner, createdAt: game.time.worldTime, expiresAt: game.time.worldTime + 60,
-        });
-        await token.actor.update({ "system.attributes.hp.value": 1, "system.attributes.hp.max": 1, "system.attributes.hp.temp": 0 });
+        }); }
+        catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall lifetime repair`, error); }
+        try { await token.actor.update({ "system.attributes.hp.value": 1, "system.attributes.hp.max": 1, "system.attributes.hp.temp": 0 }); }
+        catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall HP repair`, error); }
         // Recover from the helper failing between placement and its itemsToAdd step.
         if (!contents(token.actor.items).some((item) => item.system?.slug === EXPIRATION_SLUG)) {
-          await token.actor.createEmbeddedDocuments("Item", [expiry]);
+          try { await token.actor.createEmbeddedDocuments("Item", [expiry]); }
+          catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall expiration repair`, error); }
         }
       }
       if (failure) console.warn(`${moduleId} | Thrall placed; helper post-processing reported an error`, failure);
-      if (persistenceFailed) {
-        return warn("Thrall placed, but Flash Mob's round use could not be saved. It remains spent on this client; check before reloading.");
+      if (repairFailed) {
+        ui.notifications.warn("A thrall was placed, but its owner link, HP, or expiration could not be fully repaired. Inspect that token before summoning again; see the console.");
+        return true; // Placement occurred: never report this as cancellation/no token.
       }
       ui.notifications.info(`Flash Mob: ${variant.name} summoned (1 action). No independent turn or attacks.`);
       return true;
@@ -247,7 +256,7 @@ export function createBlasterSummons(moduleId: string) {
       const escape = (value: string) => foundry.utils.escapeHTML(value);
       const choice = await foundry.applications.api.DialogV2.prompt({
         window: { title: "Command Flash Mob — 1 action" }, rejectClose: false,
-        content: `<p>Choose one of this Blaster's hype thralls within 60 feet. Support lasts until the start of Blaster's next turn.</p>
+        content: `<p>Choose one of this Blaster's hype thralls within 60 feet. Support lasts until Blaster's next turn, or 6 seconds of world time outside combat. Action costs and frequency are GM-adjudicated.</p>
           <div class="form-group"><label>Hype thrall</label><select name="thrallUuid">${candidates.map((token) =>
             `<option value="${escape(token.uuid)}">${escape(token.name)} (${escape(token.id)})</option>`).join("")}</select></div>
           <div class="form-group"><label>Support for Blaster</label><select name="support">
@@ -262,28 +271,38 @@ export function createBlasterSummons(moduleId: string) {
       if (!choice) return false;
       if (!Object.prototype.hasOwnProperty.call(SUPPORT_IDS, choice.support)) return warn("Choose a valid support option.");
       const source = await effectSource(SUPPORT_IDS[choice.support as Support], ctx);
-      const thrall = liveThralls(ctx).find((token) => token.uuid === choice.thrallUuid && inRange(token, ctx));
-      if (!stillCurrent(ctx) || !thrall) return warn("The turn or selected thrall changed; no use was spent.");
-      source.system.duration = { value: 1, unit: "rounds", expiry: "turn-start", sustained: false };
-      source.flags = { ...(source.flags ?? {}), [moduleId]: {
-        ...(source.flags?.[moduleId] ?? {}), commandMobSource: {
-          ownerActorUuid: ctx.actor.uuid, ownerTokenUuid: ctx.token.uuid, combatUuid: ctx.combat.uuid,
-          round: ctx.round, thrallUuid: thrall.uuid,
-        },
-      } };
-      // PF2e's actual TempHP rule applies max(current, 10), records tempSource, and
-      // clears only its own remaining HP on deletion. Never add directly to hp.temp.
-      const effects = await ctx.actor.createEmbeddedDocuments("Item", [source]);
-      if (!effects.length) return false;
-      await recordUse(ctx, "commandMob");
-      ui.notifications.info("Command Flash Mob: support applied to Blaster (1 action), until the start of its next turn.");
-      return true;
+      // Serialize refresh against turn/time cleanup, including removal of this effect's TempHP.
+      const apply = supportCleanup.catch(() => {}).then(async () => {
+        const thrall = liveThralls(ctx).find((token) => token.uuid === choice.thrallUuid && inRange(token, ctx));
+        if (!stillCurrent(ctx) || !thrall) return warn("The selected Blaster, thrall, scene, or GM authority changed.");
+        const oldIds = contents(ctx.actor.items).filter((item) =>
+          item.system?.slug === source.system.slug && flag(item, "commandMobSource")?.ownerTokenUuid === ctx.token.uuid
+        ).map((item) => item.id);
+        // Remove only this tool's previous same support. This preserves other sources of temporary HP.
+        if (oldIds.length) await ctx.actor.deleteEmbeddedDocuments("Item", oldIds);
+        if (!stillCurrent(ctx) || !isLive(thrall) || !inRange(thrall, ctx)) return warn("The selected thrall or GM authority changed before applying support.");
+        const timing = supportTiming(ctx);
+        // PF2e has no "seconds" duration unit: one round is six world-time seconds.
+        source.system.duration = { value: 1, unit: "rounds", expiry: "turn-start", sustained: false };
+        source.system.start = { value: game.time.worldTime, initiative: timing.initiative };
+        source.flags = { ...(source.flags ?? {}), [moduleId]: {
+          ...(source.flags?.[moduleId] ?? {}), commandMobSource: {
+            ownerActorUuid: ctx.actor.uuid, ownerTokenUuid: ctx.token.uuid, ...timing, thrallUuid: thrall.uuid,
+          },
+        } };
+        const effects = await ctx.actor.createEmbeddedDocuments("Item", [source]);
+        if (!effects.length) return false;
+        ui.notifications.info("Command Flash Mob: support applied to Blaster. Action costs and frequency are GM-adjudicated.");
+        return true;
+      });
+      supportCleanup = apply.then(() => {}, () => {});
+      return apply;
     });
   }
 
   const isCleanupGM = () => game.user?.isGM && game.users?.activeGM?.id === game.user.id;
 
-  async function expireSupport(combat: any, ended = false) {
+  async function expireSupport(combat: any = null, ended = false) {
     if (!isCleanupGM()) return;
     const actors = new Map<string, any>();
     for (const actor of contents(game.actors)) actors.set(actor.uuid, actor);
@@ -291,8 +310,12 @@ export function createBlasterSummons(moduleId: string) {
     for (const actor of actors.values()) {
       const ids = contents(actor.items).filter((item) => {
         const source = flag(item, "commandMobSource");
-        return source?.combatUuid === combat.uuid && (ended ||
-          (source.ownerTokenUuid === combat.combatant?.token?.uuid && source.round < combat.round));
+        if (!source) return false;
+        if (!source.combatUuid) return Number.isFinite(source.expiresAt) && source.expiresAt <= game.time.worldTime;
+        const later = combat && (source.round < combat.round ||
+          (source.round === combat.round && Number.isInteger(source.turn) && source.turn < combat.turn));
+        return source.combatUuid === combat?.uuid && (ended ||
+          (source.ownerTokenUuid === combat.combatant?.token?.uuid && later));
       }).map((item) => item.id);
       if (ids.length) await actor.deleteEmbeddedDocuments("Item", ids);
     }
@@ -321,10 +344,10 @@ export function createBlasterSummons(moduleId: string) {
     return job;
   }
 
-  function queueSupportCleanup(combat: any, ended = false) {
+  function queueSupportCleanup(combat: any = null, ended = false) {
     // Both combat hooks may fire for the same transition. Serialize deletion so
     // the second pass sees the first pass's result (including TempHP cleanup).
-    const turn = { uuid: combat.uuid, round: combat.round, combatant: { token: { uuid: combat.combatant?.token?.uuid } } };
+    const turn = combat ? { uuid: combat.uuid, round: combat.round, turn: combat.turn, combatant: { token: { uuid: combat.combatant?.token?.uuid } } } : null;
     supportCleanup = supportCleanup.catch(() => {}).then(() => expireSupport(turn, ended));
     return background(supportCleanup);
   }
@@ -341,10 +364,11 @@ export function createBlasterSummons(moduleId: string) {
         if ("round" in changed || "turn" in changed) return queueSupportCleanup(combat);
       });
       Hooks.on("deleteCombat", (combat: any) => queueSupportCleanup(combat, true));
-      Hooks.on("updateWorldTime", () => background(expireThralls()));
-      Hooks.on("canvasReady", () => background(expireThralls()));
+      const expireTimed = () => Promise.all([background(expireThralls()), queueSupportCleanup()]);
+      Hooks.on("updateWorldTime", expireTimed);
+      Hooks.on("canvasReady", expireTimed);
       background(expireThralls());
-      if (game.combat) queueSupportCleanup(game.combat);
+      queueSupportCleanup(game.combat);
     }
     // Also allows callers/tests to await already queued cleanup without registering twice.
     while (backgroundJobs.size) await Promise.all([...backgroundJobs]);
