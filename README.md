@@ -97,6 +97,8 @@ The editor uses Foundry's native FilePicker and the existing DialogV2 form. Brow
 
 ## Compatibility
 
+Version 0.10.9 gives each charged-blast leg an independent 80-foot limit, adds optional per-actor Your Turn sound stingers, and bundles Hype Fan, Ego Guard, and Paparazzo sheets/artwork with a Flash Mob selection window. Existing Blasters can use Refresh Sheet Descriptions for the updated range text. Reload all connected clients after updating; new summons use the selected variant, while existing world actors and tokens are not replaced.
+
 Version 0.10.8 sets the compendium Blaster's current and maximum HP to 600. Existing world actors need their HP changed separately; Refresh Sheet Descriptions deliberately does not change statistics.
 
 Version 0.10.7 reorganizes Blaster's encounter descriptions into concise PF2e-style entries, preserving all mechanics and inline controls. It does not automatically replace existing world actor descriptions; use Refresh Sheet Descriptions.
