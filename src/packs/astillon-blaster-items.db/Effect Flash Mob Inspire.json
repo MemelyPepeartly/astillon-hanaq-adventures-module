@@ -5,7 +5,7 @@
   "img": "icons/svg/sound.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains a +1 status bonus to attack rolls, damage rolls, and saves against fear until the start of his next turn.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains a +1 status bonus to attack rolls, damage rolls, and saves against fear only while within 60 feet of the thrall emitting @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraIns01]{Inspire Aura}. The benefit ends when the aura ends, at the start of his next turn, or if the thrall is destroyed or removed.</p>",
       "gm": ""
     },
     "publication": {

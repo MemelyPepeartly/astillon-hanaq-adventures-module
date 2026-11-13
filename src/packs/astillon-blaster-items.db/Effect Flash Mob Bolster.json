@@ -5,7 +5,7 @@
   "img": "icons/svg/upgrade.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains 10 temporary HP until used or the start of his next turn, whichever comes first. If his existing temporary HP are higher, he keeps them with their original duration.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains 10 temporary HP once per activation, until used or the start of his next turn, whichever comes first. Leaving the 60-foot aura retains them; re-entry does not refill them. Only Bolster-granted HP expire when the aura ends. If his existing temporary HP are higher, he keeps them with their original duration.</p>",
       "gm": ""
     },
     "publication": {

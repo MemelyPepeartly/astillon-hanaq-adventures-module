@@ -59,18 +59,24 @@ const spellSpecs = [
 ];
 const round = { max: 1, per: "round" };
 const supportDuration = { value: 1, unit: "rounds", expiry: "turn-start", sustained: false };
+const auraSpecs = [
+  { id: "BlasterAuraIns01", benefit: "BlasterInspire01", key: "inspire", slug: "blaster-aura-inspire", color: "#66E56A", removeOnExit: true },
+  { id: "BlasterAuraGrd01", benefit: "BlasterGuard0001", key: "guard", slug: "blaster-aura-guard", color: "#9B6CFF", removeOnExit: true },
+  { id: "BlasterAuraBol01", benefit: "BlasterTempHP001", key: "tempHP", slug: "blaster-aura-bolster", color: "#F35BCB", removeOnExit: false },
+];
 const contentItems = [...items, ...actors.flatMap((actor) => actor.items)];
 
 test("expected documents have stable IDs, unique per document collection", () => {
   assert.equal(actors.length, 4);
-  assert.equal(items.length, 5);
+  assert.equal(items.length, 8);
   assert.equal(macros.length, 11);
   for (const documents of [actors, items, macros, ...actors.map((actor) => actor.items)]) {
     assert.equal(new Set(documents.map((doc) => doc._id)).size, documents.length);
     for (const doc of documents) assert.match(doc._id, /^[A-Za-z0-9]{16}$/, doc.name);
   }
   assert.deepEqual([...byId.keys()].sort(),
-    ["BlasterCommand01", "BlasterExpiry001", "BlasterGuard0001", "BlasterInspire01", "BlasterTempHP001"].sort());
+    ["BlasterCommand01", "BlasterExpiry001", "BlasterGuard0001", "BlasterInspire01", "BlasterTempHP001",
+      ...auraSpecs.map(spec => spec.id)].sort());
   assert.equal(blaster.flags[moduleId].blasterRole, "blaster");
   assert.equal(thrall.flags[moduleId].blasterRole, "hype-thrall");
 });
@@ -381,13 +387,74 @@ test("Flash Mob and its separate support command each cost one action once per r
     assert.match(description(flash), pattern);
   }
   assert.match(description(command), /within 60 feet/);
-  assert.match(description(command), /Blaster commands one qualifying thrall, gaining one/);
+  assert.match(description(command), /thrall emits one 60-foot aura for only its summoning Blaster/);
   assert.match(description(command), /until the start of his next turn/);
   assert.match(description(command), /once per round, separate from Flash Mob/);
   assert.match(description(command), /thrall gains no movement or other actions/);
   assert.match(description(command), /Higher existing temporary HP retain their original duration/);
+  assert.match(description(command), /only Bolster-granted HP expire with this aura/);
+  assert.match(description(command), /retained on exit without refilling on re-entry/);
+  assert.match(description(command), /destruction ends the aura and benefits/);
+  for (const spec of auraSpecs) assert.match(description(command), new RegExp(spec.id));
   assert.match(description(flash), /destroyed at 0 HP/);
   assert.match(operatingNotes(), /at expiration, not immediately at 0 HP/);
+});
+
+test("portable native auras affect only the summoning Blaster within 60 feet", () => {
+  for (const spec of auraSpecs) {
+    const item = byId.get(spec.id);
+    assert.equal(item.type, "effect");
+    assert.deepEqual(item.flags, { [moduleId]: { blasterAura: spec.key } });
+    assert.equal(item.system.slug, spec.slug);
+    assert.deepEqual(item.system.duration, supportDuration);
+    assert.deepEqual(item.system.start, { value: 0, initiative: null });
+    assert.equal(item.system.context, null, "runtime supplies owner and activation timing");
+    assert.deepEqual(item.system.traits, { value: [], otherTags: [] }, "no new mental-immunity interaction");
+    assert.equal(item.system.rules.length, 1);
+    const [aura] = item.system.rules;
+    assert.equal(aura.key, "Aura");
+    assert.equal(aura.slug, spec.slug);
+    assert.equal(aura.radius, 60);
+    assert.deepEqual(aura.predicate, ["self:trait:thrall"]);
+    assert.deepEqual(aura.traits, []);
+    assert.deepEqual(aura.effects, [{
+      uuid: `Compendium.${moduleId}.astillon-blaster-items.Item.${spec.benefit}`,
+      affects: "all", // Match owner signature even when token dispositions differ.
+      includesSelf: false,
+      events: ["enter"],
+      predicate: ["target:signature:{actor|flags.pf2e-summons-assistant.summoner.signature}"],
+      removeOnExit: spec.removeOnExit,
+    }]);
+    assert.equal(byId.get(aura.effects[0].uuid.split(".").at(-1)).type, "effect");
+    assert.deepEqual(aura.appearance, {
+      border: { color: spec.color, alpha: 0.75 }, highlight: { color: spec.color, alpha: 0.1 },
+    });
+    for (const key of ["ownership", "_stats", "_key", "folder"]) assert.equal(key in item, false, key);
+    assert.match(description(item), /only to its summoning Blaster/);
+    assert.match(description(item), /No other creature benefits/);
+    assert.match(description(item), /aura and its benefits end if the thrall is destroyed or removed/);
+  }
+  assert.equal(new Set(auraSpecs.map(spec => byId.get(spec.id).system.rules[0].appearance.border.color)).size, 3);
+  for (const actor of actors) {
+    assert.ok(actor.items.every(item => !item.system.rules.some(rule => rule.key === "Aura")), "auras activate only on command");
+    assert.ok(actor.items.every(item => !auraSpecs.some(spec => spec.id === item._id)), "no default embedded emitter");
+  }
+});
+
+test("aura operating notes cover manual activation, ownership, timing, and teardown on every sheet", () => {
+  for (const actor of actors) {
+    const notes = actor.system.details.privateNotes;
+    for (const spec of auraSpecs) assert.match(notes, new RegExp(spec.id));
+    for (const pattern of [/All three variants can Inspire, Guard, or Bolster/, /none has an active aura by default/,
+      /drag one linked aura item onto a living thrall summoned through Flash Mob/, /within 60 feet of its Blaster/,
+      /Manually placed, unlinked thralls cannot grant these benefits/, /summoner signature and module owner linkage/,
+      /regardless of token disposition, never allies or the emitting thrall/, /Runtime stamps the owner and activation timing/,
+      /start of Blaster's next turn/, /6 world-time seconds without combat/,
+      /Ending, deleting, or expiring the aura, or destroying or deleting its thrall, ends every linked benefit/,
+      /Inspire and Guard apply only while Blaster is within 60 feet/, /re-entry never refills it/,
+      /higher temporary HP from another source keep their original duration/]) assert.match(notes, pattern, actor.name);
+  }
+  assert.doesNotMatch(blaster.system.details.privateNotes, /apply exactly one linked effect to Blaster|Remove the old effect before reapplying/);
 });
 
 test("support FlatModifiers use correct domains, status stacking, and fear predicate", () => {
@@ -406,6 +473,10 @@ test("support FlatModifiers use correct domains, status stacking, and fear predi
     assert.deepEqual(item.system.duration, supportDuration);
     assert.match(description(item), /Blaster gains/);
   }
+  for (const item of [inspire, guard]) {
+    assert.match(description(item), /only while within 60 feet of the thrall/);
+    assert.match(description(item), /benefit ends when the aura ends/);
+  }
 });
 
 test("Bolster grants temporary HP only on creation and does not regenerate", () => {
@@ -414,6 +485,11 @@ test("Bolster grants temporary HP only on creation and does not regenerate", () 
   assert.deepEqual(item.system.rules, [{ key: "TempHP", value: 10, events: { onCreate: true, onTurnStart: false } }]);
   assert.match(description(item), /existing temporary HP are higher, he keeps them with their original duration/);
   assert.match(description(item), /until used or the start of his next turn, whichever comes first/);
+  for (const source of [item, byId.get("BlasterAuraBol01")]) {
+    assert.match(description(source), /once per activation/);
+    assert.match(description(source), /Leaving.*retains them; re-entry does not refill them/);
+    assert.match(description(source), /Only Bolster-granted HP expire/);
+  }
   assert.match(operatingNotes(), /never refreshes automatically/);
 });
 
@@ -450,7 +526,6 @@ test("helper expiration is a separate attack-free one-minute marker with the exa
 });
 
 test("three distinct entourage sheets share the unchanged support shell and ship transparent art", async () => {
-  const effectIds = ["BlasterInspire01", "BlasterGuard0001", "BlasterTempHP001"];
   for (const [i, variant] of BLASTER_THRALLS.entries()) {
     const actor = actors.find((entry) => entry._id === variant.id);
     assert.ok(actor, variant.name);
@@ -468,10 +543,13 @@ test("three distinct entourage sheets share the unchanged support shell and ship
     assert.ok(actor.items.every(item => item.type === "action" && item.system.actionType.value === "passive"));
     assert.deepEqual(actor.items.slice(0, 2), thrall.items.slice(0, 2));
     const routine = actor.items[2];
-    assert.match(description(routine), new RegExp(effectIds[i]));
+    assert.match(description(routine), new RegExp(auraSpecs[i].id));
     assert.match(description(routine), /within 60 feet/);
+    assert.match(description(routine), /a 60-foot aura granting only its summoning Blaster/);
+    assert.match(description(routine), /ending early if the thrall is destroyed or removed/);
     assert.match(description(routine), /either other Command Flash Mob benefit/);
     assert.match(description(routine), /no extra action or free support/);
+    assert.doesNotMatch(description(routine), /Select Blaster|drag|Runtime|Foundry/);
     assert.deepEqual(routine.system.rules, []);
     const png = PNG.sync.read(await readFile(new URL(`../src/assets/blaster-thralls/${variant.key}.png`, import.meta.url)));
     assert.equal(png.width, png.height);

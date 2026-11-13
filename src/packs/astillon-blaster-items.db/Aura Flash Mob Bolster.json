@@ -1,0 +1,87 @@
+{
+  "_id": "BlasterAuraBol01",
+  "name": "Aura: Flash Mob — Bolster",
+  "type": "effect",
+  "img": "icons/svg/upgrade.svg",
+  "system": {
+    "description": {
+      "value": "<p><strong>Requirements</strong> A living Flash Mob thrall activated by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}.</p>\n<p><strong>Duration</strong> until the start of Blaster's next turn</p>\n<hr />\n<p><strong>Effect</strong> The thrall emits a 60-foot aura granting @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster} only to its summoning Blaster. No other creature benefits.</p>\n<p>Bolster grants temporary HP once per activation. Leaving the aura retains them; re-entry does not refill them. Only Bolster-granted HP expire with this aura; higher existing temporary HP keep their original duration.</p>\n<p>The aura and its benefits end if the thrall is destroyed or removed.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "Aura",
+        "radius": 60,
+        "slug": "blaster-aura-bolster",
+        "predicate": [
+          "self:trait:thrall"
+        ],
+        "traits": [],
+        "effects": [
+          {
+            "uuid": "Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001",
+            "affects": "all",
+            "includesSelf": false,
+            "events": [
+              "enter"
+            ],
+            "predicate": [
+              "target:signature:{actor|flags.pf2e-summons-assistant.summoner.signature}"
+            ],
+            "removeOnExit": false
+          }
+        ],
+        "appearance": {
+          "border": {
+            "color": "#F35BCB",
+            "alpha": 0.75
+          },
+          "highlight": {
+            "color": "#F35BCB",
+            "alpha": 0.1
+          }
+        }
+      }
+    ],
+    "slug": "blaster-aura-bolster",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": 1,
+      "unit": "rounds",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterAura": "tempHP"
+    }
+  }
+}
