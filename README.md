@@ -93,6 +93,8 @@ The editor uses Foundry's native FilePicker and the existing DialogV2 form. Brow
 
 ## Compatibility
 
+Version 0.10.8 sets the compendium Blaster's current and maximum HP to 600. Existing world actors need their HP changed separately; Refresh Sheet Descriptions deliberately does not change statistics.
+
 Version 0.10.7 reorganizes Blaster's encounter descriptions into concise PF2e-style entries, preserving all mechanics and inline controls. It does not automatically replace existing world actor descriptions; use Refresh Sheet Descriptions.
 
 Version 0.10.6 removes the portrait fit-down caps so the configured width enlarges every portrait to that width, including tall and low-resolution art.

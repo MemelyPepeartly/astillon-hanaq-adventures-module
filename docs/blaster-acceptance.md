@@ -6,7 +6,7 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 
 ## NPC and compendia
 
-- Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 330, visible skills, three saves, strikes, and linked abilities with no console errors.
+- Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 600, visible skills, three saves, strikes, and linked abilities with no console errors.
 - Open the hype-thrall actor and support effects. Ensure core artwork resolves and links to all eight macros open the intended macro.
 - Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
 - On an existing Blaster with current HP, effects, custom artwork, and GM notes, run **Refresh Sheet Descriptions**. Only shipped ability descriptions should change; repeat it and confirm there are no further writes. Deleted abilities must not be recreated, and ambiguous duplicates must not be overwritten.

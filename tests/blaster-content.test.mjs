@@ -115,7 +115,7 @@ test("every module and core compendium link resolves, including the description 
 test("Blaster has the selected level-18 defenses and no unrequested immunities", () => {
   assert.equal(blaster.system.details.level.value, 18);
   assert.equal(blaster.system.attributes.ac.value, 41);
-  assert.deepEqual(blaster.system.attributes.hp, { value: 330, max: 330, temp: 0, details: "" });
+  assert.deepEqual(blaster.system.attributes.hp, { value: 600, max: 600, temp: 0, details: "" });
   assert.equal(blaster.system.saves.fortitude.value, 30);
   assert.equal(blaster.system.saves.reflex.value, 33);
   assert.equal(blaster.system.saves.will.value, 27);

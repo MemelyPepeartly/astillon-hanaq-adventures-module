@@ -443,8 +443,8 @@
         "value": ""
       },
       "hp": {
-        "value": 330,
-        "max": 330,
+        "value": 600,
+        "max": 600,
         "temp": 0,
         "details": ""
       },

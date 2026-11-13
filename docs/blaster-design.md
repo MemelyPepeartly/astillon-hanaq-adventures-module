@@ -9,7 +9,7 @@ The [GM Core creature-building rules](https://2e.aonprd.com/Rules.aspx?ID=2874),
 | Statistic | Selected | Level-18 comparison |
 | --- | --- | --- |
 | AC | 41 | Moderate 41 |
-| HP | 330 | Just below moderate 331–339 |
+| HP | 600 | User-requested boss endurance override; increased from the original 330 |
 | Fortitude / Reflex / Will | +30 / +33 / +27 | Moderate / high / low |
 | Perception | +30 | Moderate |
 | Ability save DC | 40 | High |
