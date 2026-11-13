@@ -65,7 +65,8 @@ function durationList(value) {
 }
 
 describe("your turn cut-in", { concurrency: 1 }, () => {
-  function setup(t, { enabled = true, reduced = false, userId = "player-1", scale = 1, hold = 1.45, portraitWidth = 400, route = null } = {}) {
+  function setup(t, { enabled = true, reduced = false, userId = "player-1", isGM = false,
+    scale = 1, hold = 1.45, portraitWidth = 400, route = null, savedWorld = {}, legacyUser = {} } = {}) {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const callbacks = new Map();
     const settings = new Map([
@@ -74,6 +75,11 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       ["yourTurnHold", hold],
       ["yourTurnPortraitWidth", portraitWidth],
     ]);
+    const worldDocuments = new Map(Object.entries(savedWorld).map(([key, value]) => [`${MODULE}.${key}`, { value }]));
+    const legacyDocuments = new Map(Object.entries(legacyUser).map(([key, value]) => [`${userId}:${MODULE}.${key}`, { value }]));
+    for (const [key, value] of Object.entries(savedWorld)) settings.set(key, value);
+    const registrations = new Map();
+    const settingsWrites = [];
     const scheduled = [];
     const timerCallbacks = new Map();
     const timerIds = [];
@@ -320,7 +326,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         preload: () => assert.fail("Do not broadcast sound preloads"),
       },
       socket: { emit: () => assert.fail("Stingers must never broadcast") },
-      user: { id: userId, isGM: false },
+      ready: true,
+      user: { id: userId, isGM, can: permission => permission === "SETTINGS_MODIFY" && game.user.isGM },
+      users: { activeGM: { id: isGM ? userId : "primary-gm" } },
       actors: [], scenes: [], combats: [],
       i18n: {
         localize: (key) => ({
@@ -341,12 +349,19 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         format: (key) => key,
       },
       settings: {
-        register() {},
+        register(_scope, key, data) { registrations.set(key, data); },
+        storage: new Map([["world", { getSetting: (key, user = null) => user
+          ? legacyDocuments.get(`${user}:${key}`) : worldDocuments.get(key) }]]),
         get(_scope, key) {
           return settings.get(key);
         },
-        set(_scope, key, value) {
+        async set(_scope, key, value) {
+          if (registrations.get(key)?.scope === "world" && !game.user.can("SETTINGS_MODIFY")) throw new Error("World setting permission denied");
+          settingsWrites.push({ key, value });
+          worldDocuments.set(`${MODULE}.${key}`, { value });
           settings.set(key, value);
+          registrations.get(key)?.onChange?.(value);
+          return value;
         },
       },
     };
@@ -583,12 +598,17 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
     return {
       feature,
+      ui: globals.ui,
       dom,
       sidebar,
       hotbar,
       uiLeft,
       uiTop,
       settings,
+      registrations,
+      settingsWrites,
+      worldDocuments,
+      legacyDocuments,
       scheduled,
       timerCallbacks,
       audioControl,
@@ -619,6 +639,123 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       { combatantId: "c1", round: 1, turn: 1 },
     );
     assert.equal(env.overlays().length, 0);
+  });
+
+  test("world enable overrides a player's old opt-out and players cannot change it", async t => {
+    const env = setup(t, { savedWorld: { yourTurnEnabled: true }, legacyUser: { yourTurnEnabled: false } });
+    await env.feature.ready();
+    await env.turnChange(env.combat(), {}, { combatantId: "c1", round: 1, turn: 0 });
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.settingsWrites.length, 0);
+    await assert.rejects(env.game.settings.set(MODULE, "yourTurnEnabled", false), /permission denied/);
+    // Native Setting._onUpdate invokes onChange for old user-scoped documents too.
+    env.registrations.get("yourTurnEnabled").onChange(false);
+    assert.equal(env.overlays().length, 1, "a legacy player-setting update cannot stop a world-enabled cut-in");
+  });
+
+  test("world disable overrides a player's old opt-in and remote updates cancel playback", async t => {
+    const env = setup(t, { savedWorld: { yourTurnEnabled: true }, legacyUser: { yourTurnEnabled: true } });
+    await env.turnChange(env.combat({ combatant: env.combatant({ sound: "sounds/turn.ogg" }) }), {}, { combatantId: "c1" });
+    assert.equal(env.overlays().length, 1);
+    env.settings.set("yourTurnEnabled", false); // World Setting update received from the GM.
+    env.registrations.get("yourTurnEnabled").onChange(false);
+    await flush();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.audioControl.sounds[0].playing, false);
+    await env.feature.ready();
+    await env.turnChange(env.combat(), {}, { combatantId: "c2" });
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.settingsWrites.length, 0);
+  });
+
+  test("primary GM migrates only their saved user settings and preserves existing world width", async t => {
+    const env = setup(t, { userId: "gm", isGM: true, enabled: false,
+      legacyUser: { yourTurnEnabled: true, yourTurnScale: 1.25, yourTurnHold: 2 },
+      savedWorld: { yourTurnPortraitWidth: 650 } });
+    env.legacyDocuments.set(`player:${MODULE}.yourTurnEnabled`, { value: false });
+    await Promise.all([env.feature.ready(), env.feature.ready()]);
+    assert.deepEqual(env.settingsWrites, [
+      { key: "yourTurnEnabled", value: true }, { key: "yourTurnScale", value: 1.25 }, { key: "yourTurnHold", value: 2 },
+    ]);
+    assert.equal(env.settings.get("yourTurnPortraitWidth"), 650);
+    assert.equal(env.legacyDocuments.get(`gm:${MODULE}.yourTurnEnabled`).value, true, "old preferences are not destructively removed");
+    await env.feature.ready();
+    assert.equal(env.settingsWrites.length, 3);
+  });
+
+  test("existing world choices win over every legacy GM preference", async t => {
+    const env = setup(t, { isGM: true, legacyUser: { yourTurnEnabled: true, yourTurnScale: 1.5, yourTurnHold: 4 },
+      savedWorld: { yourTurnEnabled: false, yourTurnScale: 0.75, yourTurnHold: 1 } });
+    await env.feature.ready();
+    assert.equal(env.settingsWrites.length, 0);
+    assert.equal(env.settings.get("yourTurnEnabled"), false);
+    assert.equal(env.settings.get("yourTurnScale"), 0.75);
+    assert.equal(env.settings.get("yourTurnHold"), 1);
+  });
+
+  test("missing or invalid legacy values seed defaults, not another player's preferences", async t => {
+    const env = setup(t, { userId: "gm", isGM: true, legacyUser: { yourTurnEnabled: "yes", yourTurnScale: 50, yourTurnHold: NaN } });
+    env.legacyDocuments.set(`player:${MODULE}.yourTurnEnabled`, { value: true });
+    await env.feature.ready();
+    assert.deepEqual(env.settingsWrites, [
+      { key: "yourTurnEnabled", value: false }, { key: "yourTurnScale", value: 1 }, { key: "yourTurnHold", value: 1.45 },
+    ]);
+  });
+
+  for (const reason of ["secondary GM", "no settings permission", "not ready"]) {
+    test(`settings migration performs no world writes with ${reason}`, async t => {
+      const env = setup(t, { isGM: true, legacyUser: { yourTurnEnabled: true } });
+      if (reason === "secondary GM") env.game.users.activeGM.id = "otherGM";
+      if (reason === "no settings permission") env.game.user.can = () => false;
+      if (reason === "not ready") env.game.ready = false;
+      await env.feature.ready();
+      assert.equal(env.settingsWrites.length, 0);
+      env.game.ready = true;
+      env.game.users.activeGM.id = env.game.user.id;
+      env.game.user.can = () => true;
+      env.emit("userConnected", { id: "otherGM" }, false);
+      await env.feature.ready();
+      assert.equal(env.settingsWrites.length, 3, "the newly authorized GM can complete migration");
+    });
+  }
+
+  test("migration rechecks GM authority after each awaited setting write", async t => {
+    const env = setup(t, { isGM: true, legacyUser: { yourTurnEnabled: true, yourTurnScale: 1.2 } });
+    const original = env.game.settings.set;
+    env.game.settings.set = async (...args) => {
+      const result = await original(...args);
+      env.game.users.activeGM.id = "otherGM";
+      return result;
+    };
+    await env.feature.ready();
+    assert.deepEqual(env.settingsWrites, [{ key: "yourTurnEnabled", value: true }]);
+  });
+
+  test("a migration failure is reported and a later ready can retry without replacing saved choices", async t => {
+    const env = setup(t, { isGM: true, legacyUser: { yourTurnEnabled: true, yourTurnScale: 1.2 } });
+    const original = env.game.settings.set;
+    const warnings = [];
+    env.ui.notifications.warn = message => warnings.push(message);
+    env.game.settings.set = async (...args) => {
+      if (args[1] === "yourTurnScale") throw new Error("injected setting failure");
+      return original(...args);
+    };
+    await env.feature.ready();
+    assert.equal(warnings.length, 1);
+    assert.deepEqual(env.settingsWrites, [{ key: "yourTurnEnabled", value: true }]);
+    env.game.settings.set = original;
+    await env.feature.ready();
+    assert.equal(env.settingsWrites.length, 3);
+    assert.equal(env.settingsWrites.filter(write => write.key === "yourTurnEnabled").length, 1);
+  });
+
+  test("Foundry's settings visibility contract hides world controls from players", t => {
+    const env = setup(t);
+    const visible = () => [...env.registrations.values()].filter(setting => setting.config &&
+      (setting.scope !== "world" || env.game.user.can("SETTINGS_MODIFY")));
+    assert.equal(visible().length, 0);
+    env.game.user.isGM = true;
+    assert.equal(visible().length, 4);
   });
 
   test("a foundry route is used before the stored portrait path is drawn", async (t) => {
@@ -1725,7 +1862,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(dialog.querySelector("[name=yourTurnArt]").value, "icons/original.webp");
   });
 
-  test("init registers three per-user controls and one world-wide portrait width, not a world portrait path", async (t) => {
+  test("init registers four GM-controlled world settings, not a world portrait path", async (t) => {
     withFoundryNamespace(
       t,
       {
@@ -1744,7 +1881,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         const names = registrations.map((entry) => entry.key);
         assert.deepEqual(names, ["yourTurnEnabled", "yourTurnScale", "yourTurnHold", "yourTurnPortraitWidth"]);
         for (const entry of registrations) {
-          assert.equal(entry.data.scope, entry.key === "yourTurnPortraitWidth" ? "world" : "user");
+          assert.equal(entry.data.scope, "world");
           assert.equal(entry.data.config, true);
         }
         const enabled = registrations.find((entry) => entry.key === "yourTurnEnabled");

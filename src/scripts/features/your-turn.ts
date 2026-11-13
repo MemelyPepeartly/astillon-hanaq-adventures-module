@@ -357,6 +357,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   let presentationOwner: EditorSession | undefined;
   let stinger: Stinger | undefined;
   let soundCleanup: Promise<void> = Promise.resolve();
+  let settingsMigration: Promise<void> | undefined;
   const artCache = new Map<string, ArtResult>();
   const pendingArt = new Map<string, Promise<ArtResult>>();
   const failedArt = new Map<string, number>();
@@ -396,6 +397,34 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   function isEnabled(): boolean {
     return readSetting(SETTING_ENABLED) === true;
+  }
+
+  /** V14 stores user and world settings separately, even when they share a key. */
+  function migrateWorldSettings(): Promise<void> {
+    if (settingsMigration) return settingsMigration;
+    const mayMigrate = () => game.ready && game.user?.isGM && game.user.can("SETTINGS_MODIFY") &&
+      game.users?.activeGM?.id === game.user.id;
+    const storage = game.settings.storage?.get("world") as any;
+    if (!mayMigrate() || typeof storage?.getSetting !== "function") return Promise.resolve();
+    const defaults = [
+      { key: SETTING_ENABLED, value: false, valid: (value: unknown) => typeof value === "boolean" },
+      { key: SETTING_SCALE, value: 1, valid: (value: unknown) => typeof value === "number" && value >= 0.5 && value <= 1.5 },
+      { key: SETTING_HOLD, value: 1.45, valid: (value: unknown) => typeof value === "number" && value >= 0.5 && value <= 4 },
+    ];
+    settingsMigration = (async () => {
+      for (const setting of defaults) {
+        if (!mayMigrate()) return;
+        const key = `${moduleId}.${setting.key}`;
+        if (storage.getSetting(key)) continue; // Never overwrite an existing world choice, including false.
+        const previous = storage.getSetting(key, game.user.id)?.value;
+        // Persist defaults too: a later GM must not replace them with different personal preferences.
+        await game.settings.set(moduleId, setting.key, setting.valid(previous) ? previous : setting.value);
+      }
+    })().catch(error => {
+      console.warn(`${moduleId} | Your Turn world settings migration`, error);
+      ui.notifications?.warn?.("Your Turn: could not carry over the GM's settings. Check Configure Settings before playing.");
+    }).finally(() => { settingsMigration = undefined; });
+    return settingsMigration;
   }
 
   function readScale(): number {
@@ -1356,16 +1385,18 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       game.settings.register(moduleId, SETTING_ENABLED, {
         name: localize("ASTILLON.YourTurn.Enabled"),
         hint: localize("ASTILLON.YourTurn.EnabledHint"),
-        scope: "user",
+        scope: "world",
         config: true,
         type: createBooleanField(),
         default: false,
-        onChange: (enabled: boolean) => { if (!enabled) cancel(); },
+        // Old user-scoped Setting documents can still emit this callback after upgrade.
+        // Only the authoritative world value may stop playback.
+        onChange: () => { if (!isEnabled()) cancel(); },
       });
       game.settings.register(moduleId, SETTING_SCALE, {
         name: localize("ASTILLON.YourTurn.Scale"),
         hint: localize("ASTILLON.YourTurn.ScaleHint"),
-        scope: "user",
+        scope: "world",
         config: true,
         type: createNumberField({ min: 0.5, max: 1.5, step: 0.05 }),
         default: 1,
@@ -1373,7 +1404,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       game.settings.register(moduleId, SETTING_HOLD, {
         name: localize("ASTILLON.YourTurn.Hold"),
         hint: localize("ASTILLON.YourTurn.HoldHint"),
-        scope: "user",
+        scope: "world",
         config: true,
         type: createNumberField({ min: 0.5, max: 4, step: 0.05 }),
         default: 1.45,
@@ -1400,13 +1431,16 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       Hooks.on("updateCombatant", (combatant: any) => { void firstArt(subjectFromCombatant(combatant).art).catch(() => {}); });
       Hooks.on("canvasReady", () => { void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error)); });
       Hooks.on("canvasTearDown", cancel);
+      Hooks.on("userConnected", () => { void migrateWorldSettings(); });
+      Hooks.on("updateUser", () => { void migrateWorldSettings(); });
 
       const view = document.defaultView;
       view?.addEventListener("resize", refreshInsets);
     },
     ready() {
-      // Runs on every client, including those that enable cut-ins later. No world writes.
+      // Every client warms portraits; only the primary settings-authorized GM seeds shared settings.
       void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error));
+      return migrateWorldSettings();
     },
   };
 }
