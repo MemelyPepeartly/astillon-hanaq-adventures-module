@@ -28,6 +28,8 @@ Curated Spectrum selects fire, cold, electricity, or sonic with a DC 40 basic Re
 
 Each charge's sheet description also has six labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Recharge has an inline GM die, and Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. The custom macro remains the correct way to place the five-point area.
 
+The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigger**, and **Effect** labels, horizontal separators, compact spectrum/support choices, and separate Beam Clash outcomes. Long operating instructions live under **Foundry Operating Notes** on the compendium NPC's Notes tab, not in the ability summaries. Existing world Blasters get the shorter rules text by selecting their token and running **Blaster — Refresh Sheet Descriptions** after updating/reloading. This preserves their HP, statistics, artwork, effects, item GM notes, and actor Notes; consult the compendium Notes for the new operating reference. Newly summoned/imported hype thralls and support effects also use the concise source descriptions.
+
 **Clear Blast Areas** removes only the selected Blaster's areas. **Release Blast Root** is a GM adjudication tool for forced movement or corrections; clearing areas does not refund a use or end the root. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
 
 ### Flash Mob
@@ -90,6 +92,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art and color together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.7 reorganizes Blaster's encounter descriptions into concise PF2e-style entries, preserving all mechanics and inline controls. It does not automatically replace existing world actor descriptions; use Refresh Sheet Descriptions.
 
 Version 0.10.6 removes the portrait fit-down caps so the configured width enlarges every portrait to that width, including tall and low-resolution art.
 

@@ -29,7 +29,7 @@
       "img": "icons/svg/skull.svg",
       "system": {
         "description": {
-          "value": "<p>This is Blaster's custom disposable support minion, not a real bard NPC or a separate level-18 encounter enemy. Level 18 is a scaling shell for the summoning integration. Award no separate XP for these thralls; they are part of Blaster's abilities.</p><p>It has no independent turns, actions, reactions, Strikes, spellcasting, or free support. This specific restriction overrides the usual two-action minion command. It is stationary unless a separate ability explicitly commands movement. Blaster's one-action Command Flash Mob chooses one live thrall within 60 feet to grant exactly one linked support benefit to Blaster; the command does not move it.</p><p>It is automatically hit by attacks and automatically fails all saving throws. Its AC and save numbers are placeholders for this thrall behavior, not level-18 defenses. It has 1 HP and no dying recovery. At 0 HP it is destroyed and no longer usable for support or the live cap; remove its token. Runtime cleanup occurs after 1 minute, not immediately at 0 HP. It retains the assistant thrall's immunities and can contribute to flanking as described by that skeleton; this grants no Strike.</p>",
+          "value": "<p>The hype thrall has no independent turns, actions, reactions, Strikes, or spells. Command Flash Mob grants support only, not the usual two minion actions. The thrall is stationary unless another ability moves it.</p>\n<p>Attacks automatically hit the thrall, and it automatically fails all saving throws. It has 1 HP, is destroyed at 0 HP, and does not use dying rules. It can flank but cannot Strike.</p>\n<hr />\n<p><strong>Special</strong> The thrall grants no separate XP.</p>",
           "gm": ""
         },
         "publication": {
@@ -72,7 +72,7 @@
       "img": "icons/svg/skull.svg",
       "system": {
         "description": {
-          "value": "<p>A Hype Thrall cannot hold its ground. A creature can move into its space as though it were unoccupied. The space is difficult terrain, and the moving creature can automatically push the thrall into an adjacent space outside its path. Forced displacement is not an independent move or support command.</p>",
+          "value": "<p>The thrall's space is difficult terrain, but other creatures can enter it as though it were unoccupied. A creature entering its space can automatically push the thrall into an adjacent space outside that creature's path.</p>",
           "gm": ""
         },
         "publication": {
@@ -181,7 +181,7 @@
       },
       "blurb": "Disposable applause and encouragement; no independent turns.",
       "publicNotes": "<p>A one-hit-point, bard-like support prop created by Flash Mob. This custom thrall uses a level-18 scaling shell and grants no separate encounter XP. It has no independent turns, Strikes, or spells. Its one-minute expiration marker is supplied when summoned.</p>",
-      "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall actor trait for the helper's self:trait:thrall predicate. Runtime adds summoner linkage, owner actor/token UUIDs, creation nonce, and the expiration marker without generating strikes. Do not add this token to initiative as an independent enemy.</p>",
+      "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall actor trait for the helper's self:trait:thrall predicate. Runtime adds summoner linkage, owner actor/token UUIDs, creation nonce, and the expiration marker without generating strikes. Do not add this token to initiative as an independent enemy.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<h3>Support Shell</h3>\n<p>This is a disposable support minion, not a real bard or a separate level-18 enemy. Level 18 is a scaling shell for the summoning integration; AC and saving-throw values are placeholders. Retain the helper thrall's immunities and summoner linkage.</p>\n<p>At 0 HP, remove its token; it no longer qualifies for support or the live cap. Automatic runtime cleanup occurs after 1 minute, not immediately at 0 HP. Command Flash Mob chooses one living own thrall within 60 feet and gives a benefit only to Blaster.</p>\n<h3>Yield the Stage</h3>\n<p>This forced displacement does not grant the thrall an independent move or a support command.</p>",
       "publication": {
         "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
         "authors": "",

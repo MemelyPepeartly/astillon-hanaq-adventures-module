@@ -5,7 +5,7 @@
   "img": "icons/svg/upgrade.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}. Apply to Blaster, not the thrall. Blaster gains 10 temporary Hit Points once when this effect is created. They do not stack with existing temporary HP: keep the higher amount. They are lost when spent or at the start of Blaster's next turn, whichever comes first.</p><p>This is not healing or regeneration and never refreshes automatically. Each new use costs another Command Flash Mob action. Remove the old copy before applying a fresh one; do not clear temporary HP belonging to another source.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains 10 temporary HP until used or the start of his next turn, whichever comes first. If his existing temporary HP are higher, he keeps them with their original duration.</p>",
       "gm": ""
     },
     "publication": {

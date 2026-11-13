@@ -67,6 +67,16 @@ Actor roles are stored under flags.astillon-hanaq-adventures-module.blasterRole.
 
 Descriptions follow the [PF2e inline-automation style guide](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation): typed damage and area-damage options, basic saves, stable condition UUIDs, effect links, and non-damage dice. These formatting changes do not change the numbers above. Use only one spectrum row. The refresh macro updates matching action/Strike descriptions in a selected existing Blaster without replacing the actor; other data and unmatched/ambiguous items are preserved. Native template links are not substitutes for the four-segment path, and manual d20 links do not submit to Beam Clash's GM-controlled state.
 
+### Ability formatting reference (0.10.7)
+
+The rewrite follows the [PF2e formatting guide](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#formatting) and the [data-entry tool's header/outcome formatter](https://github.com/TikaelSol/PF2e-Foundry-Data-Entry/blob/b3328006e402d4aeb9196dad3f9ef2114e4c476e/dataEntry.py#L850). Native examples checked at PF2e `8b6df942c21d32ceb0894d48988a04d6f9c56d38` (8.7.0, Foundry 14.370): [ancient blue dragon](https://github.com/foundryvtt/pf2e/blob/8b6df942c21d32ceb0894d48988a04d6f9c56d38/packs/pf2e/pathfinder-bestiary/blue-dragon-ancient.json) (Breath Weapon, Storm Breath, Wing Deflection), [Shield Block](https://github.com/foundryvtt/pf2e/blob/8b6df942c21d32ceb0894d48988a04d6f9c56d38/packs/pf2e/feats/general/level-1/shield-block.json), and [Courageous Anthem's effect](https://github.com/foundryvtt/pf2e/blob/8b6df942c21d32ceb0894d48988a04d6f9c56d38/packs/pf2e/spell-effects/spell-effect-courageous-anthem.json).
+
+- Setup labels precede a horizontal rule; the effect, option list, and outcomes are short and separately readable. Native action fields remain responsible for the action glyphs/costs.
+- Six typed damage/save choices remain on every charge. The bent line retains its custom placement macro; no cone or ordinary straight-line template replaces it.
+- Module controls get a short, separated footer. Operational detail moves to the NPC's private Notes, **not** item GM notes: PF2e's item-summary template displays those inline above the ability, which would recreate the clutter.
+- Refresh Sheet Descriptions updates only `system.description.value`. Existing actor private Notes and item GM notes remain untouched. The new compendium Notes remain available as the operating reference without overwriting campaign notes.
+- Only descriptions and actor private Notes changed; all other JSON content is identical to 0.10.6. Readability tests bound paragraph/ability lengths and verify the headers, dividers, options, outcomes, and inline links.
+
 The expiration effect has duration {value:1, unit:"minutes", expiry:"turn-start", sustained:false} and rules:[]. The runtime passes this cloned source through itemsToAdd, not the helper factory that generates attacks. It supplies context.origin actor/token as Blaster and helper summoner linkage {uuid,id,signature}; module owner data uses full actor/token UUIDs and a creation nonce. The helper's auto-expire setting defaults true; the module's marked-summon cleanup also enforces 60 world-time seconds. Do not pre-embed expiration, ownership, nonce, or helper world IDs in the reusable actor.
 
 ## Validation boundary

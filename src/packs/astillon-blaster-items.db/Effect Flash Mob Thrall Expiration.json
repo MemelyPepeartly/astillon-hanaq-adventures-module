@@ -5,7 +5,7 @@
   "img": "icons/svg/clockwork.svg",
   "system": {
     "description": {
-      "value": "<p>Apply only to a summoned Flash Mob Hype Thrall. It lasts 1 minute from creation, then disappears. This marker grants no attacks, actions, bonuses, or replenishing resources.</p><p>Runtime supplies Blaster's actor/token origin and PF2e Summons Assistant summoner linkage. The helper deletes the token when PF2e removes the expired marker, provided its necromancer.thrall.auto-expire setting is enabled (default true). The module also removes summons identified by its owner and creation-nonce flags after 60 world-time seconds, even if helper auto-expire or PF2e automatic effect removal is disabled. Without runtime, the GM tracks and removes expired thralls manually. Removing this marker early can invoke the helper's deletion handler; do not drag it onto Blaster.</p>",
+      "value": "<p><strong>Target</strong> a summoned @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-actors.Actor.BlasterThrall001]{Flash Mob Hype Thrall}</p>\n<p><strong>Duration</strong> 1 minute</p>\n<hr />\n<p>The thrall disappears when this effect expires.</p>",
       "gm": ""
     },
     "publication": {

@@ -5,7 +5,7 @@
   "img": "icons/svg/sound.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}. Apply to Blaster, not the thrall. Blaster gains a +1 status bonus to attack rolls, damage rolls, and saving throws against fear until the start of Blaster's next turn.</p><p>Multiple copies do not stack, nor do these bonuses stack with other status bonuses to the same statistic. This does not raise save DCs or modify Beam Clash's unmodified d20s. Raw damage rolls outside PF2e's modifier pipeline require the GM to include the single damage bonus once for the whole blast, before basic-save adjustments, never once per segment.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains a +1 status bonus to attack rolls, damage rolls, and saves against fear until the start of his next turn.</p>",
       "gm": ""
     },
     "publication": {

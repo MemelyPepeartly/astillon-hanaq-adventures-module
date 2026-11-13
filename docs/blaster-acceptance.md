@@ -11,6 +11,7 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 - Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
 - On an existing Blaster with current HP, effects, custom artwork, and GM notes, run **Refresh Sheet Descriptions**. Only shipped ability descriptions should change; repeat it and confirm there are no further writes. Deleted abilities must not be recreated, and ambiguous duplicates must not be overwritten.
 - Expand each charge's ability. Check that all six typed damage links and matching basic saves render, Dazzled and Stupefied 1 open the correct conditions, and the recharge die is rollable. Support links should open this module's correct effects. The manual Beam Clash die must not advance the animated contest. Native Strike controls still handle attack, MAP, and critical damage.
+- Check the 0.10.7 layout: bold Frequency/Area/Requirements/Trigger labels above a horizontal rule, a short Effect, compact choices, and separately labeled Beam Clash outcomes. No long operating notes should appear above the rules in item GM-note blocks. Open the compendium actor's Notes tab for the operating reference. On a world actor, Refresh Sheet Descriptions must shorten the ability text without changing existing actor Notes or item GM notes. Confirm Bolster does not change the duration of higher temporary HP from another source.
 
 ## Connected blast
 

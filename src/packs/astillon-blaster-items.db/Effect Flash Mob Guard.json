@@ -5,7 +5,7 @@
   "img": "icons/svg/shield.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}. Apply to Blaster, not the thrall. Blaster gains a +1 status bonus to AC until the start of Blaster's next turn. Multiple copies do not stack, nor does this bonus stack with another status bonus to AC.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains a +1 status bonus to AC until the start of his next turn.</p>",
       "gm": ""
     },
     "publication": {
