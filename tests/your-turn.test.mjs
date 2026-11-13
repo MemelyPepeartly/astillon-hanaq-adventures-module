@@ -75,6 +75,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       ["yourTurnPortraitWidth", portraitWidth],
     ]);
     const scheduled = [];
+    const timerCallbacks = new Map();
     const timerIds = [];
     const realSetTimeout = globalThis.setTimeout;
     const realClearTimeout = globalThis.clearTimeout;
@@ -90,6 +91,41 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const filePickers = [];
     const errors = [];
     const calls = { nextTurn: 0, update: 0 };
+    const dialogs = [];
+    const audioControl = { sounds: [], loadAuto: true, playAuto: true, stopAuto: true, failLoad: false, failPlay: false, failStop: false };
+
+    class SoundStub {
+      constructor(options) {
+        this.options = options;
+        this.playing = false;
+        this.failed = false;
+        this.playCalls = [];
+        this.stopCalls = [];
+        this.loads = [];
+        audioControl.sounds.push(this);
+      }
+      async load(options) {
+        this.loads.push(options);
+        if (!audioControl.loadAuto) await new Promise(resolve => { this.finishLoad = resolve; });
+        if (audioControl.failLoad) throw new Error("Audio missing");
+        return this;
+      }
+      async play(options) {
+        this.playCalls.push(options);
+        this.overlayAtPlay = dom.window.document.querySelector(ROOT);
+        if (!audioControl.playAuto) await new Promise(resolve => { this.finishPlay = resolve; });
+        if (audioControl.failPlay) throw new Error("Audio blocked");
+        this.playing = true;
+        return this;
+      }
+      async stop(options) {
+        this.stopCalls.push(options);
+        if (!audioControl.stopAuto) await new Promise(resolve => { this.finishStop = resolve; });
+        this.playing = false;
+        if (audioControl.failStop) throw new Error("Stop failed");
+        return this;
+      }
+    }
 
     const emit = (name, ...args) => {
       for (const callback of callbacks.get(name) ?? []) callback(...args);
@@ -276,6 +312,14 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
     const viewedCombat = { id: "combat-viewed" };
     const game = {
+      audio: {
+        interface: { name: "Foundry interface master volume" },
+        unlock: Promise.resolve(),
+        create: options => new SoundStub(options),
+        play: () => assert.fail("A managed Sound must handle local playback"),
+        preload: () => assert.fail("Do not broadcast sound preloads"),
+      },
+      socket: { emit: () => assert.fail("Stingers must never broadcast") },
       user: { id: userId, isGM: false },
       actors: [], scenes: [], combats: [],
       i18n: {
@@ -289,6 +333,10 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
           "ASTILLON.YourTurn.Browse": "Browse",
           "ASTILLON.YourTurn.Preview": "Preview",
           "ASTILLON.YourTurn.Save": "Save",
+          "ASTILLON.YourTurn.Sound": "Sound stinger (optional)",
+          "ASTILLON.YourTurn.SoundPlaceholder": "Leave blank for silence",
+          "ASTILLON.YourTurn.SoundHint": "Sound plays once with the cut-in and stops when it ends. Uses your Interface volume.",
+          "ASTILLON.YourTurn.StopPreview": "Stop preview",
         })[key] ?? key,
         format: (key) => key,
       },
@@ -311,7 +359,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
       async browse() {
         this.browsed = true;
-        this.options.callback?.("icons/picked.webp");
+        this.options.callback?.(this.options.type === "audio" ? "sounds/picked.ogg" : "icons/picked.webp");
       }
     }
 
@@ -329,6 +377,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
               const dialog = { element: wrap };
               let resolve;
               const closed = new Promise(done => { resolve = done; });
+              dialog.close = () => { config.close?.(new dom.window.Event("close"), dialog); wrap.remove(); resolve(null); };
+              dialogs.push(dialog);
               config.render?.(new dom.window.Event("render"), dialog);
               for (const button of config.buttons ?? []) {
                 const element = dom.window.document.createElement("button");
@@ -339,6 +389,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
                   event.preventDefault();
                   try {
                     const result = await button.callback?.(event, element, dialog);
+                    config.close?.(new dom.window.Event("close"), dialog);
                     wrap.remove(); resolve(result);
                   } catch (error) { errors.push(error.message); }
                 });
@@ -383,6 +434,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       foundry: foundryNamespace,
       setTimeout: (fn, ms, ...args) => {
         scheduled.push(ms);
+        timerCallbacks.set(ms, fn);
         const id = realSetTimeout(fn, ms, ...args);
         timerIds.push(id);
         return id;
@@ -411,6 +463,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
     t.after(async () => {
       feature.api.cancel();
+      audioControl.loadAuto = audioControl.playAuto = audioControl.stopAuto = true;
+      for (const sound of audioControl.sounds) { sound.finishLoad?.(); sound.finishPlay?.(); sound.finishStop?.(); }
       imageControl.auto = true;
       for (const finish of imageControl.pending.splice(0)) finish();
       await flush();
@@ -429,11 +483,13 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       img = "icons/actor.webp",
       art,
       color,
+      sound,
       documentName = "Actor",
     } = {}) {
       const flags = {};
       if (art !== undefined) flags.yourTurnArt = art;
       if (color !== undefined) flags.yourTurnColor = color;
+      if (sound !== undefined) flags.yourTurnSound = sound;
       return {
         name,
         img,
@@ -442,6 +498,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
         setCalls: [],
         unsetCalls: [],
         updated: false,
+        updateCalls: [],
         isEditable: true,
         getFlag(module, key) {
           assert.equal(module, MODULE);
@@ -458,6 +515,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
           this.unsetCalls.push(key);
         },
         async update(changes) {
+          this.updateCalls.push(changes);
           this.updated = true;
           calls.update += 1;
           for (const [key, value] of Object.entries(changes)) {
@@ -477,11 +535,12 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       actorImg = "icons/actor.webp",
       art,
       color,
+      sound,
       baseArt,
       baseColor,
       actorName,
     } = {}) {
-      const actor = makeActor({ name: actorName ?? name, img: actorImg, art, color });
+      const actor = makeActor({ name: actorName ?? name, img: actorImg, art, color, sound });
       const baseActor = baseArt !== undefined || baseColor !== undefined
         ? makeActor({ name: "Base", img: "icons/base.webp", art: baseArt, color: baseColor })
         : null;
@@ -531,6 +590,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       uiTop,
       settings,
       scheduled,
+      timerCallbacks,
+      audioControl,
+      dialogs,
       imageControl,
       resizeObservers,
       filePickers,
@@ -1215,7 +1277,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("editable sheet can preview the draft and save flags", async (t) => {
     const env = setup(t, { enabled: false });
-    const actor = env.makeActor({ name: "Editor", img: "icons/saved-actor.webp", art: "icons/stored.webp" });
+    const actor = env.makeActor({ name: "Editor", img: "icons/saved-actor.webp", art: "icons/stored.webp", sound: "sounds/stored.ogg" });
     const host = env.dom.window.document.createElement("section");
     const header = env.dom.window.document.createElement("div");
     header.className = "window-header";
@@ -1241,6 +1303,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(dialog.querySelectorAll("form").length, 1, "Foundry owns the only form");
     const art = dialog.querySelector("[name=yourTurnArt]");
     const color = dialog.querySelector("[name=yourTurnColor]");
+    const sound = dialog.querySelector("[name=yourTurnSound]");
+    assert.equal(sound.value, "sounds/stored.ogg");
     assert.equal(art.value, "icons/stored.webp");
     assert.equal(dialog.querySelector("[data-action=preview]").textContent, "Preview");
     assert.equal(dialog.querySelector("[data-action=save]").textContent, "Save");
@@ -1250,8 +1314,15 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.filePickers[0].options.type, "image");
     assert.equal(env.filePickers[0].options.field, art);
     assert.equal(env.filePickers[0].browsed, true);
+    dialog.querySelector("[data-action=browse-sound]").click();
+    assert.equal(sound.value, "sounds/picked.ogg");
+    assert.equal(env.filePickers[1].options.type, "audio");
+    assert.equal(env.filePickers[1].options.field, sound);
+    assert.equal(env.filePickers[1].options.current, "sounds/stored.ogg");
+    assert.equal(env.filePickers[1].browsed, true);
     art.value = "icons/draft.webp";
     color.value = "#112233";
+    sound.value = "  sounds/draft.ogg  ";
     dialog.querySelector("[data-action=preview]").click();
     await flush();
     assert.equal(env.overlays().length, 1);
@@ -1260,24 +1331,278 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.calls.nextTurn, 0);
     assert.equal(env.overlays()[0].querySelector(".astillon-yt-character img").getAttribute("src"), "icons/draft.webp");
     assert.equal(env.overlays()[0].style.getPropertyValue("--yt-color"), "#112233");
+    assert.equal(env.audioControl.sounds[0].options.src, "sounds/draft.ogg");
+    assert.equal(actor.flags.yourTurnSound, "sounds/stored.ogg");
 
     dialog.querySelector("[data-action=save]").click();
     await flush();
     assert.equal(actor.flags.yourTurnArt, "icons/draft.webp");
     assert.equal(actor.flags.yourTurnColor, "#112233");
+    assert.equal(actor.flags.yourTurnSound, "sounds/draft.ogg");
     assert.equal(dialog.isConnected, false);
-    assert.equal(env.calls.update, 1, "portrait and color save in one document update");
+    assert.equal(env.calls.update, 1, "portrait, color, and sound save in one document update");
+    assert.deepEqual(actor.updateCalls[0], {
+      [`flags.${MODULE}.yourTurnArt`]: "icons/draft.webp",
+      [`flags.${MODULE}.yourTurnColor`]: "#112233",
+      [`flags.${MODULE}.yourTurnSound`]: "sounds/draft.ogg",
+    });
+    assert.equal(env.audioControl.sounds[0].playing, false, "saving stops the editor preview");
 
     header.querySelector("button").click();
     const reopened = env.dom.window.document.querySelector(".astillon-yt-dialog");
     assert.equal(reopened.querySelector("[name=yourTurnArt]").value, "icons/draft.webp");
     assert.equal(reopened.querySelector("[name=yourTurnColor]").value, "#112233");
+    assert.equal(reopened.querySelector("[name=yourTurnSound]").value, "sounds/draft.ogg");
     reopened.querySelector("[name=yourTurnArt]").value = "   ";
+    reopened.querySelector("[name=yourTurnSound]").value = "   ";
     reopened.querySelector("[data-action=save]").click();
     await flush();
     assert.ok(actor.unsetCalls.includes("yourTurnArt"));
     assert.equal(actor.flags.yourTurnArt, undefined);
+    assert.equal(actor.flags.yourTurnSound, undefined);
+    assert.ok(actor.unsetCalls.includes("yourTurnSound"));
     assert.deepEqual(env.errors, [], "Browse and Preview must not fall through to DialogV2 submit actions");
+  });
+
+  test("sound starts once locally after the displayed portrait decodes and uses Foundry's interface context", async t => {
+    const env = setup(t);
+    let finishDecode;
+    env.dom.window.HTMLImageElement.prototype.decode = () => new Promise(resolve => { finishDecode = resolve; });
+    const current = env.combatant({ sound: "sounds/turn.ogg" });
+    const combat = env.combat({ combatant: current });
+    await env.turnChange(combat, { combatantId: null }, { combatantId: current.id, round: 1, turn: 0 });
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.audioControl.sounds.length, 0);
+    finishDecode(); await flush();
+    const [sound] = env.audioControl.sounds;
+    assert.deepEqual(sound.options, {
+      src: "sounds/turn.ogg", context: env.game.audio.interface, singleton: false, preload: false, autoplay: false,
+    });
+    assert.deepEqual(sound.loads, [{ autoplay: false }]);
+    assert.deepEqual(sound.playCalls, [{ loop: false, volume: 1, offset: 0 }]);
+    assert.equal(sound.overlayAtPlay, env.overlays()[0]);
+    assert.equal(sound.playing, true);
+    const history = { combatantId: current.id, round: 1, turn: 0 };
+    await env.turnChange(combat, history, { ...history });
+    assert.equal(env.audioControl.sounds.length, 1);
+    env.timerCallbacks.get(TURN_INTRO_MS)(); await flush();
+    assert.equal(sound.playing, false);
+    assert.equal(env.overlays().length, 0);
+  });
+
+  test("blank paths are silent and disabled cut-ins never load sound", async t => {
+    const env = setup(t, { enabled: false });
+    await env.turnChange(env.combat({ combatant: env.combatant({ sound: "sounds/turn.ogg" }) }), {}, { combatantId: "c1" });
+    assert.equal(env.audioControl.sounds.length, 0);
+    await env.feature.api.preview(env.makeActor({ sound: "  " })); await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.audioControl.sounds.length, 0);
+    env.imageControl.auto = false;
+    env.settings.set("yourTurnEnabled", true);
+    const combat = env.combat({ combatant: env.combatant({ actorImg: "icons/late-sound.webp", sound: "sounds/turn.ogg" }) });
+    env.emit("combatTurnChange", combat, {}, { combatantId: "c1" });
+    env.settings.set("yourTurnEnabled", false);
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await flush();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.audioControl.sounds.length, 0);
+  });
+
+  test("cancel during image loading suppresses sound and artwork", async t => {
+    const env = setup(t);
+    env.imageControl.auto = false;
+    const showing = env.feature.api.preview(env.makeActor({ sound: "sounds/turn.ogg" }));
+    env.feature.api.cancel();
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await showing; await flush();
+    assert.equal(env.audioControl.sounds.length, 0);
+    assert.equal(env.overlays().length, 0);
+  });
+
+  test("audio unlock cannot resurrect a canceled cut-in", async t => {
+    const env = setup(t);
+    let unlock;
+    env.game.audio.unlock = new Promise(resolve => { unlock = resolve; });
+    await env.feature.api.preview(env.makeActor({ sound: "sounds/turn.ogg" }));
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.audioControl.sounds.length, 0);
+    env.emit("canvasTearDown");
+    unlock(); await flush();
+    assert.equal(env.audioControl.sounds.length, 0);
+  });
+
+  test("a canceled audio load never autoplays or stops a replacement using the same path", async t => {
+    const env = setup(t);
+    env.audioControl.loadAuto = false;
+    const actor = env.makeActor({ sound: "sounds/shared.ogg" });
+    await env.feature.api.preview(actor); await flush();
+    const first = env.audioControl.sounds[0];
+    env.audioControl.loadAuto = true;
+    await env.feature.api.preview(actor); await flush();
+    const second = env.audioControl.sounds[1];
+    assert.equal(second.playing, true);
+    first.finishLoad(); await flush();
+    assert.equal(first.playCalls.length, 0);
+    assert.equal(first.playing, false);
+    assert.equal(second.playing, true);
+    assert.equal(second.stopCalls.length, 0);
+    env.emit("canvasTearDown"); await flush();
+    assert.equal(second.playing, false);
+  });
+
+  test("a pending play is stopped again before a replacement sound starts", async t => {
+    const env = setup(t);
+    env.audioControl.playAuto = false;
+    const actor = env.makeActor({ sound: "sounds/shared.ogg" });
+    await env.feature.api.preview(actor); await flush();
+    const first = env.audioControl.sounds[0];
+    assert.equal(first.playCalls.length, 1);
+    env.audioControl.playAuto = true;
+    await env.feature.api.preview(actor); await flush();
+    const second = env.audioControl.sounds[1];
+    assert.equal(second.playCalls.length, 0, "wait for the canceled start and its cleanup");
+    first.finishPlay(); await flush();
+    assert.equal(first.playing, false);
+    assert.ok(first.stopCalls.length >= 2);
+    assert.equal(second.playing, true);
+  });
+
+  test("replacement playback waits for asynchronous sound teardown", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ sound: "sounds/shared.ogg" });
+    await env.feature.api.preview(actor); await flush();
+    const first = env.audioControl.sounds[0];
+    env.audioControl.stopAuto = false;
+    await env.feature.api.preview(actor); await flush();
+    const second = env.audioControl.sounds[1];
+    assert.equal(second.playCalls.length, 0);
+    env.audioControl.stopAuto = true;
+    first.finishStop(); await flush();
+    assert.equal(first.playing, false);
+    assert.equal(second.playing, true);
+  });
+
+  test("audio loading and playback failures preserve the cut-in and permit later playback", async t => {
+    const env = setup(t);
+    t.mock.method(console, "error", () => {});
+    t.mock.method(console, "warn", () => {});
+    const actor = env.makeActor({ sound: "sounds/turn.ogg" });
+    env.audioControl.failLoad = true;
+    await env.feature.api.preview(actor); await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.audioControl.sounds[0].playCalls.length, 0);
+    assert.ok(env.errors.some(error => /Audio missing/.test(error)));
+    env.audioControl.failLoad = false;
+    env.audioControl.failPlay = env.audioControl.failStop = true;
+    await env.feature.api.preview(actor); await flush();
+    assert.equal(env.overlays().length, 1);
+    assert.ok(env.errors.some(error => /Audio blocked/.test(error)));
+    env.audioControl.failPlay = env.audioControl.failStop = false;
+    await env.feature.api.preview(actor); await flush();
+    assert.equal(env.audioControl.sounds.at(-1).playing, true);
+  });
+
+  test("cancel or window dismissal preserves every stored field and stops the editor preview", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456", sound: "sounds/saved.ogg" });
+    for (const dismiss of ["cancel", "close"]) {
+      void env.feature.api.configure(actor);
+      const dialog = env.dialogs.at(-1);
+      dialog.element.querySelector("[name=yourTurnArt]").value = "icons/draft.webp";
+      dialog.element.querySelector("[name=yourTurnColor]").value = "#abcdef";
+      dialog.element.querySelector("[name=yourTurnSound]").value = "sounds/draft.ogg";
+      dialog.element.querySelector("[data-action=preview]").click(); await flush();
+      const sound = env.audioControl.sounds.at(-1);
+      assert.equal(sound.playing, true);
+      if (dismiss === "cancel") dialog.element.querySelector("[data-action=cancel]").click();
+      else dialog.close();
+      await flush();
+      assert.equal(sound.playing, false);
+      assert.equal(env.overlays().length, 0);
+      assert.deepEqual(actor.flags, { yourTurnArt: "icons/saved.webp", yourTurnColor: "#123456", yourTurnSound: "sounds/saved.ogg" });
+    }
+    assert.equal(env.calls.update, 0);
+    assert.deepEqual(env.errors, []);
+  });
+
+  test("closing an editor cancels pending artwork and sound loads", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ sound: "sounds/turn.ogg" });
+    void env.feature.api.configure(actor);
+    env.imageControl.auto = false;
+    const first = env.dialogs[0];
+    first.element.querySelector("[data-action=preview]").click();
+    first.close();
+    env.imageControl.auto = true;
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await flush();
+    assert.equal(env.audioControl.sounds.length, 0);
+    assert.equal(env.overlays().length, 0);
+    void env.feature.api.configure(actor);
+    env.audioControl.loadAuto = false;
+    const second = env.dialogs[1];
+    second.element.querySelector("[data-action=preview]").click(); await flush();
+    second.close();
+    env.audioControl.sounds[0].finishLoad(); await flush();
+    assert.equal(env.audioControl.sounds[0].playCalls.length, 0);
+    assert.equal(env.calls.update, 0);
+  });
+
+  test("stop preview and path changes cancel audio without submitting the editor", async t => {
+    const env = setup(t);
+    void env.feature.api.configure(env.makeActor({ sound: "sounds/turn.ogg" }));
+    const dialog = env.dialogs[0].element;
+    for (const stop of ["button", "input", "change"]) {
+      dialog.querySelector("[data-action=preview]").click(); await flush();
+      const sound = env.audioControl.sounds.at(-1);
+      if (stop === "button") dialog.querySelector("[data-action=stop-preview]").click();
+      else dialog.querySelector("[name=yourTurnSound]").dispatchEvent(new env.dom.window.Event(stop, { bubbles: true }));
+      await flush();
+      assert.equal(sound.playing, false);
+      assert.equal(env.overlays().length, 0);
+      assert.equal(dialog.isConnected, true);
+    }
+    assert.equal(env.calls.update, 0);
+    assert.deepEqual(env.errors, []);
+  });
+
+  test("closing another editor does not cancel the latest editor or combat stinger", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ sound: "sounds/turn.ogg" });
+    void env.feature.api.configure(actor); void env.feature.api.configure(actor);
+    env.dialogs[0].element.querySelector("[data-action=preview]").click(); await flush();
+    env.dialogs[1].element.querySelector("[data-action=preview]").click(); await flush();
+    const second = env.audioControl.sounds.at(-1);
+    env.dialogs[0].close(); await flush();
+    assert.equal(second.playing, true);
+    await env.turnChange(env.combat({ combatant: env.combatant({ sound: "sounds/combat.ogg" }) }), {}, { combatantId: "c1" });
+    const combatSound = env.audioControl.sounds.at(-1);
+    env.dialogs[1].close(); await flush();
+    assert.equal(combatSound.playing, true);
+    assert.equal(env.overlays().length, 1);
+  });
+
+  test("audio picker cancellation, failure, and late selection preserve the draft and saved sound", async t => {
+    const env = setup(t);
+    t.mock.method(console, "error", () => {});
+    const actor = env.makeActor({ sound: "sounds/saved.ogg" });
+    const Picker = foundry.applications.apps.FilePicker.implementation;
+    const browse = t.mock.method(Picker.prototype, "browse", async function () { this.browsed = true; });
+    void env.feature.api.configure(actor);
+    const dialog = env.dialogs[0];
+    const input = dialog.element.querySelector("[name=yourTurnSound]");
+    input.value = "sounds/typed.ogg";
+    dialog.element.querySelector("[data-action=browse-sound]").click(); await flush();
+    assert.equal(input.value, "sounds/typed.ogg");
+    browse.mock.mockImplementation(async () => { throw new Error("Storage unavailable"); });
+    dialog.element.querySelector("[data-action=browse-sound]").click(); await flush();
+    assert.equal(input.value, "sounds/typed.ogg");
+    assert.ok(env.errors.some(error => /file browser.*Storage unavailable/.test(error)));
+    dialog.close(); await flush();
+    env.filePickers[0].options.callback("sounds/too-late.ogg");
+    assert.equal(input.value, "sounds/typed.ogg");
+    assert.equal(actor.flags.yourTurnSound, "sounds/saved.ogg");
+    assert.equal(env.calls.update, 0);
   });
 
   test("startup preloads world actors, synthetic tokens, base-actor art, combatants and all slices even while disabled", async t => {
@@ -1374,14 +1699,16 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
   test("save failures are visible and cannot silently clear the stored artwork", async t => {
     const env = setup(t);
     t.mock.method(console, "error", () => {});
-    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456" });
+    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456", sound: "sounds/saved.ogg" });
     actor.update = async () => { throw new Error("Permission denied"); };
     void env.feature.api.configure(actor);
     const dialog = env.dom.window.document.querySelector(".astillon-yt-dialog");
     dialog.querySelector("[name=yourTurnArt]").value = "icons/new.webp";
+    dialog.querySelector("[name=yourTurnSound]").value = "sounds/new.ogg";
     dialog.querySelector("[data-action=save]").click(); await flush();
     assert.equal(actor.flags.yourTurnArt, "icons/saved.webp");
     assert.equal(actor.flags.yourTurnColor, "#123456");
+    assert.equal(actor.flags.yourTurnSound, "sounds/saved.ogg");
     assert.ok(env.errors.some(message => /could not save.*Permission denied/.test(message)));
     assert.equal(dialog.isConnected, true);
   });

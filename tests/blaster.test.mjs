@@ -7,6 +7,7 @@ import { createBlasterFeature } from "../dist/scripts/features/blaster.js";
 
 const MODULE = "astillon-hanaq-adventures-module";
 const points = [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 250, y: 150 }, { x: 350, y: 150 }];
+const maximumLegPoints = [{ x: 50, y: 50 }, { x: 1650, y: 50 }, { x: 50, y: 50 }, { x: 1650, y: 50 }, { x: 50, y: 50 }];
 test("five waypoints produce four native line shapes with three-square full width", () => {
   const shapes = lineShapes(points, 100, 3);
   assert.equal(shapes.length, 4);
@@ -17,6 +18,14 @@ test("five waypoints produce four native line shapes with three-square full widt
   assert.throws(() => lineShapes(points.slice(0, 4), 100, 1), /five/);
   assert.throws(() => lineShapes([{ x: NaN, y: 0 }, ...points.slice(1)], 100, 1), /Invalid/);
   assert.equal(BLAST_TIERS[2].dice, 9);
+});
+
+test("all charge tiers allow 80 feet per leg while retaining damage and width", () => {
+  assert.deepEqual(Object.values(BLAST_TIERS).map(({ range, dice, width }) => ({ range, dice, width })), [
+    { range: 80, dice: 4, width: 1 },
+    { range: 80, dice: 9, width: 1 },
+    { range: 80, dice: 18, width: 3 },
+  ]);
 });
 
 test("root survives intervening turns and round boundary but ends on next own turn", () => {
@@ -38,7 +47,7 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
   const view = dom.window.document.querySelector("canvas");
   view.getBoundingClientRect = () => ({ left: 0, top: 0, width: 2000, height: 1000 });
   const callbacks = new Map();
-  const warnings = [], errors = [], messages = [], regions = [];
+  const warnings = [], errors = [], messages = [], regions = [], prompts = [], measurements = [];
   const flags = { blasterRole: "blaster" };
   const tokenFlags = {};
   const actor = {
@@ -85,13 +94,17 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
       grid: {
         isSquare: true, size: 100, units: "ft",
         getCenterPoint: p => ({ x: Math.floor(p.x / 100) * 100 + 50, y: Math.floor(p.y / 100) * 100 + 50 }),
-        measurePath: path => ({ distance: path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - path[i].x, p.y - path[i].y) / 20, 0) }),
+        measurePath: path => {
+          assert.equal(path.length, 2, "Measure each leg independently through the public grid API");
+          measurements.push(path);
+          return { distance: Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) / 20 };
+        },
       },
     },
     foundry: {
       utils: { escapeHTML: s => s, randomID: () => "blast-1" },
       dice: { Roll: class { async evaluate() { this.total = 2; return this; } } },
-      applications: { api: { DialogV2: { prompt: async () => ({ charge, mode }) } } },
+      applications: { api: { DialogV2: { prompt: async options => { prompts.push(options); return { charge, mode }; } } } },
       documents: { ChatMessage: { getSpeaker: () => ({}), implementation: { create: async data => { messages.push(data); return data; } } } },
     },
   };
@@ -99,10 +112,65 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
   Object.assign(globalThis, globals);
   t.after(() => { for (const k of Object.keys(globals)) { if (prior[k] === undefined) delete globalThis[k]; else globalThis[k] = prior[k]; } dom.window.close(); });
   return {
-    feature: createBlasterFeature(MODULE), warnings, errors, messages, regions, flags, tokenFlags, combat, scene, callbacks, globals,
-    click(p) { view.dispatchEvent(new dom.window.MouseEvent("pointerdown", { clientX: p.x, clientY: p.y, button: 0, bubbles: true, cancelable: true })); },
+    feature: createBlasterFeature(MODULE), warnings, errors, messages, regions, flags, tokenFlags, combat, scene, callbacks, globals, prompts, measurements,
+    click(p, button = 0) { view.dispatchEvent(new dom.window.MouseEvent("pointerdown", { clientX: p.x, clientY: p.y, button, bubbles: true, cancelable: true })); },
+    move(p) { view.dispatchEvent(new dom.window.MouseEvent("pointermove", { clientX: p.x, clientY: p.y, bubbles: true })); },
     key(key) { dom.window.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key, bubbles: true })); },
   };
+}
+
+for (const charge of [1, 2, 3]) {
+  test(`${charge} action tier accepts four 80-foot legs totaling 320 feet with valid hover feedback`, async t => {
+    const env = setup(t, { charge });
+    const pending = env.feature.api.blast(); await setImmediate();
+    const prompt = document.createElement("div");
+    prompt.innerHTML = env.prompts[0].content;
+    const options = [...prompt.querySelectorAll('select[name="charge"] option')];
+    assert.equal(options.length, 3);
+    assert.ok(options.every(option => option.textContent.includes("80 ft per leg")));
+    assert.match(prompt.textContent, /Five clicks create four connected legs, each up to 80 ft/);
+    env.click(maximumLegPoints[0]);
+    for (const [i, point] of maximumLegPoints.slice(1).entries()) {
+      env.move(point);
+      assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff4433");
+      assert.match(document.querySelector(".aha-blast-instructions").textContent, /80 ft per leg · Next leg: 80\/80 ft/);
+      env.click(point);
+      if (i < 3) assert.match(document.querySelector(".aha-blast-instructions").textContent, /Last leg: 80\/80 ft/);
+    }
+    await pending;
+    assert.deepEqual(env.warnings, []);
+    assert.deepEqual(env.errors, []);
+    assert.equal(env.regions.length, 4);
+    assert.deepEqual(env.regions.map(r => r.shapes[0].length / 20), [80, 80, 80, 80]);
+    assert.equal(env.regions.reduce((total, r) => total + r.shapes[0].length / 20, 0), 320);
+    assert.ok(env.measurements.length > 0);
+    assert.ok(env.measurements.every(path => path.length === 2));
+    assert.ok(env.regions.every(r => r.shapes[0].width === (charge === 3 ? 300 : 100)));
+    assert.equal(env.messages.length, 1);
+    assert.ok(env.messages[0].content.includes(`${BLAST_TIERS[charge].dice}d6[fire]`));
+    assert.equal(env.flags.blastUse.round, 1);
+    assert.equal(env.flags.blastUse.readyRound, charge === 3 ? 4 : undefined);
+    assert.equal(env.tokenFlags.blastRoot?.round, charge === 3 ? 1 : undefined);
+  });
+
+  test(`${charge} action tier rejects an 85-foot last leg even after three short legs`, async t => {
+    const env = setup(t, { charge });
+    const pending = env.feature.api.blast(); await setImmediate();
+    for (const point of points.slice(0, 4)) env.click(point);
+    const tooFar = { x: 1950, y: 150 };
+    env.move(tooFar);
+    assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff2222");
+    assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 85\/80 ft/);
+    env.click(tooFar);
+    assert.equal(env.warnings.at(-1), "Each leg cannot exceed 80 ft.");
+    assert.match(document.querySelector(".aha-blast-instructions").textContent, /4\/5 points/);
+    assert.equal(env.regions.length, 0);
+    assert.equal(env.flags.blastUse, undefined);
+    assert.equal(env.tokenFlags.blastRoot, undefined);
+    env.click(points[4]); await pending;
+    assert.deepEqual(env.errors, []);
+    assert.equal(env.regions.length, 4);
+  });
 }
 
 test("placement commits exactly four regions, one chat card and shared cooldown; clear removes only own areas", async t => {
@@ -131,17 +199,52 @@ test("placement commits exactly four regions, one chat card and shared cooldown;
 test("cancel and undo leave no templates, cooldown or root and remove listeners", async t => {
   const env = setup(t);
   const pending = env.feature.api.blast(); await setImmediate();
-  env.click(points[0]); env.click(points[1]); env.key("Backspace");
+  env.click(maximumLegPoints[0]); env.click(maximumLegPoints[1]);
+  env.move({ x: 1750, y: 50 });
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 5\/80 ft/);
+  env.key("Backspace");
   assert.match(document.querySelector(".aha-blast-instructions").textContent, /1\/5/);
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /Next leg: 85\/80 ft/);
+  assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff2222");
+  env.move(maximumLegPoints[1]);
+  assert.equal(document.querySelector(".aha-blast-preview polyline").getAttribute("stroke"), "#ff4433");
+  env.key("Backspace");
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /0\/5.*Click Blaster's square first/);
+  env.click(maximumLegPoints[1]);
+  assert.match(env.warnings.at(-1), /first waypoint/);
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /0\/5/);
+  env.click(maximumLegPoints[0]); env.click(maximumLegPoints[1]);
   env.key("Escape"); await pending;
   assert.equal(env.regions.length, 0);
   assert.equal(env.flags.blastUse, undefined);
   assert.equal(env.tokenFlags.blastRoot, undefined);
   assert.equal(document.querySelector(".aha-blast-preview"), null);
+  assert.equal(document.querySelector(".aha-blast-instructions"), null);
   assert.equal(env.callbacks.get("canvasTearDown").length, 0);
+  assert.equal(env.callbacks.get("canvasPan").length, 0);
 });
 
-test("invalid origin and overlong path are rejected; scene teardown cancels placement", async t => {
+for (const cancel of ["right-click", "api"]) {
+  test(`${cancel} cancels a path exceeding 80 feet in total without spending the blast`, async t => {
+    const env = setup(t);
+    const pending = env.feature.api.blast(); await setImmediate();
+    for (const point of maximumLegPoints.slice(0, 3)) env.click(point);
+    assert.match(document.querySelector(".aha-blast-instructions").textContent, /3\/5/);
+    if (cancel === "right-click") env.click(maximumLegPoints[2], 2);
+    else env.feature.api.cancelPlacement();
+    await pending;
+    assert.deepEqual(env.errors, []);
+    assert.equal(env.regions.length, 0);
+    assert.equal(env.flags.blastUse, undefined);
+    assert.equal(env.tokenFlags.blastRoot, undefined);
+    assert.equal(document.querySelector(".aha-blast-preview"), null);
+    assert.equal(document.querySelector(".aha-blast-instructions"), null);
+    assert.equal(env.callbacks.get("canvasTearDown").length, 0);
+    assert.equal(env.callbacks.get("canvasPan").length, 0);
+  });
+}
+
+test("invalid origin and overlong leg are rejected; scene teardown cancels placement", async t => {
   const env = setup(t, { charge: 1 });
   const pending = env.feature.api.blast(); await setImmediate();
   env.click(points[2]); assert.match(env.warnings.at(-1), /first waypoint/);

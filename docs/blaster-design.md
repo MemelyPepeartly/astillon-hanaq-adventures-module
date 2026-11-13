@@ -18,15 +18,15 @@ The [GM Core creature-building rules](https://2e.aonprd.com/Rules.aspx?ID=2874),
 
 The two ordinary Strikes provide options after or without Charged Blast, use the normal multiple-attack penalty, and receive no Curated Spectrum riders. Crystal Flechette is a physical projectile, so every actual blast remains selectable through Curated Spectrum.
 
-| Charged Blast cost | Raw damage (mean) | Rider damage (mean) | Total path / width |
+| Charged Blast cost | Raw damage (mean) | Rider damage (mean) | Per-segment limit / width |
 | --- | --- | --- | --- |
-| 1 action | 4d6 (14) | 2d6 (7) | 60 feet / 1 square |
-| 2 actions | 9d6 (31.5) | 7d6 (24.5) | 90 feet / 1 square |
-| 3 actions | 18d6 (63) | 16d6 (56) | 120 feet / 3 squares |
+| 1 action | 4d6 (14) | 2d6 (7) | 80 feet / 1 square |
+| 2 actions | 9d6 (31.5) | 7d6 (24.5) | 80 feet / 1 square |
+| 3 actions | 18d6 (63) | 16d6 (56) | 80 feet / 3 squares |
 
 GM Core Table 2–12 lists level-18 unlimited area damage as 9d6 (approximately 30) and limited area damage as 19d6 (approximately 67), based on a two-action activity. The one-action option is substantially lower; the reusable two-action option follows the unlimited benchmark. The three-action option stays below the limited benchmark, consumes the whole turn, roots Blaster until his next turn, and recharges only after 1d4 **full intervening rounds**: readyRound = firingRound + roll + 1. A round-4 shot with a roll of 1 becomes available in round 6. The lower modes remain usable on intervening rounds.
 
-The three variants share one use per round and all carry flourish. PF2e item frequency counters alone do not synchronize separate action documents; runtime or the GM must enforce the shared limit. Clear Blast and Release Root never restore that use or recharge. Five waypoints make four segments with one combined length budget. Blaster is excluded; every other creature is affected at most once across the union of all segments.
+The three variants share one use per round and all carry flourish. PF2e item frequency counters alone do not synchronize separate action documents; runtime or the GM must enforce the shared limit. Clear Blast and Release Root never restore that use or recharge. Five waypoints make four independently limited segments, each up to 80 feet: a maximum 320-foot path at every charge level. This user-requested range override replaces the former 60/90/120-foot total budgets without changing damage or action costs. Blaster is excluded; every other creature is affected at most once across the union of all segments.
 
 Raw fire, cold, electricity, and sonic use a DC 40 basic Reflex save. Dazzling light is fire with two fewer dice and adds dazzled for 1 round only on a failure or critical failure. Psychic humiliation instead deals mental damage with two fewer dice, uses a DC 40 basic Will save, and adds stupefied 1 for 1 round only on a failure or critical failure. The reduced dice pay for the rider and flexible save/damage selection. All riders end at the start of Blaster's next turn.
 
@@ -40,7 +40,11 @@ Flash Mob costs 1 action, creates one thrall within 30 feet, and is usable once 
 
 The [Hype Thrall source](../src/packs/astillon-blaster-actors.db/Flash%20Mob%20Hype%20Thrall.json) is a custom support minion derived from the assistant's built-in Thrall. It retains 1 HP, automatic-hit/failed-save defenses, undead immunities, flanking participation, and the ability to be pushed aside. Its level-18 entry is a scaling shell, not an independent level-18 enemy or a real bard; award no separate XP. It has no turns, Strikes, spells, reactions, or standard two-action minion turn. Support commands grant no movement. These disposable bodies and their flanking can still affect an encounter; include that utility in Blaster's overall playtest.
 
+Each variant has its own NPC sheet and bundled transparent portrait/token image. Hype Fan's **Make Some Noise** showcases Inspire; Ego Guard's **Protect the Talent** showcases Guard; Paparazzo's **Flash of Fame** showcases Bolster. These are signature presentation choices, not exclusive powers: every variant retains all three support options and the same original 1-HP shell. No new bonus, attack, or free command is granted. Flash Mob presents a portrait-card radio picker (including random), then passes exactly one fixed actor UUID to the existing Summons Assistant placement API. Cancelling either step leaves the use unspent; actor identity, current turn, GM authority, and the three-live cap are rechecked before placement.
+
 ## Verified source basis
+
+Entourage/range update rechecked against Foundry **14.370** and PF2e **8.7.0** at `8b6df942c21d32ceb0894d48988a04d6f9c56d38`. The original implementation pins below remain historical references.
 
 - Foundry [releases](https://foundryvtt.com/releases/) and [API](https://foundryvtt.com/api/) checked: stable **14.370**, API generation 14.
 - PF2e **8.7.0**, verified 14.370, commit **bdea4f90b512ccaa13c7205c357e8863a451950d**. Source schema/migration version **0.961**.
@@ -56,7 +60,9 @@ Actor UUIDs use Compendium.astillon-hanaq-adventures-module.astillon-blaster-act
 | Document | ID | Slug or actor role |
 | --- | --- | --- |
 | Blaster | BlasterActor0001 | blaster |
-| Flash Mob Hype Thrall | BlasterThrall001 | hype-thrall |
+| Flash Mob Hype Fan | BlasterThrall001 | hype-thrall / hype-fan |
+| Flash Mob Ego Guard | BlasterThrall002 | hype-thrall / ego-guard |
+| Flash Mob Paparazzo | BlasterThrall003 | hype-thrall / paparazzo |
 | Command Flash Mob | BlasterCommand01 | blaster-command-flash-mob |
 | Inspire | BlasterInspire01 | blaster-inspire |
 | Guard | BlasterGuard0001 | blaster-guard |

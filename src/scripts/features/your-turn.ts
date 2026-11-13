@@ -8,6 +8,7 @@ const SETTING_PORTRAIT_WIDTH = "yourTurnPortraitWidth";
 const DEFAULT_PORTRAIT_WIDTH = 400;
 const ART_FLAG = "yourTurnArt";
 const COLOR_FLAG = "yourTurnColor";
+const SOUND_FLAG = "yourTurnSound";
 const DEFAULT_COLOR = "#2B8CFF";
 const ROOT_CLASS = "astillon-yt";
 const CONFIGURE_CLASS = "astillon-your-turn-configure";
@@ -61,9 +62,12 @@ type Subject = {
   name: string;
   art: string[];
   color: string;
+  sound: string;
 };
 
-type ArtDraft = { art: string; color: string };
+type ArtDraft = { art: string; color: string; sound?: string };
+type EditorSession = { closed: boolean };
+type Stinger = { sound?: any; starting?: Promise<unknown> };
 
 type Rgb = { r: number; g: number; b: number };
 
@@ -350,6 +354,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   let removeTimer: ReturnType<typeof setTimeout> | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let observedSidebar: Element | null = null;
+  let presentationOwner: EditorSession | undefined;
+  let stinger: Stinger | undefined;
+  let soundCleanup: Promise<void> = Promise.resolve();
   const artCache = new Map<string, ArtResult>();
   const pendingArt = new Map<string, Promise<ArtResult>>();
   const failedArt = new Map<string, number>();
@@ -445,6 +452,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       name,
       art: artChainFrom(actor, baseActor, actor?.img, combatant?.token?.texture?.src, null),
       color: colorFrom(actor, baseActor, null),
+      sound: trimmed(flagRaw(actor ?? baseActor, SOUND_FLAG)),
     };
   }
 
@@ -454,6 +462,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       name,
       art: artChainFrom(actor, null, actor?.img, null, draft ? draft.art : null),
       color: colorFrom(actor, null, draft ? draft.color : null),
+      sound: draft?.sound !== undefined ? trimmed(draft.sound) : trimmed(flagRaw(actor, SOUND_FLAG)),
     };
   }
 
@@ -594,7 +603,59 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     revokeIfUnused(url);
   }
 
+  async function stopSound(sound: any): Promise<void> {
+    if (!sound) return;
+    try { await sound.stop({ fade: 0 }); }
+    catch (error) { console.warn(`${moduleId} | Your Turn sound cleanup`, error); }
+  }
+
+  function stopStinger(): void {
+    const previous = stinger;
+    stinger = undefined;
+    if (!previous?.sound) return;
+    // A pending play may start after stop returns. Drain it before another sound plays.
+    soundCleanup = Promise.all([
+      soundCleanup,
+      stopSound(previous.sound),
+      previous.starting?.then(() => stopSound(previous.sound), () => stopSound(previous.sound)),
+    ]).then(() => {});
+  }
+
+  async function playStinger(src: string, root: HTMLElement, gen: number, automatic: boolean): Promise<void> {
+    if (!src) return;
+    const run: Stinger = {};
+    stinger = run;
+    const current = () => stinger === run && generation === gen && overlay === root
+      && root.isConnected && (!automatic || isEnabled());
+    try {
+      const audio = game.audio;
+      if (!audio?.interface || typeof audio.create !== "function") throw new Error("Foundry audio is unavailable.");
+      await audio.unlock;
+      if (!current()) return;
+      // V14's interface context owns the user's master interface volume and mute.
+      // A unique local Sound avoids broadcasts and same-path cleanup collisions.
+      run.sound = audio.create({ src, context: audio.interface, singleton: false, preload: false, autoplay: false });
+      await run.sound.load({ autoplay: false });
+      await soundCleanup;
+      if (!current()) { await stopSound(run.sound); return; }
+      if (run.sound.failed) throw new Error("The sound could not be loaded.");
+      run.starting = Promise.resolve(run.sound.play({ loop: false, volume: 1, offset: 0 }));
+      await run.starting;
+      run.starting = undefined;
+      if (!current()) await stopSound(run.sound);
+    } catch (error) {
+      if (current()) {
+        if (automatic) console.warn(`${moduleId} | Your Turn sound playback`, error);
+        else reportEditorError("play the sound", error);
+      }
+      run.starting = undefined;
+      if (stinger === run) stopStinger();
+      else await stopSound(run.sound);
+    }
+  }
+
   function removeOverlay(): void {
+    stopStinger();
     if (removeTimer !== undefined) {
       clearTimeout(removeTimer);
       removeTimer = undefined;
@@ -936,13 +997,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     void firstArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art).catch(() => {});
   }
 
-  async function present(subject: Subject): Promise<void> {
+  async function present(subject: Subject, owner?: EditorSession, automatic = false): Promise<void> {
     const gen = generation + 1;
     generation = gen;
     const reduced = prefersReducedMotion();
     removeOverlay();
+    presentationOwner = owner;
     const [art] = await Promise.all([firstArt(subject.art), preloadSlices()]);
-    if (gen !== generation) return;
+    if (gen !== generation || (automatic && !isEnabled())) return;
     const root = buildOverlay(subject, gen, reduced);
     if (art) revealPortrait(root, art);
     const image = root.querySelector<HTMLImageElement>(".astillon-yt-character img");
@@ -950,13 +1012,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       try { await image.decode(); }
       catch { releaseOverlayBlob(root); return; }
     }
-    if (gen !== generation) { releaseOverlayBlob(root); return; }
+    if (gen !== generation || (automatic && !isEnabled())) { releaseOverlayBlob(root); return; }
     document.body.append(root);
     overlay = root;
     for (const piece of Array.from(root.querySelectorAll<HTMLElement>(".astillon-yt-layer"))) {
       playLayer(root, piece, Number(piece.dataset.enterMs), Number(piece.dataset.exitMs), reduced);
     }
     watchSidebar();
+    void playStinger(subject.sound, root, gen, automatic);
     removeTimer = setTimeout(() => {
       try {
         if (gen !== generation || overlay !== root) return;
@@ -967,9 +1030,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }, TURN_INTRO_MS);
   }
 
-  async function preview(actor: any, draft: ArtDraft | null = null): Promise<void> {
+  async function preview(actor: any, draft: ArtDraft | null = null, owner?: EditorSession): Promise<void> {
     try {
-      await present(subjectFromActor(actor, draft));
+      if (owner?.closed) return;
+      await present(subjectFromActor(actor, draft), owner);
     } catch (error) {
       reportEditorError("preview", error);
     }
@@ -977,6 +1041,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   function cancel(): void {
     generation += 1;
+    presentationOwner = undefined;
     try {
       removeOverlay();
     } catch {
@@ -1001,7 +1066,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       if (!historyChanged(prior, current)) return;
       const combatant = combat.combatant;
       if (!combatant) return;
-      void present(subjectFromCombatant(combatant)).catch(error => console.warn(`${moduleId} | Your Turn playback`, error));
+      void present(subjectFromCombatant(combatant), undefined, true).catch(error => console.warn(`${moduleId} | Your Turn playback`, error));
     } catch {
       // A bad portrait must not break the combat hook.
     }
@@ -1018,12 +1083,12 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     ui.notifications?.error?.(`Your Turn: could not ${action}. ${detail}`);
   }
 
-  async function openFilePicker(input: HTMLInputElement): Promise<void> {
+  async function openFilePicker(input: HTMLInputElement, type: "image" | "audio" = "image"): Promise<void> {
     const Picker = filePickerClass();
     try {
       if (typeof Picker !== "function") throw new Error("Foundry's file browser is unavailable.");
       const picker = new Picker({
-        type: "image",
+        type,
         current: input.value,
         field: input,
         callback: (path: string) => {
@@ -1040,15 +1105,17 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  async function writeFlags(actor: any, art: string, color: string): Promise<void> {
+  async function writeFlags(actor: any, art: string, color: string, sound: string): Promise<void> {
     if (actor?.isOwner === false || typeof actor?.update !== "function") throw new Error("You do not have permission to edit this actor.");
     const trimmedArt = art.trim();
+    const trimmedSound = sound.trim();
     const hex = normalizeHexColor(color);
     if (!hex) throw new Error("Choose a valid six-digit hex color.");
-    // One document update: do not leave the art and color half-saved.
+    // One document update: do not leave the art, color, and sound half-saved.
     await actor.update({
       [`flags.${moduleId}.${trimmedArt ? ART_FLAG : `-=${ART_FLAG}`}`]: trimmedArt || null,
       [`flags.${moduleId}.${COLOR_FLAG}`]: hex,
+      [`flags.${moduleId}.${trimmedSound ? SOUND_FLAG : `-=${SOUND_FLAG}`}`]: trimmedSound || null,
     });
     if (trimmedArt) failedArt.delete(trimmedArt);
     warmActor(actor);
@@ -1057,13 +1124,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   function editorDraft(element: HTMLElement): ArtDraft {
     const art = element.querySelector<HTMLInputElement>("[name=yourTurnArt]");
     const color = element.querySelector<HTMLInputElement>("[name=yourTurnColor]");
-    if (!art || !color) throw new Error("The editor fields are missing; close it and open it again.");
-    return { art: art.value, color: color.value };
+    const sound = element.querySelector<HTMLInputElement>("[name=yourTurnSound]");
+    if (!art || !color || !sound) throw new Error("The editor fields are missing; close it and open it again.");
+    return { art: art.value, color: color.value, sound: sound.value };
   }
 
   function editorContent(actor: any): string {
     const art = trimmed(flagRaw(actor, ART_FLAG));
     const color = normalizeHexColor(flagRaw(actor, COLOR_FLAG)) ?? DEFAULT_COLOR;
+    const sound = trimmed(flagRaw(actor, SOUND_FLAG));
     // DialogV2 owns the surrounding form. Nested forms are discarded by HTML parsing.
     return `<div class="astillon-yt-editor">
       <label class="astillon-yt-editor-label">
@@ -1077,11 +1146,24 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         <span>${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Color"))}</span>
         <input type="color" name="yourTurnColor" value="${escapeHtml(color)}">
       </label>
+      <label class="astillon-yt-editor-label">
+        <span>${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Sound"))}</span>
+        <span class="astillon-yt-editor-file">
+          <input type="text" name="yourTurnSound" value="${escapeHtml(sound)}" placeholder="${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.SoundPlaceholder"))}">
+          <button type="button" data-action="browse-sound">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Browse"))}</button>
+        </span>
+      </label>
+      <p class="hint">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.SoundHint"))}</p>
       <button type="button" data-action="preview">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Preview"))}</button>
+      <button type="button" data-action="stop-preview">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.StopPreview"))}</button>
     </div>`;
   }
 
-  function bindEditor(element: HTMLElement, actor: any): void {
+  function stopEditorPreview(owner: EditorSession): void {
+    if (presentationOwner === owner) cancel();
+  }
+
+  function bindEditor(element: HTMLElement, actor: any, owner: EditorSession): void {
     const form = element.querySelector<HTMLElement>(".astillon-yt-editor");
     if (!form || boundEditors.has(form)) return;
     boundEditors.add(form);
@@ -1091,11 +1173,24 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       const input = form.querySelector<HTMLInputElement>("[name=yourTurnArt]");
       if (input) void openFilePicker(input);
     });
+    form.querySelector<HTMLButtonElement>("[data-action=browse-sound]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const input = form.querySelector<HTMLInputElement>("[name=yourTurnSound]");
+      if (input) void openFilePicker(input, "audio");
+    });
     form.querySelector<HTMLButtonElement>("[data-action=preview]")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      void preview(actor, editorDraft(form));
+      void preview(actor, editorDraft(form), owner);
     });
+    form.querySelector<HTMLButtonElement>("[data-action=stop-preview]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      stopEditorPreview(owner);
+    });
+    const sound = form.querySelector<HTMLInputElement>("[name=yourTurnSound]");
+    for (const event of ["input", "change"]) sound?.addEventListener(event, () => stopEditorPreview(owner));
   }
 
   function editorElement(first: any, second: any): HTMLElement | null {
@@ -1108,6 +1203,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   async function openEditor(actor: any): Promise<void> {
     if (!actor) return;
+    const owner: EditorSession = { closed: false };
     try {
       const DialogV2 = foundry.applications?.api?.DialogV2;
       if (typeof DialogV2?.wait !== "function") {
@@ -1127,25 +1223,31 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
               // Read this dialog's form, never another actor's last-opened editor.
               const element = htmlRoot(dialog?.element) ?? button.form;
               if (!element) throw new Error("The editor form is unavailable.");
-              const { art, color } = editorDraft(element);
-              try { await writeFlags(actor, art, color); }
-              catch (error) { reportEditorError("save the portrait and color", error); throw error; }
+              const { art, color, sound } = editorDraft(element);
+              try { await writeFlags(actor, art, color, sound ?? ""); }
+              catch (error) { reportEditorError("save the portrait, color, and sound", error); throw error; }
             },
           },
+          { action: "cancel", label: "Cancel" },
         ],
         render: (first: any, second: any) => {
           const element = editorElement(first, second);
-          if (element) bindEditor(element, actor);
+          if (element) bindEditor(element, actor, owner);
         },
+        close: () => { owner.closed = true; stopEditorPreview(owner); },
         rejectClose: false,
       });
     } catch (error) {
       // rejectClose:false handles normal dismissal; other failures must be visible.
       reportEditorError("open the editor", error);
+    } finally {
+      owner.closed = true;
+      stopEditorPreview(owner);
     }
   }
 
   function openFallbackEditor(actor: any): void {
+    const owner: EditorSession = { closed: false };
     const wrap = document.createElement("div");
     wrap.className = "astillon-yt-editor-fallback";
     wrap.innerHTML = editorContent(actor);
@@ -1158,11 +1260,17 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         actor,
         wrap.querySelector<HTMLInputElement>("[name=yourTurnArt]")?.value ?? "",
         wrap.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
-      ).catch(error => reportEditorError("save the portrait and color", error));
+        wrap.querySelector<HTMLInputElement>("[name=yourTurnSound]")?.value ?? "",
+      ).then(() => { owner.closed = true; stopEditorPreview(owner); wrap.remove(); })
+        .catch(error => reportEditorError("save the portrait, color, and sound", error));
     });
-    wrap.append(save);
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.textContent = "Cancel";
+    dismiss.addEventListener("click", () => { owner.closed = true; stopEditorPreview(owner); wrap.remove(); });
+    wrap.append(save, dismiss);
     document.body.append(wrap);
-    bindEditor(wrap, actor);
+    bindEditor(wrap, actor, owner);
   }
 
   function configureLabel(): string {
@@ -1252,6 +1360,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         config: true,
         type: createBooleanField(),
         default: false,
+        onChange: (enabled: boolean) => { if (!enabled) cancel(); },
       });
       game.settings.register(moduleId, SETTING_SCALE, {
         name: localize("ASTILLON.YourTurn.Scale"),

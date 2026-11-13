@@ -20,6 +20,10 @@
       "EditorTitle": "Your Turn Cut-In",
       "Art": "Portrait",
       "Color": "Color",
+      "Sound": "Sound stinger (optional)",
+      "SoundPlaceholder": "Leave blank for silence",
+      "SoundHint": "Sound plays once with the cut-in and stops when it ends. Uses your Interface volume.",
+      "StopPreview": "Stop preview",
       "Browse": "Browse",
       "Preview": "Preview",
       "Save": "Save"

@@ -1,3 +1,5 @@
+import { BLASTER_THRALLS, thrallArtwork, thrallPickerContent } from "./blaster-thralls.js";
+
 const ASSISTANT = "pf2e-summons-assistant";
 const CREATE_THRALL = "Compendium.pf2e.spells-srd.Item.1JaRoJvlf8EPvnnD";
 const EXPIRATION_SLUG = "effect-thrall-expiration-date";
@@ -135,15 +137,34 @@ export function createBlasterSummons(moduleId: string) {
         return warn("Flash Mob requires an active PF2e Summons Assistant and its dependencies.");
       }
       if (liveThralls(ctx).length >= 3) return warn("This Blaster already has three live hype thralls.");
+      const choice = await foundry.applications.api.DialogV2.prompt({
+        window: { title: "Flash Mob — Choose Your Entourage" },
+        position: { width: 680 }, rejectClose: false,
+        content: thrallPickerContent(moduleId),
+        ok: { label: "Place Thrall · 1 Action", icon: "fa-solid fa-location-dot",
+          callback: (_event: any, button: any) => button.form.elements.variant.value },
+      });
+      if (choice === null || choice === undefined) return false;
+      const variant = choice === "random"
+        ? BLASTER_THRALLS[Math.floor(Math.random() * BLASTER_THRALLS.length)]
+        : BLASTER_THRALLS.find((entry) => entry.key === choice);
+      if (!variant) return warn("Choose one of Blaster's three thrall variants.");
+      const actorUuid = `Compendium.${moduleId}.astillon-blaster-actors.Actor.${variant.id}`;
+      const template = await foundry.utils.fromUuid(actorUuid);
+      if (template?.type !== "npc" || flag(template, "blasterRole") !== "hype-thrall" ||
+          flag(template, "blasterVariant") !== variant.key) {
+        return warn(`The ${variant.name} sheet is missing or outdated. Update the module's Blaster NPC pack.`);
+      }
       const expiry = await effectSource("BlasterExpiry001", ctx);
       if (expiry.system.slug !== EXPIRATION_SLUG || expiry.system.rules?.length) {
         throw new Error("Hype thrall expiration must use the helper slug and grant no attacks.");
       }
       expiry.system.duration = { value: 1, unit: "minutes", expiry: "turn-start", sustained: false };
       if (!stillCurrent(ctx)) return warn("Blaster's turn changed before placement began; no use was spent.");
+      if (liveThralls(ctx).length >= 3) return warn("This Blaster now has three live hype thralls; no use was spent.");
       const nonce = foundry.utils.randomID();
       const owner = {
-        ownerActorUuid: ctx.actor.uuid, ownerTokenUuid: ctx.token.uuid, nonce,
+        ownerActorUuid: ctx.actor.uuid, ownerTokenUuid: ctx.token.uuid, nonce, variant: variant.key,
         createdAt: game.time.worldTime, expiresAt: game.time.worldTime + 60,
       };
       const created = new Map<string, any>();
@@ -161,7 +182,7 @@ export function createBlasterSummons(moduleId: string) {
         await api.summon({
           summonerActor: ctx.actor, itemUuid: CREATE_THRALL, summonType: "thrall",
           summonDetailsGroup: [{
-            specific_uuids: [`Compendium.${moduleId}.astillon-blaster-actors.Actor.BlasterThrall001`],
+            specific_uuids: [actorUuid],
             amount: 1, rank: 1, summonLevel: 18, noDefaultTraits: true,
             // Same public crosshair contract used by the helper's own range limiter.
             crosshairParameters: { location: {
@@ -172,9 +193,11 @@ export function createBlasterSummons(moduleId: string) {
               "system.attributes.hp.value": 1, "system.attributes.hp.max": 1,
               "system.attributes.hp.temp": 0,
               [`flags.${moduleId}.blasterRole`]: "hype-thrall",
+              [`flags.${moduleId}.blasterVariant`]: variant.key,
               [`flags.${ASSISTANT}.summoner`]: { uuid: ctx.actor.uuid, id: ctx.actor.id, signature: ctx.actor.signature },
             },
             tokenModifications: {
+              name: `Flash Mob ${variant.name}`, texture: { src: thrallArtwork(moduleId, variant.key) },
               actorLink: false, elevation: ctx.token.elevation, level: ctx.token.level,
               flags: { [moduleId]: { blasterSummon: owner } },
             },
@@ -212,7 +235,7 @@ export function createBlasterSummons(moduleId: string) {
       if (persistenceFailed) {
         return warn("Thrall placed, but Flash Mob's round use could not be saved. It remains spent on this client; check before reloading.");
       }
-      ui.notifications.info("Flash Mob: one hype thrall summoned (1 action). No independent turn or attacks.");
+      ui.notifications.info(`Flash Mob: ${variant.name} summoned (1 action). No independent turn or attacks.`);
       return true;
     });
   }

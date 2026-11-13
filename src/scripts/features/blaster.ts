@@ -59,7 +59,8 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
     status.className = "aha-blast-instructions";
     status.setAttribute("role", "status");
     document.body.append(overlay, status);
-    const measured = (path: Point[]) => path.length < 2 ? 0 : canvas.grid.measurePath(path).distance;
+    const measureLeg = (start: Point, end: Point) => canvas.grid.measurePath([start, end]).distance;
+    const exceedsRange = (distance: number) => distance > tier.range + 0.001;
     const toScreen = (p: Point): Point => {
       const r = view.getBoundingClientRect();
       const global = canvas.stage.toGlobal(p);
@@ -76,10 +77,11 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       if (finished || canvas.scene !== scene) return;
       overlay.replaceChildren();
       const path = cursor ? [...points, cursor] : points;
+      const distances = path.slice(1).map((point, i) => measureLeg(path[i], point));
       const line = document.createElementNS(SVG_NS, "polyline");
       line.setAttribute("points", path.map(toScreen).map(p => `${p.x},${p.y}`).join(" "));
       line.setAttribute("fill", "none");
-      line.setAttribute("stroke", measured(path) > tier.range ? "#ff2222" : BLAST_MODES[mode].color);
+      line.setAttribute("stroke", distances.some(exceedsRange) ? "#ff2222" : BLAST_MODES[mode].color);
       line.setAttribute("stroke-width", String(tier.width * canvas.grid.size * canvas.stage.scale.x * view.getBoundingClientRect().width / canvas.app.screen.width));
       line.setAttribute("stroke-opacity", "0.35");
       line.setAttribute("stroke-linejoin", "bevel");
@@ -93,7 +95,8 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
         marker.setAttribute("font-size", "22"); marker.textContent = String(i + 1);
         overlay.append(marker);
       }
-      status.textContent = `${tier.name} · ${points.length}/5 points · ${Math.round(measured(points))}/${tier.range} ${canvas.grid.units} · ${points.length ? "Click next square" : "Click Blaster's square first"} · Backspace: undo · Esc/right-click: cancel`;
+      const legStatus = distances.length ? ` · ${cursor ? "Next" : "Last"} leg: ${Math.round(distances[distances.length - 1])}/${tier.range} ${canvas.grid.units}` : "";
+      status.textContent = `${tier.name} · ${points.length}/5 points · ${tier.range} ${canvas.grid.units} per leg${legStatus} · ${points.length ? "Click next square" : "Click Blaster's square first"} · Backspace: undo · Esc/right-click: cancel`;
     };
     return new Promise(resolve => {
       const finish = (result: Point[] | null) => {
@@ -122,7 +125,7 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
           ui.notifications.warn("The first waypoint must be in Blaster's square."); return;
         }
         if (points.length && p.x === points[points.length - 1].x && p.y === points[points.length - 1].y) return;
-        if (measured([...points, p]) > tier.range + 0.001) { ui.notifications.warn(`Total path cannot exceed ${tier.range} ${canvas.grid.units}.`); return; }
+        if (points.length && exceedsRange(measureLeg(points[points.length - 1], p))) { ui.notifications.warn(`Each leg cannot exceed ${tier.range} ${canvas.grid.units}.`); return; }
         points.push(p); cursor = null; draw();
         if (points.length === 5) finish(points);
       };
@@ -152,7 +155,7 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       const scene = canvas.scene;
       const chosen = await foundry.applications.api.DialogV2.prompt({
         window: { title: "Blaster · Charged Blast" },
-        content: `<p>Choose the charge and Curated Spectrum. Five clicks create four connected areas; each creature saves once for the entire blast.</p><div class="form-group"><label>Charge</label><select name="charge">${Object.entries(BLAST_TIERS).map(([key, t]) => `<option value="${key}">${key} action${key === "1" ? "" : "s"}: ${t.name} — ${t.dice}d6, ${t.range} ft, ${t.width} square wide</option>`).join("")}</select></div><div class="form-group"><label>Spectrum</label><select name="mode">${Object.entries(BLAST_MODES).map(([key, m]) => `<option value="${key}">${m.label}${m.penalty ? " (−2 dice; condition on failed save)" : ""}</option>`).join("")}</select></div><p>Three actions roots Blaster until his next turn and recharges for 1d4 rounds. Actions, saves, damage and condition application are adjudicated normally.</p>`,
+        content: `<p>Choose the charge and Curated Spectrum. Five clicks create four connected legs, each up to 80 ft; each creature saves once for the entire blast.</p><div class="form-group"><label>Charge</label><select name="charge">${Object.entries(BLAST_TIERS).map(([key, t]) => `<option value="${key}">${key} action${key === "1" ? "" : "s"}: ${t.name} — ${t.dice}d6, ${t.range} ft per leg, ${t.width} square wide</option>`).join("")}</select></div><div class="form-group"><label>Spectrum</label><select name="mode">${Object.entries(BLAST_MODES).map(([key, m]) => `<option value="${key}">${m.label}${m.penalty ? " (−2 dice; condition on failed save)" : ""}</option>`).join("")}</select></div><p>Three actions roots Blaster until his next turn and recharges for 1d4 rounds. Actions, saves, damage and condition application are adjudicated normally.</p>`,
         ok: { label: "Choose five points", callback: (_event: Event, button: any) => ({ charge: Number(button.form.elements.charge.value), mode: button.form.elements.mode.value }) },
         rejectClose: false,
       });

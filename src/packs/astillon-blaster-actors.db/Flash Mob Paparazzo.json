@@ -1,0 +1,266 @@
+{
+  "_id": "BlasterThrall003",
+  "name": "Flash Mob Paparazzo",
+  "type": "npc",
+  "img": "modules/astillon-hanaq-adventures-module/assets/blaster-thralls/paparazzo.png",
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterRole": "hype-thrall",
+      "blasterVariant": "paparazzo"
+    }
+  },
+  "prototypeToken": {
+    "name": "Flash Mob Paparazzo",
+    "actorLink": false,
+    "texture": {
+      "src": "modules/astillon-hanaq-adventures-module/assets/blaster-thralls/paparazzo.png"
+    },
+    "width": 1,
+    "height": 1,
+    "disposition": -1,
+    "bar1": {
+      "attribute": "attributes.hp"
+    }
+  },
+  "items": [
+    {
+      "_id": "BlasterThrallAct",
+      "name": "Hype Thrall — Support Shell",
+      "type": "action",
+      "img": "icons/svg/skull.svg",
+      "system": {
+        "description": {
+          "value": "<p>The hype thrall has no independent turns, actions, reactions, Strikes, or spells. Command Flash Mob grants support only, not the usual two minion actions. The thrall is stationary unless another ability moves it.</p>\n<p>Attacks automatically hit the thrall, and it automatically fails all saving throws. It has 1 HP, is destroyed at 0 HP, and does not use dying rules. It can flank but cannot Strike.</p>\n<hr />\n<p><strong>Special</strong> The thrall grants no separate XP.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [
+          {
+            "key": "AdjustDegreeOfSuccess",
+            "selector": "saving-throw",
+            "adjustment": {
+              "all": "to-failure"
+            }
+          }
+        ],
+        "slug": "blaster-hype-thrall-shell",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "defensive"
+      }
+    },
+    {
+      "_id": "BlasterStagehand",
+      "name": "Hype Thrall — Yield the Stage",
+      "type": "action",
+      "img": "icons/svg/skull.svg",
+      "system": {
+        "description": {
+          "value": "<p>The thrall's space is difficult terrain, but other creatures can enter it as though it were unoccupied. A creature entering its space can automatically push the thrall into an adjacent space outside that creature's path.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-hype-thrall-movable",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "defensive"
+      }
+    },
+    {
+      "_id": "BlasterRoutine03",
+      "name": "Flash of Fame",
+      "type": "action",
+      "img": "icons/svg/sound.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Requirements</strong> Blaster uses Command Flash Mob while this living thrall is within 60 feet.</p>\n<hr />\n<p><strong>Effect</strong> The photographer captures Blaster's good side in a burst of magenta light. Its signature routine is @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster}: Blaster gains 10 temporary HP. Higher existing temporary HP keep their original duration; only Bolster-granted HP expire with this benefit. The benefit lasts until the start of Blaster's next turn.</p>\n<p>Blaster can instead choose either other Command Flash Mob benefit. This grants no extra action or free support.</p>\n<hr />\n<p><strong>Foundry</strong> Select Blaster and use @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMobCmd001]{Command Thrall}.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-paparazzo-routine",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "interaction"
+      }
+    }
+  ],
+  "system": {
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "abilities": {
+      "str": {
+        "mod": 0
+      },
+      "dex": {
+        "mod": 0
+      },
+      "con": {
+        "mod": 0
+      },
+      "int": {
+        "mod": 0
+      },
+      "wis": {
+        "mod": 0
+      },
+      "cha": {
+        "mod": 0
+      }
+    },
+    "attributes": {
+      "ac": {
+        "value": 0,
+        "details": "Automatically hit by attacks."
+      },
+      "adjustment": null,
+      "allSaves": {
+        "value": "Automatically fails saving throws."
+      },
+      "hp": {
+        "value": 1,
+        "max": 1,
+        "temp": 0,
+        "details": "Destroyed at 0 HP; remove token."
+      },
+      "speed": {
+        "value": 15,
+        "otherSpeeds": [],
+        "details": "Stationary unless explicitly commanded; support commands grant no movement."
+      },
+      "immunities": [
+        {
+          "type": "bleed",
+          "exceptions": []
+        },
+        {
+          "type": "death-effects",
+          "exceptions": []
+        },
+        {
+          "type": "disease",
+          "exceptions": []
+        },
+        {
+          "type": "mental",
+          "exceptions": []
+        },
+        {
+          "type": "poison",
+          "exceptions": []
+        }
+      ],
+      "weaknesses": [],
+      "resistances": []
+    },
+    "details": {
+      "level": {
+        "value": 18
+      },
+      "languages": {
+        "value": [],
+        "details": "Understands Blaster's commands."
+      },
+      "blurb": "An obsessive photographer whose flashing camera feeds Blaster's vanity.",
+      "publicNotes": "<p>An obsessive photographer whose flashing camera feeds Blaster's vanity. The photographer captures Blaster's good side in a burst of magenta light.</p>\n<p>A 1-HP Flash Mob thrall with no independent turns or attacks. It lasts 1 minute and grants no separate XP.</p>",
+      "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall actor trait for the helper's self:trait:thrall predicate. Runtime adds summoner linkage, owner actor/token UUIDs, creation nonce, and the expiration marker without generating strikes. Do not add this token to initiative as an independent enemy.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<h3>Support Shell</h3>\n<p>This is a disposable support minion, not a real bard or a separate level-18 enemy. Level 18 is a scaling shell for the summoning integration; AC and saving-throw values are placeholders. Retain the helper thrall's immunities and summoner linkage.</p>\n<p>At 0 HP, remove its token; it no longer qualifies for support or the live cap. Automatic runtime cleanup occurs after 1 minute, not immediately at 0 HP. Command Flash Mob chooses one living own thrall within 60 feet and gives a benefit only to Blaster.</p>\n<h3>Yield the Stage</h3>\n<p>This forced displacement does not grant the thrall an independent move or a support command.</p>",
+      "publication": {
+        "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+        "authors": "",
+        "license": "ORC",
+        "remaster": true
+      }
+    },
+    "initiative": {
+      "statistic": "perception"
+    },
+    "perception": {
+      "mod": 0,
+      "details": "",
+      "senses": [],
+      "vision": true
+    },
+    "resources": {},
+    "saves": {
+      "fortitude": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      },
+      "reflex": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      },
+      "will": {
+        "value": 0,
+        "saveDetail": "Automatically fails."
+      }
+    },
+    "skills": {},
+    "traits": {
+      "rarity": "uncommon",
+      "size": {
+        "value": "med"
+      },
+      "value": [
+        "minion",
+        "summoned",
+        "thrall",
+        "undead"
+      ]
+    }
+  }
+}

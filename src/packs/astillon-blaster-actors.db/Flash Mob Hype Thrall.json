@@ -1,18 +1,19 @@
 {
   "_id": "BlasterThrall001",
-  "name": "Flash Mob Hype Thrall",
+  "name": "Flash Mob Hype Fan",
   "type": "npc",
-  "img": "icons/svg/skull.svg",
+  "img": "modules/astillon-hanaq-adventures-module/assets/blaster-thralls/hype-fan.png",
   "flags": {
     "astillon-hanaq-adventures-module": {
-      "blasterRole": "hype-thrall"
+      "blasterRole": "hype-thrall",
+      "blasterVariant": "hype-fan"
     }
   },
   "prototypeToken": {
-    "name": "Flash Mob Hype Thrall",
+    "name": "Flash Mob Hype Fan",
     "actorLink": false,
     "texture": {
-      "src": "icons/svg/skull.svg"
+      "src": "modules/astillon-hanaq-adventures-module/assets/blaster-thralls/hype-fan.png"
     },
     "width": 1,
     "height": 1,
@@ -99,6 +100,41 @@
         },
         "category": "defensive"
       }
+    },
+    {
+      "_id": "BlasterRoutine01",
+      "name": "Make Some Noise",
+      "type": "action",
+      "img": "icons/svg/sound.svg",
+      "system": {
+        "description": {
+          "value": "<p><strong>Requirements</strong> Blaster uses Command Flash Mob while this living thrall is within 60 feet.</p>\n<hr />\n<p><strong>Effect</strong> The fan waves its glowsticks and shrieks Blaster's name. Its signature routine is @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01]{Inspire}: Blaster gains a +1 status bonus to attack rolls, damage rolls, and saves against fear. The benefit lasts until the start of Blaster's next turn.</p>\n<p>Blaster can instead choose either other Command Flash Mob benefit. This grants no extra action or free support.</p>\n<hr />\n<p><strong>Foundry</strong> Select Blaster and use @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMobCmd001]{Command Thrall}.</p>",
+          "gm": ""
+        },
+        "publication": {
+          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+          "authors": "",
+          "license": "ORC",
+          "remaster": true
+        },
+        "rules": [],
+        "slug": "blaster-hype-fan-routine",
+        "_migration": {
+          "version": 0.961,
+          "previous": null
+        },
+        "traits": {
+          "value": [],
+          "otherTags": []
+        },
+        "actionType": {
+          "value": "passive"
+        },
+        "actions": {
+          "value": null
+        },
+        "category": "interaction"
+      }
     }
   ],
   "system": {
@@ -179,8 +215,8 @@
         "value": [],
         "details": "Understands Blaster's commands."
       },
-      "blurb": "Disposable applause and encouragement; no independent turns.",
-      "publicNotes": "<p>A one-hit-point, bard-like support prop created by Flash Mob. This custom thrall uses a level-18 scaling shell and grants no separate encounter XP. It has no independent turns, Strikes, or spells. Its one-minute expiration marker is supplied when summoned.</p>",
+      "blurb": "A grinning, glowstick-waving superfan who cheers every blast.",
+      "publicNotes": "<p>A grinning, glowstick-waving superfan who cheers every blast. The fan waves its glowsticks and shrieks Blaster's name.</p>\n<p>A 1-HP Flash Mob thrall with no independent turns or attacks. It lasts 1 minute and grants no separate XP.</p>",
       "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall actor trait for the helper's self:trait:thrall predicate. Runtime adds summoner linkage, owner actor/token UUIDs, creation nonce, and the expiration marker without generating strikes. Do not add this token to initiative as an independent enemy.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<h3>Support Shell</h3>\n<p>This is a disposable support minion, not a real bard or a separate level-18 enemy. Level 18 is a scaling shell for the summoning integration; AC and saving-throw values are placeholders. Retain the helper thrall's immunities and summoner linkage.</p>\n<p>At 0 HP, remove its token; it no longer qualifies for support or the live cap. Automatic runtime cleanup occurs after 1 minute, not immediately at 0 HP. Command Flash Mob chooses one living own thrall within 60 feet and gives a benefit only to Blaster.</p>\n<h3>Yield the Stage</h3>\n<p>This forced displacement does not grant the thrall an independent move or a support command.</p>",
       "publication": {
         "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",

@@ -1,9 +1,10 @@
 export type Point = { x: number; y: number };
 export type Charge = 1 | 2 | 3;
+/** Range limits each of the four legs between five waypoints independently. */
 export const BLAST_TIERS = {
-  1: { name: "Snapshot", dice: 4, range: 60, width: 1 },
-  2: { name: "Spotlight", dice: 9, range: 90, width: 1 },
-  3: { name: "Standing Ovation", dice: 18, range: 120, width: 3 },
+  1: { name: "Snapshot", dice: 4, range: 80, width: 1 },
+  2: { name: "Spotlight", dice: 9, range: 80, width: 1 },
+  3: { name: "Standing Ovation", dice: 18, range: 80, width: 3 },
 } as const;
 export const BLAST_MODES = {
   fire: { label: "Fire", damage: "fire", save: "reflex", penalty: 0, color: "#ff4433", rider: "" },

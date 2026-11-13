@@ -8,7 +8,11 @@ import { createBlasterSummons } from "../dist/scripts/features/blaster-summons.j
 const MODULE = "astillon-hanaq-adventures-module";
 const HELPER = "pf2e-summons-assistant";
 const CREATE_THRALL = "Compendium.pf2e.spells-srd.Item.1JaRoJvlf8EPvnnD";
-const THRALL = `Compendium.${MODULE}.astillon-blaster-actors.Actor.BlasterThrall001`;
+const THRALL_ACTOR_FILES = [
+  "Flash Mob Hype Thrall.json",
+  "Flash Mob Ego Guard.json",
+  "Flash Mob Paparazzo.json",
+];
 const EFFECT_IDS = {
   expiration: "BlasterExpiry001",
   inspire: "BlasterInspire01",
@@ -68,12 +72,32 @@ function packEffect(kind) {
   return JSON.parse(readFileSync(new URL(`../src/packs/astillon-blaster-items.db/${EFFECT_FILES[kind]}`, import.meta.url), "utf8"));
 }
 
+function packThralls() {
+  const fixtures = THRALL_ACTOR_FILES.map((name) => JSON.parse(readFileSync(new URL(`../src/packs/astillon-blaster-actors.db/${name}`, import.meta.url), "utf8")));
+  return fixtures.map((source) => {
+    const variant = source.flags?.[MODULE]?.blasterVariant;
+    return {
+      id: source._id,
+      name: source.name,
+      variant,
+      role: source.flags?.[MODULE]?.blasterRole,
+      uuid: `Compendium.${MODULE}.astillon-blaster-actors.Actor.${source._id}`,
+      img: source.img,
+      source,
+    };
+  });
+}
+
+const THRALLS = packThralls();
+const THRALLS_BY_VARIANT = new Map(THRALLS.map((entry) => [entry.variant, entry]));
+const THRALLS_BY_UUID = new Map(THRALLS.map((entry) => [entry.uuid, entry]));
+
 function setup(t) {
   const dom = new JSDOM("<!doctype html><body></body>");
   const callbacks = new Map();
   let nextId = 0;
   const calls = { helper: [], dialogs: [], chat: [], loads: [], warnings: [], errors: [], actorUpdates: [], itemCreates: [], itemDeletes: [] };
-  const state = { helperBehavior: null, dialogBehavior: null, choice: null, emitCreation: true };
+  const state = { helperBehavior: null, dialogBehavior: null, choice: undefined, flashMobVariant: undefined, emitCreation: true };
   const Hooks = {
     on(name, callback) {
       const id = ++nextId;
@@ -111,7 +135,10 @@ function setup(t) {
     packDocuments.set(doc.uuid, doc);
   }
   packDocuments.set(CREATE_THRALL, { uuid: CREATE_THRALL, documentName: "Item", type: "spell", name: "Create Thrall", getFlag() {} });
-  packDocuments.set(THRALL, { uuid: THRALL, documentName: "Actor", type: "npc", name: "Hype Thrall", system: { traits: { value: ["thrall"] } } });
+  for (const fixture of THRALLS) {
+    const actorDoc = flagDocument({ ...clone(fixture.source), _id: fixture.id, id: fixture.id, uuid: fixture.uuid, documentName: "Actor" });
+    packDocuments.set(actorDoc.uuid, actorDoc);
+  }
   game.packs = new Map([[`${MODULE}.astillon-blaster-items`, {
     getDocument: async (id) => packDocuments.get(`Compendium.${MODULE}.astillon-blaster-items.Item.${id}`),
     getIndex: async () => [...packDocuments.values()].filter((doc) => doc.documentName === "Item"),
@@ -196,14 +223,15 @@ function setup(t) {
     return result;
   }
 
-  function token({ actor: tokenActor = actor(), id = `token${++nextId}`, distance = 20, flags = {}, actorLink = false } = {}) {
+  function token({ actor: tokenActor = actor(), id = `token${++nextId}`, distance = 20, flags = {}, actorLink = false, name = tokenActor.name, texture = null } = {}) {
     const doc = flagDocument({
-      id, _id: id, uuid: `${scene.uuid}.Token.${id}`, name: tokenActor.name, documentName: "Token", actor: tokenActor,
+      id, _id: id, uuid: `${scene.uuid}.Token.${id}`, name, documentName: "Token", actor: tokenActor,
       actorId: tokenActor.id, actorLink, isOwner: true, parent: scene, scene, flags: clone(flags), x: 0, y: 0, width: 1, height: 1,
+      texture: texture ? clone(texture) : { src: tokenActor.img ?? "" },
       async update(changes) { mergeObject(this, changes); return this; },
       async delete() { scene.tokens.delete(this.id); canvas.tokens.placeables = canvas.tokens.placeables.filter((entry) => entry.document !== this); await emit("deleteToken", this); return this; },
     });
-    const object = { id, document: doc, actor: tokenActor, name: tokenActor.name, distance, center: { x: 50, y: 50 },
+    const object = { id, document: doc, actor: tokenActor, name: doc.name, distance, center: { x: 50, y: 50 },
       distanceTo(other) { return other.distance; }, isOwner: true,
     };
     doc.object = object;
@@ -239,12 +267,25 @@ function setup(t) {
 
   async function place(payload) {
     const details = payload.summonDetailsGroup[0];
+    const source = packDocuments.get(details.specific_uuids[0]);
+    assert.ok(source, "specific_uuids[0] must resolve to a fixture actor");
+    assert.equal(source.documentName, "Actor");
     // The real helper mutates these inputs and returns undefined even after success.
     details.itemsToAdd.unshift({ name: "Summon Owner", type: "effect", system: { slug: "summon-owner", rules: [], duration: { unit: "unlimited", value: -1 } } });
-    const thrallActor = actor({ role: "hype-thrall", hp: 1 });
+    const thrallActor = actor({ role: source.getFlag(MODULE, "blasterRole") ?? "hype-thrall", hp: source.system?.attributes?.hp?.value ?? 1 });
+    thrallActor.name = source.name;
+    thrallActor.img = source.img;
+    thrallActor.flags[MODULE] = clone(source.flags?.[MODULE] ?? {});
+    thrallActor.prototypeToken = clone(source.prototypeToken ?? { name: source.name });
     mergeObject(thrallActor, details.modifications ?? {});
     delete details.modifications?.["system.traits.value"];
-    const summoned = token({ actor: thrallActor, flags: details.tokenModifications.flags, actorLink: details.tokenModifications.actorLink });
+    const summoned = token({
+      actor: thrallActor,
+      flags: details.tokenModifications.flags,
+      actorLink: details.tokenModifications.actorLink,
+      name: details.tokenModifications.name,
+      texture: details.tokenModifications.texture,
+    });
     if (state.emitCreation) await emit("createToken", summoned.document, {}, game.user.id);
     await thrallActor.createEmbeddedDocuments("Item", details.itemsToAdd);
     await thrallActor.setFlag(HELPER, "summoner", { uuid: payload.summonerActor.uuid, id: payload.summonerActor.id, signature: payload.summonerActor.signature });
@@ -265,6 +306,9 @@ function setup(t) {
     if (state.choice === null) return null;
     const form = dom.window.document.createElement("form");
     form.innerHTML = options.content;
+    for (const radio of form.querySelectorAll('input[type="radio"][name="variant"]')) {
+      radio.checked = radio.value === (state.flashMobVariant ?? THRALLS[0].variant);
+    }
     for (const select of form.querySelectorAll("select")) {
       select.value = /support|command|mode/i.test(select.name) ? state.choice.support : state.choice.thrallUuid;
     }
@@ -305,14 +349,15 @@ function setup(t) {
 describe("Blaster summons integration", { concurrency: 1 }, () => {
   test("Flash Mob uses the real public helper contract and detects its undefined-return success", async (t) => {
     const env = setup(t);
-    assert.equal(THRALL.split(".").at(-1).length, 16);
+    for (const fixture of THRALLS) assert.equal(fixture.id.length, 16);
     assert.equal(await env.api.flashMob(), true);
     assert.equal(env.calls.helper.length, 1);
     const { payload, details: [group] } = env.calls.helper[0];
+    const selected = THRALLS_BY_VARIANT.get(THRALLS[0].variant);
     assert.equal(payload.summonerActor, env.selected.actor);
     assert.equal(payload.itemUuid, CREATE_THRALL);
     assert.equal(payload.summonType, "thrall");
-    assert.deepEqual(group.specific_uuids, [THRALL]);
+    assert.deepEqual(group.specific_uuids, [selected.uuid]);
     assert.equal(group.amount, 1);
     assert.equal(group.tokenModifications.actorLink, false);
     assert.equal(group.crosshairParameters.location.obj, env.selected);
@@ -330,10 +375,86 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(expiration.system.duration.value, 1);
     assert.equal(expiration.system.duration.unit, "minutes");
     assert.equal(expiration.system.rules.some((rule) => rule.key === "Strike"), false);
+    const summoned = env.scene.tokens.find((token) => token.id !== env.selected.id);
+    assert.ok(summoned);
+    assert.equal(summoned.name, group.tokenModifications.name);
+    assert.equal(summoned.texture.src, selected.img);
+    assert.equal(summoned.actor.getFlag(MODULE, "blasterVariant"), selected.variant);
+    assert.notEqual(summoned.actor.uuid, group.specific_uuids[0]);
     assert.equal(env.uses().flashMob, "Combat.combat1:1");
     assert.equal(env.calls.chat.some((message) => JSON.stringify(message.flags ?? {}).includes(CREATE_THRALL)), false);
     assert.equal(env.callbacks.get("createToken")?.size ?? 0, 0);
   });
+
+  for (const fixture of THRALLS) {
+    test(`Flash Mob picker selects ${fixture.variant} through the DialogV2 radio callback`, async (t) => {
+      const env = setup(t);
+      env.state.dialogBehavior = async (options) => {
+        const form = globalThis.document.createElement("form");
+        form.innerHTML = options.content;
+        for (const radio of form.querySelectorAll('input[type="radio"][name="variant"]')) radio.checked = radio.value === fixture.variant;
+        return options.ok.callback(new globalThis.window.Event("click"), { form });
+      };
+      assert.equal(await env.api.flashMob(), true);
+      const [{ details: [group] }] = env.calls.helper;
+      assert.deepEqual(group.specific_uuids, [fixture.uuid]);
+      const summoned = env.scene.tokens.find((token) => token.id !== env.selected.id);
+      assert.ok(summoned);
+      assert.equal(summoned.name, group.tokenModifications.name);
+      assert.equal(summoned.texture.src, `modules/${MODULE}/assets/blaster-thralls/${fixture.variant}.png`);
+      assert.equal(summoned.actor.getFlag(MODULE, "blasterVariant"), fixture.variant);
+    });
+  }
+
+  test("Flash Mob allows the random picker option and resolves to one supported actor UUID", async (t) => {
+    const env = setup(t);
+    t.mock.method(Math, "random", () => 0.99);
+    env.state.flashMobVariant = "random";
+    assert.equal(await env.api.flashMob(), true);
+    const [{ details: [group] }] = env.calls.helper;
+    assert.equal(THRALLS_BY_UUID.has(group.specific_uuids[0]), true);
+  });
+
+  test("Flash Mob cancel in the picker spends nothing", async (t) => {
+    const env = setup(t);
+    env.state.dialogBehavior = async () => null;
+    assert.equal(await env.api.flashMob(), false);
+    assert.equal(env.calls.helper.length, 0);
+    assert.equal(env.uses()?.flashMob, undefined);
+  });
+
+  for (const invalid of ["missing doc", "wrong role", "wrong variant"]) {
+    test(`Flash Mob rejects an invalid picker-backed actor fixture: ${invalid}`, async (t) => {
+      const env = setup(t);
+      const fixture = THRALLS_BY_VARIANT.get("ego-guard");
+      env.state.flashMobVariant = fixture.variant;
+      const packed = env.packDocuments.get(fixture.uuid);
+      if (invalid === "missing doc") env.packDocuments.delete(fixture.uuid);
+      if (invalid === "wrong role") packed.flags[MODULE].blasterRole = "blaster";
+      if (invalid === "wrong variant") packed.flags[MODULE].blasterVariant = "hype-fan";
+      assert.equal(await env.api.flashMob(), false);
+      assert.equal(env.calls.helper.length, 0);
+      assert.equal(env.uses()?.flashMob, undefined);
+    });
+  }
+
+  for (const change of ["turn", "gm", "cap"]) {
+    test(`Flash Mob revalidates ${change} after waiting on the picker`, async (t) => {
+      const env = setup(t);
+      env.state.dialogBehavior = async (options) => {
+        if (change === "turn") env.combat.round = 2;
+        if (change === "gm") env.game.users.activeGM.id = "otherGM";
+        if (change === "cap") { env.ownThrall(); env.ownThrall(); env.ownThrall(); }
+        const form = globalThis.document.createElement("form");
+        form.innerHTML = options.content;
+        for (const radio of form.querySelectorAll('input[type="radio"][name="variant"]')) radio.checked = radio.value === THRALLS[0].variant;
+        return options.ok.callback(new globalThis.window.Event("click"), { form });
+      };
+      assert.equal(await env.api.flashMob(), false);
+      assert.equal(env.calls.helper.length, 0);
+      assert.equal(env.uses()?.flashMob, undefined);
+    });
+  }
 
   for (const invalid of ["not GM", "secondary GM", "not PF2e", "no selected token", "multiple controlled tokens", "wrong role", "no combat", "other turn", "ambiguous actor tokens"]) {
     test(`Flash Mob refuses ${invalid} without invoking the helper`, async (t) => {

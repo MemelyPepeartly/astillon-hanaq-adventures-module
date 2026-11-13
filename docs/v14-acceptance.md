@@ -2,7 +2,7 @@
 
 The build, TypeScript checks and Node regression suite can run without Foundry. They do not establish live world acceptance. A Foundry V14 installation was not available during this update.
 
-Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.6. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
+Use a V14-compatible PF2e release and enable the current Astillon Hanaq Adventures build. Reload connected clients after installing the build. Menacing and Your Turn do not require Sequencer or JB2A; Blaster's optional integrations have their own [acceptance checks](blaster-acceptance.md).
 
 ## Menacing
 
@@ -24,6 +24,13 @@ Use a V14-compatible PF2e release and enable Astillon Hanaq Adventures 0.10.6. R
 5. Reload GM and player clients with custom art on a world actor, an unlinked scene token, and a combatant. Observe startup image requests in the browser Network panel, or await `game.astillonHanaqAdventures["your-turn"].preload()`. Advance to those actors' first turns: the portrait and shared slices must be ready for the full animation rather than appearing halfway through. No world documents should be written by preloading.
 6. Throttle the network and select a new image. Before it is ready, there must be no empty timed flash-in. Once decoded, its full 2.6-second timeline starts. Advance past that combatant while its image loads, cancel a preview, or leave the scene: no obsolete cut-in may appear later. A broken custom image should fall back without poisoning subsequent valid images. Saving changed artwork on another client should warm it on this client too.
 7. As GM, set **Your Turn Portrait Width (px)** to 400, then 1000, then 250. Compare the same art exported at 64px and 1024px: at user scale 1 both must reach the exact selected width, not their intrinsic size or a hidden percentage of the stage. Repeat with transparent and opaque portraits, a wide image, and a tall image. Preserve proportions; tall/large art may extend beyond the backdrop or viewport instead of silently shrinking. Opaque art must not be stretched or cropped to fill an unrelated aspect ratio. Width changes should apply to the next cached preview without new downloads or actor edits. Players receive the world setting but do not control it; their own overall scale remains available. Invalid values use the default, and numeric widths clamp only to the documented 100–1000 setting range. Transparent padding still counts as part of the image width.
+
+### Your Turn sound follow-up
+
+- Browse beside **Sound stinger** opens the native audio picker without submitting the editor. Choose a short audio file, Preview, and Save. Reopen and verify art, color, and sound persist together. Clear sound and save to return to silence.
+- With GM and player clients enabled, each viewer hears exactly one local stinger when the portrait appears; a client with cut-ins disabled stays silent. Interface volume and global mute apply. A preview is heard only by the previewing user.
+- Test Stop preview, Cancel, window-close, sound-path changes, rapid combat turns, scene teardown, and disabling cut-ins during a pending load. No obsolete or overlapping sound should start later, including after the browser's first audio-unlocking gesture.
+- Test slow/broken audio and a long clip. Portrait playback remains functional, and audio stops at the end of the cut-in. Closing one actor editor must not stop another editor's newer preview or an automatic combat cut-in.
 
 ## Existing content
 

@@ -14,13 +14,13 @@ Blaster's portrait and prototype token both use the world asset `common/portrait
 
 ### Charged Blast
 
-Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then click five squares, starting in Blaster's square. The four connecting segments form one blast; their **combined** path length is limited. A live preview follows the pointer; Backspace undoes a point, and Escape or right-click cancels without creating areas or spending a use. On the fifth click, four native V14 line Regions are saved and shared with the scene.
+Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the charge and damage/effect mode, then click five squares, starting in Blaster's square. The four connecting segments form one blast; **each leg can be up to 80 feet**, independently (up to 320 feet overall). A live preview shows the current leg's distance; Backspace undoes a point, and Escape or right-click cancels without creating areas or spending a use. On the fifth click, four native V14 line Regions are saved and shared with the scene.
 
-| Actions | Mode | Damage | Total path | Full width |
+| Actions | Mode | Damage | Each leg | Full width |
 | --- | --- | --- | --- | --- |
-| 1 | Snapshot | 4d6 | 60 feet | 1 square |
-| 2 | Spotlight | 9d6 | 90 feet | 1 square |
-| 3 | Standing Ovation | 18d6 | 120 feet | 3 squares |
+| 1 | Snapshot | 4d6 | 80 feet | 1 square |
+| 2 | Spotlight | 9d6 | 80 feet | 1 square |
+| 3 | Standing Ovation | 18d6 | 80 feet | 3 squares |
 
 All modes share one use per round. Standing Ovation roots Blaster until the start of his next turn and cannot be used for the next **1d4 full rounds**; smaller blasts remain available on later turns. The macro reports the ready round. Outside combat the tool can be previewed normally, with a six-second root and world-time recharge. Within combat, use it on Blaster's turn.
 
@@ -34,7 +34,9 @@ The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigg
 
 ### Flash Mob
 
-Enable [PF2e Summons Assistant](https://github.com/ChasarooniZ/pf2e-summons-assistant) and its dependencies. **Blaster — Flash Mob** calls its public thrall summoning API, using this module's custom **Flash Mob Hype Thrall** actor, the canonical Create Thrall identifier, summoner linkage, and compatible expiration effect. It does not impersonate a spell chat card or trigger a second summon. No independent fallback summon is created when the helper is missing.
+Enable [PF2e Summons Assistant](https://github.com/ChasarooniZ/pf2e-summons-assistant) and its dependencies. **Blaster — Flash Mob** calls its public thrall summoning API, using this module's three custom thrall actors, the canonical Create Thrall identifier, summoner linkage, and compatible expiration effect. It does not impersonate a spell chat card or trigger a second summon. No independent fallback summon is created when the helper is missing.
+
+The macro first opens a portrait-card picker for **Hype Fan**, **Ego Guard**, or **Paparazzo**, plus **Surprise Me** for a random choice. Each has its own themed NPC sheet and bundled transparent token/portrait. Pick a card, click **Place Thrall**, then select its map position through Summons Assistant. Cancel either step without spending the use. Their signature routines highlight Inspire, Guard, and Bolster respectively, but all three retain all three support choices; no bonus is granted just by summoning.
 
 On Blaster's turn, Flash Mob costs one action and places one 1-HP hype thrall within 30 feet, once per round, up to three live thralls belonging to that Blaster. The adds last one minute and have no autonomous turns. **Command Flash Mob** costs one action, once per round: choose a live add within 60 feet to inspire Blaster (+1 status to attacks, damage, and saves against fear), guard him (+1 status AC), or bolster him (10 non-stacking temporary HP). Support expires at the start of Blaster's next turn. The effects are also in the support compendium. Use unlinked NPC tokens if multiple Blasters are on the scene, since the helper selects an actor's first active token.
 
@@ -83,13 +85,15 @@ The GM or a token owner can toggle it. The token flag is `flags.astillon-hanaq-a
 
 Configure Settings includes three per-user controls. **Your Turn Cut-In** is off by default. **Your Turn Scale** (0.5–1.5) sizes the graphic, and **Your Turn Hold** (0.5–4 seconds) is how long it stays fully on screen. With the cut-in enabled, each change of combatant, round, or turn plays one announcement for every combatant, including characters this user does not own. The graphic sits on the lower right of the usable map, leaving the left side clear: jagged theme panels, a thick white outline around the portrait, the combatant's name in large italic type, and a smaller YOUR TURN strip. It does not take clicks. The portrait is the actor's Your Turn art, then the same flag on the token's base actor, then the actor image, then the token image. The color is the actor flag, then the base actor, then #2B8CFF.
 
-Owners and the GM get a Your Turn control on the actor sheet. It opens an editor with an image field, a color, Preview, and Save. Preview plays the current draft even when the setting is off and does not write flags or advance combat. Save stores the image and an #RRGGBB color on the actor. Clearing the image removes that flag. Every client reads those actor flags.
+Owners and the GM get a Your Turn control on the actor sheet. It opens an editor with an image field, a color, an optional **Sound stinger** path with its own audio browser, Preview, Stop preview, Save, and Cancel. Preview plays the current draft even when the setting is off and does not write flags or advance combat. Save stores the image, #RRGGBB color, and sound together on the actor. Clearing either path removes that flag; blank sound is silent. Every client reads those actor flags.
+
+The stinger plays once locally on each client showing the cut-in, after the portrait is ready, using Foundry's **Interface** audio volume and mute. It is not broadcast by every client. Use a short clip: playback stops when the 2.6-second cut-in ends, is replaced, or is cancelled. A missing/broken sound does not prevent the portrait from appearing. Preview is local; Stop preview, cancelling/closing that editor, or changing its sound path stops its preview without saving. The sound path must be available to connected clients through Foundry, like other media assets.
 
 The GM can set **Your Turn Portrait Width (px)** under **Configure Settings → Astillon Hanaq Adventures**. This world-wide setting defaults to **400 px** (100–1000 px) at Your Turn Scale 1. It is an **exact target width, not a maximum**: a 64px image and a 1024px image both display at 600px when 600 is selected. There are no extra backdrop-width or height caps that silently cancel enlargement. Height follows the image's proportions, so tall art or large settings may extend outside the backdrop or viewport; reduce the width if desired. Portraits keep their center above the name banner, and opaque portraits retain their angular frame without cropping to fill it. Each user's overall cut-in scale still applies. Changes take effect on the next turn or Preview, including already cached art, without changing source images or actor flags. Transparent margins inside an uploaded image still count as part of that image's width.
 
 At world startup, each client preloads the effective portraits for world actors, scene tokens (including unlinked overrides), and combatants, plus the seven shared animation images. Portrait work is limited to four concurrent preparations and duplicate requests share a cache. Actor/token changes warm new artwork. If a new portrait is not ready yet, playback waits for loading and decoding before starting its full 2.6-second timeline; obsolete turns are discarded. Invalid custom paths fall back to the actor/token art, then Foundry's generic portrait. Unopened compendia are not downloaded.
 
-The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art and color together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
+The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse and Preview do not submit the dialog; Save reads that specific editor and updates art, color, and sound together. Two actor editors can be open without mixing drafts. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
 

@@ -7,7 +7,7 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 ## NPC and compendia
 
 - Import **Blaster** as a fresh NPC from **Blaster — NPCs**; open its sheet and place an unlinked token. Confirm level 18, AC 41, HP 600, visible skills, three saves, strikes, and linked abilities with no console errors.
-- Open the hype-thrall actor and support effects. Ensure core artwork resolves and links to all eight macros open the intended macro.
+- Open the hype-thrall actor and support effects. Open Hype Fan, Ego Guard, and Paparazzo; ensure their distinct bundled portrait/token artwork resolves and links to all eight macros open the intended macro.
 - Import the macros to the hotbar. Existing world copies of other module macros/content must remain unchanged.
 - On an existing Blaster with current HP, effects, custom artwork, and GM notes, run **Refresh Sheet Descriptions**. Only shipped ability descriptions should change; repeat it and confirm there are no further writes. Deleted abilities must not be recreated, and ambiguous duplicates must not be overwritten.
 - Expand each charge's ability. Check that all six typed damage links and matching basic saves render, Dazzled and Stupefied 1 open the correct conditions, and the recharge die is rollable. Support links should open this module's correct effects. The manual Beam Clash die must not advance the animated contest. Native Strike controls still handle attack, MAP, and critical damage.
@@ -17,7 +17,7 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 
 - Start combat on Blaster's turn. Use the one-action blast: click Blaster's square followed by four other squares. See a connecting preview at every click and four saved line Regions after the fifth. Confirm they are visible from a player client.
 - Undo with Backspace, cancel with Escape and right-click, and leave the scene mid-placement. None should leave Regions, pointer listeners, or consume the use.
-- Reject a starting point outside Blaster, consecutive duplicate points, and a path over the selected total length. Try diagonal turns and verify the scene's distance convention and coverage highlights.
+- Reject a starting point outside Blaster, consecutive duplicate points, and any individual leg over 80 feet. Accept four 80-foot legs (320 feet total) at all three charge levels. Try diagonal turns and verify the scene's distance convention and coverage highlights.
 - Confirm all modes share one use per round; one- and two-action variants work on later turns while the large blast recharges.
 - Verify three-action full width is **three squares**, not three on each side. Attempt movement with drag, ruler, keyboard, and token configuration. It must be blocked until Blaster's next turn, but not after. Verify **Release Blast Root** allows a deliberate GM correction.
 - Advance through a round boundary before Blaster's turn: root remains until that turn. End combat: root stops blocking. Out of combat, advance world time by six seconds.
@@ -26,8 +26,10 @@ Build with `npm.cmd test`. The installable output is in `dist/`. No release, rem
 
 ## Flash Mob
 
-- As the active GM, summon one add within 30 feet on Blaster's turn. Ensure exactly one custom hype-thrall token appears, with 1 HP, helper summoner linkage and a one-minute expiration effect.
+- As the active GM, run Flash Mob on Blaster's turn. Choose each portrait card on successive turns and confirm the selected named sheet and matching token art are used. Test Surprise Me, keyboard selection, and cancelling the picker without spending the use. Summon one add within 30 feet. Ensure exactly one custom hype-thrall token appears, with 1 HP, helper summoner linkage and a one-minute expiration effect.
 - Cancel the helper placement, then retry: cancellation must not consume the round's use. Verify a fourth simultaneous live add is refused; another Blaster's adds do not count toward this Blaster's limit.
+- Advance the turn, change the active GM, or reach the three-live cap while the picker is open: placement must stop without charging the use.
+- Confirm all three variants share the live cap, expiry, and support eligibility. Their themed signature routines must not apply a bonus automatically or restrict the other two support choices.
 - Confirm the add has no independent initiative. Command a living owned add within 60 feet; reject another Blaster's add, a dead add, an expired add, and an out-of-range add.
 - Check inspire and guard appear on Blaster's prepared statistics, and bolster gives max(current temporary HP, 10), never additive stacking. Advance to Blaster's next turn and verify support removal, including remaining temporary HP originating from bolster.
 - Advance one minute, including with automatic PF2e expired-effect removal disabled: the custom add disappears. Unrelated summons must survive.

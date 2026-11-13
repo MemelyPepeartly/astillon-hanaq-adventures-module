@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { JSDOM } from "jsdom";
+import { PNG } from "pngjs";
+import { BLASTER_THRALLS, thrallArtwork, thrallPickerContent } from "../dist/scripts/features/blaster-thralls.js";
 
 const moduleId = "astillon-hanaq-adventures-module";
 const packRoot = new URL("../src/packs/", import.meta.url);
@@ -34,7 +36,7 @@ const supportDuration = { value: 1, unit: "rounds", expiry: "turn-start", sustai
 const contentItems = [...items, ...actors.flatMap((actor) => actor.items)];
 
 test("expected documents have stable IDs, unique per document collection", () => {
-  assert.equal(actors.length, 2);
+  assert.equal(actors.length, 4);
   assert.equal(items.length, 5);
   assert.equal(macros.length, 8);
   for (const documents of [actors, items, macros, ...actors.map((actor) => actor.items)]) {
@@ -55,7 +57,8 @@ test("NPC sources omit prepared actions, skill labels, foreign ownership, and wo
     assert.equal("actions" in actor.system, false);
     assert.deepEqual(Object.keys(actor.flags), [moduleId]);
     assert.equal(actor.prototypeToken.actorLink, false);
-    const expectedArt = actor === blaster ? "common/portraits/moon/blaster_portrait.png" : "icons/svg/skull.svg";
+    const expectedArt = actor === blaster ? "common/portraits/moon/blaster_portrait.png"
+      : thrallArtwork(moduleId, actor.flags[moduleId].blasterVariant);
     assert.equal(actor.img, expectedArt);
     assert.equal(actor.prototypeToken.texture.src, expectedArt);
     for (const key of ["ownership", "_stats", "_key", "folder"]) assert.equal(key in actor, false, key);
@@ -146,7 +149,7 @@ test("ordinary Strikes are usable attacks with MAP and no blast riders", () => {
 });
 
 test("all three blast activities share once-per-round flourish and a single area", () => {
-  for (const [actions, dice, length, width] of [[1, 4, 60, 1], [2, 9, 90, 1], [3, 18, 120, 3]]) {
+  for (const [actions, dice, width] of [[1, 4, 1], [2, 9, 1], [3, 18, 3]]) {
     const item = embedded("BlasterBlastAct" + actions);
     assert.equal(item.system.actions.value, actions);
     assert.deepEqual(item.system.frequency, round);
@@ -154,11 +157,12 @@ test("all three blast activities share once-per-round flourish and a single area
     const text = description(item);
     for (const pattern of [
       /once per round, shared by all Charged Blast variants/, /five points/, /four connected segments/,
-      /beginning in his space/, /total no more than/, /require line of effect/,
+      /beginning in his space/, /each at most 80 feet long/, /require line of effect/,
       /Each creature other than Blaster attempts one save/, /takes damage only once/, /roll damage once/,
       /@Check\[reflex\|dc:40\|basic\|traits:/, /@Check\[will\|dc:40\|basic\|traits:mental\]/,
     ]) assert.match(text, pattern);
-    assert.ok(text.includes(length + "-foot path"));
+    assert.ok(text.includes("four segments of up to 80 feet each"));
+    assert.doesNotMatch(text, /total no more than|60-foot path|90-foot path|120-foot path/);
     assert.ok(text.includes(width + " square"));
     const damageLinks = [...text.matchAll(/@Damage\[(\d+)d6\[([a-z]+)\]\|traits:([a-z,]+)\|options:area-damage\]/g)];
     assert.deepEqual(damageLinks.map(([, n, damage, traits]) => [Number(n), damage, traits]), [
@@ -265,7 +269,7 @@ test("Bolster grants temporary HP only on creation and does not regenerate", () 
 });
 
 test("Hype Thrall keeps helper identification and 1-HP shell without independent attacks or turns", () => {
-  assert.equal(thrall.name, "Flash Mob Hype Thrall");
+  assert.equal(thrall.name, "Flash Mob Hype Fan");
   assert.equal(thrall.system.details.level.value, 18);
   assert.equal(thrall.system.attributes.hp.max, 1);
   assert.equal(thrall.system.attributes.hp.value, 1);
@@ -294,6 +298,58 @@ test("helper expiration is a separate attack-free one-minute marker with the exa
   assert.match(description(item), /thrall disappears when this effect expires/);
   assert.match(operatingNotes(), /60 world-time seconds/);
   assert.match(operatingNotes(), /do not drag it onto Blaster/);
+});
+
+test("three distinct entourage sheets share the unchanged support shell and ship transparent art", async () => {
+  const effectIds = ["BlasterInspire01", "BlasterGuard0001", "BlasterTempHP001"];
+  for (const [i, variant] of BLASTER_THRALLS.entries()) {
+    const actor = actors.find((entry) => entry._id === variant.id);
+    assert.ok(actor, variant.name);
+    assert.equal(actor.name, `Flash Mob ${variant.name}`);
+    assert.equal(actor.flags[moduleId].blasterRole, "hype-thrall");
+    assert.equal(actor.flags[moduleId].blasterVariant, variant.key);
+    assert.equal(actor.prototypeToken.name, actor.name);
+    assert.equal(actor.prototypeToken.texture.src, thrallArtwork(moduleId, variant.key));
+    assert.equal(actor.img, actor.prototypeToken.texture.src);
+    assert.deepEqual(actor.system.attributes, thrall.system.attributes);
+    assert.deepEqual(actor.system.saves, thrall.system.saves);
+    assert.deepEqual(actor.system.traits, thrall.system.traits);
+    assert.equal(actor.system.details.level.value, 18);
+    assert.equal(actor.items.length, 3);
+    assert.ok(actor.items.every(item => item.type === "action" && item.system.actionType.value === "passive"));
+    assert.deepEqual(actor.items.slice(0, 2), thrall.items.slice(0, 2));
+    const routine = actor.items[2];
+    assert.match(description(routine), new RegExp(effectIds[i]));
+    assert.match(description(routine), /within 60 feet/);
+    assert.match(description(routine), /either other Command Flash Mob benefit/);
+    assert.match(description(routine), /no extra action or free support/);
+    assert.deepEqual(routine.system.rules, []);
+    const png = PNG.sync.read(await readFile(new URL(`../src/assets/blaster-thralls/${variant.key}.png`, import.meta.url)));
+    assert.equal(png.width, png.height);
+    assert.ok(png.width >= 512);
+    assert.ok(png.data.some((value, index) => index % 4 === 3 && value === 0), "true alpha transparency");
+  }
+});
+
+test("entourage picker renders three accessible portrait radios and an explicit random choice", () => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "foundry");
+  globalThis.foundry = { utils: { escapeHTML: value => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;") } };
+  try {
+    const dom = JSDOM.fragment(thrallPickerContent(moduleId));
+    assert.equal(dom.querySelectorAll('input[type="radio"][name="variant"]').length, 4);
+    assert.equal(dom.querySelectorAll('input[checked]').length, 1);
+    for (const variant of BLASTER_THRALLS) {
+      const control = dom.querySelector(`input[value="${variant.key}"]`);
+      const label = control.closest("label");
+      assert.equal(label.querySelector("img").getAttribute("src"), thrallArtwork(moduleId, variant.key));
+      assert.equal(label.querySelector("strong").textContent, variant.name);
+    }
+    assert.ok(dom.querySelector('input[value="random"]'));
+    assert.match(dom.textContent, /All three can Inspire, Guard, or Bolster/);
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "foundry", prior);
+    else delete globalThis.foundry;
+  }
 });
 
 test("abilities follow native PF2e header, divider, effect and outcome structure", () => {
