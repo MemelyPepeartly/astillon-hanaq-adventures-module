@@ -26,6 +26,19 @@ function assertPortraitTransform(root, { x, y, scale }) {
   assert.equal(root.style.getPropertyValue("--yt-portrait-scale"), String(scale));
 }
 
+function assertLiveTheme(root, color) {
+  assert.equal(root.style.getPropertyValue("--yt-color"), color);
+  assert.equal(root.style.getPropertyValue("--turn-theme"), color);
+  assert.equal(root.style.getPropertyValue("--turn-highlight"), turnHighlight(color));
+  for (const layer of ["theme", "highlights", "label"]) {
+    const tint = root.querySelector(`[data-layer="${layer}"] .astillon-yt-tint`);
+    const expected = layer === "theme" ? color : turnHighlight(color);
+    assert.equal(tint.dataset.tintColor, expected);
+    assert.equal(tint.style.getPropertyValue("--slice-color"), expected);
+    assert.equal(tint.style.getPropertyPriority("background-color"), "important");
+  }
+}
+
 function portraitFields(dialog) {
   return {
     x: dialog.querySelector("[name=yourTurnPortraitX]"),
@@ -2043,6 +2056,110 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.calls.update, 0);
     assert.deepEqual(env.errors, []);
   });
+
+  test("continuous color input recolors every backing layer in place before picker commit", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ color: "#123456", sound: "sounds/editor.ogg", transform: { x: 12, y: -34, scale: 1.5 } });
+    void env.feature.api.configure(actor);
+    const dialog = env.dialogs[0].element;
+    dialog.querySelector("[data-action=preview]").click(); await flush();
+    const root = env.overlays()[0];
+    const color = dialog.querySelector("[name=yourTurnColor]");
+    const nodes = [...root.querySelectorAll(".astillon-yt-layer")];
+    const masks = [...root.querySelectorAll(".astillon-yt-tint")].map(tint => tint.style.getPropertyValue("mask-image"));
+    const image = root.querySelector(".astillon-yt-character img");
+    const imageRequests = env.imageControl.requested.length;
+    for (const hex of ["#ff0000", "#00ff00", "#0000ff", "#a1b2c3"]) {
+      inputValue(env, color, hex); // No change event: the OS/browser picker is still open.
+      assertLiveTheme(root, hex.toUpperCase());
+      assert.equal(color.value, hex, "do not rewrite the input or close/reopen its native picker");
+      assert.equal(env.overlays()[0], root);
+      assert.deepEqual([...root.querySelectorAll(".astillon-yt-layer")], nodes);
+      assert.deepEqual([...root.querySelectorAll(".astillon-yt-tint")].map(tint => tint.style.getPropertyValue("mask-image")), masks);
+      assert.equal(root.querySelector(".astillon-yt-character img"), image);
+      assertPortraitTransform(root, { x: 12, y: -34, scale: 1.5 });
+    }
+    inputValue(env, color, "#765432", "change");
+    assertLiveTheme(root, "#765432");
+    await flush();
+    assert.equal(env.audioControl.sounds.length, 1);
+    assert.equal(env.audioControl.sounds[0].playCalls.length, 1);
+    assert.equal(env.audioControl.sounds[0].stopCalls.length, 0);
+    assert.equal(env.imageControl.requested.length, imageRequests);
+    assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
+    assert.equal(env.calls.update, 0);
+    assert.equal(actor.flags.yourTurnColor, "#123456");
+    dialog.querySelector("[data-action=save]").click(); await flush();
+    assert.equal(actor.flags.yourTurnColor, "#765432");
+    assert.equal(env.calls.update, 1);
+    void env.feature.api.configure(actor);
+    assert.equal(env.dialogs.at(-1).element.querySelector("[name=yourTurnColor]").value, "#765432");
+  });
+
+  test("color input without a running preview stays draft-only; Cancel discards its live color", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ color: "#123456" });
+    void env.feature.api.configure(actor);
+    const dialog = env.dialogs[0].element;
+    inputValue(env, dialog.querySelector("[name=yourTurnColor]"), "#ff0000");
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.audioControl.sounds.length, 0);
+    assert.equal(env.calls.update, 0);
+    dialog.querySelector("[data-action=preview]").click(); await flush();
+    assertLiveTheme(env.overlays()[0], "#FF0000");
+    dialog.querySelector("[data-action=cancel]").click(); await flush();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(actor.flags.yourTurnColor, "#123456");
+    assert.equal(env.calls.update, 0);
+  });
+
+  for (const active of ["another editor", "combat"]) {
+    test(`color input from a stale editor cannot recolor ${active}`, async t => {
+      const env = setup(t);
+      const actor = env.makeActor({ color: "#123456", sound: "sounds/editor.ogg" });
+      void env.feature.api.configure(actor);
+      const stale = env.dialogs[0];
+      stale.element.querySelector("[data-action=preview]").click(); await flush();
+      if (active === "another editor") {
+        void env.feature.api.configure(actor);
+        env.dialogs[1].element.querySelector("[data-action=preview]").click(); await flush();
+      } else await env.turnChange(env.combat({ combatant: env.combatant({ color: "#123456", sound: "sounds/turn.ogg" }) }), {}, { combatantId: "c1" });
+      const root = env.overlays()[0];
+      inputValue(env, stale.element.querySelector("[name=yourTurnColor]"), "#00ff00");
+      assertLiveTheme(root, "#123456");
+      stale.close(); await flush();
+      inputValue(env, stale.element.querySelector("[name=yourTurnColor]"), "#ff0000");
+      assertLiveTheme(root, "#123456");
+      assert.equal(env.overlays()[0], root);
+      assert.equal(env.audioControl.sounds.at(-1).playing, true);
+      assert.equal(env.calls.update, 0);
+    });
+  }
+
+  for (const pending of ["image load", "displayed image decode"]) {
+    test(`held preview uses the latest color chosen during ${pending}`, async t => {
+      const env = setup(t);
+      const actor = env.makeActor({ color: "#123456", art: "icons/late-color.webp" });
+      let finishDecode;
+      if (pending === "image load") env.imageControl.auto = false;
+      else env.dom.window.HTMLImageElement.prototype.decode = () => new Promise(resolve => { finishDecode = resolve; });
+      void env.feature.api.configure(actor);
+      const dialog = env.dialogs[0].element;
+      dialog.querySelector("[data-action=preview]").click(); await flush();
+      assert.equal(env.overlays().length, 0);
+      const color = dialog.querySelector("[name=yourTurnColor]");
+      inputValue(env, color, "#ff0000");
+      inputValue(env, color, "#00ff00");
+      if (pending === "image load") {
+        env.imageControl.auto = true;
+        for (const finish of env.imageControl.pending.splice(0)) finish();
+      } else finishDecode();
+      await flush();
+      assertLiveTheme(env.overlays()[0], "#00FF00");
+      assert.equal(actor.flags.yourTurnColor, "#123456");
+      assert.equal(env.calls.update, 0);
+    });
+  }
 
   for (const pending of ["image load", "displayed image decode"]) {
     test(`held preview uses the latest placement edits made during ${pending}`, async t => {

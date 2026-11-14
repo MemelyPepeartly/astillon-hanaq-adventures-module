@@ -69,7 +69,7 @@ type Subject = {
 
 type PortraitTransform = { x: number; y: number; scale: number };
 type ArtDraft = { art: string; color: string; sound?: string; transform?: PortraitTransform };
-type EditorSession = { closed: boolean; transform?: PortraitTransform };
+type EditorSession = { closed: boolean; transform?: PortraitTransform; color?: string };
 type Stinger = { sound?: any; starting?: Promise<unknown> };
 
 type Rgb = { r: number; g: number; b: number };
@@ -607,10 +607,19 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  function applyTheme(root: HTMLElement, color: string): void {
+  function applyThemeColors(root: HTMLElement, color: string): void {
     root.style.setProperty("--yt-color", color);
     root.style.setProperty("--turn-theme", color);
     root.style.setProperty("--turn-highlight", turnHighlight(color));
+    for (const spec of SLICES) {
+      if (!spec.tint) continue;
+      const tint = root.querySelector<HTMLElement>(`[data-layer="${spec.id}"] .astillon-yt-tint`);
+      if (tint) applyTintColor(tint, spec.tint === "theme" ? color : turnHighlight(color));
+    }
+  }
+
+  function applyTheme(root: HTMLElement, color: string): void {
+    applyThemeColors(root, color);
     root.style.setProperty("--yt-scale", String(readScale()));
     root.style.setProperty("--yt-portrait-width", `${portraitWidth(readSetting(SETTING_PORTRAIT_WIDTH))}px`);
   }
@@ -745,9 +754,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   function paintTint(tint: HTMLElement, src: string, color: string): void {
     const mask = `url("${src}")`;
     tint.style.setProperty("display", "block", "important");
-    tint.style.setProperty("background-color", color, "important");
+    applyTintColor(tint, color);
     tint.style.setProperty("--slice-url", mask);
-    tint.style.setProperty("--slice-color", color);
     tint.style.setProperty("mask-image", mask, "important");
     tint.style.setProperty("-webkit-mask-image", mask, "important");
     tint.style.setProperty("mask-size", "100% 100%", "important");
@@ -757,6 +765,12 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     tint.style.setProperty("mask-position", "center", "important");
     tint.style.setProperty("-webkit-mask-position", "center", "important");
     tint.style.setProperty("mask-mode", "alpha", "important");
+  }
+
+  function applyTintColor(tint: HTMLElement, color: string): void {
+    // Tints have an explicit !important fill; changing root variables alone is insufficient.
+    tint.style.setProperty("background-color", color, "important");
+    tint.style.setProperty("--slice-color", color);
     tint.dataset.tintColor = color;
   }
 
@@ -1076,6 +1090,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (owner) {
       root.dataset.preview = "held";
       applyPortraitTransform(root, owner.transform ?? subject.transform);
+      applyThemeColors(root, owner.color ?? subject.color);
     }
     for (const piece of Array.from(root.querySelectorAll<HTMLElement>(".astillon-yt-layer"))) {
       if (owner) {
@@ -1101,8 +1116,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   async function preview(actor: any, draft: ArtDraft | null = null, owner?: EditorSession): Promise<void> {
     try {
       if (owner?.closed) return;
-      if (owner) owner.transform = draft?.transform ? normalizePortraitTransform(draft.transform) : transformFrom(actor);
-      await present(subjectFromActor(actor, draft), owner);
+      const subject = subjectFromActor(actor, draft);
+      if (owner) { owner.transform = subject.transform; owner.color = subject.color; }
+      await present(subject, owner);
     } catch (error) {
       reportEditorError("preview", error);
     }
@@ -1293,6 +1309,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     });
     const sound = form.querySelector<HTMLInputElement>("[name=yourTurnSound]");
     for (const event of ["input", "change"]) sound?.addEventListener(event, () => stopEditorPreview(owner));
+    const color = form.querySelector<HTMLInputElement>("[name=yourTurnColor]")!;
+    const updateColor = () => {
+      const hex = normalizeHexColor(color.value);
+      if (!hex || owner.closed) return;
+      owner.color = hex; // Retain the latest draft while portrait loading/decoding is pending.
+      if (presentationOwner === owner && overlay?.dataset.preview === "held") applyThemeColors(overlay, hex);
+    };
+    // input fires while dragging inside the picker; change is a commit/fallback event.
+    for (const event of ["input", "change"]) color.addEventListener(event, updateColor);
     const x = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitX]")!;
     const y = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitY]")!;
     const scale = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitScale]")!;

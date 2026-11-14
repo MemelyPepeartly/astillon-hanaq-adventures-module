@@ -36,7 +36,7 @@
       "Larger": "Enlarge portrait",
       "ResetPlacement": "Reset portrait placement",
       "PlacementHint": "Arrows move 10 px; hold Shift for 1 px. Scale is relative to the GM's portrait width. Changes update your open preview; Save applies them to this actor.",
-      "PreviewHint": "Preview stays visible until stopped, closed, or replaced. Placement changes do not replay its sound.",
+      "PreviewHint": "Preview stays visible until stopped, closed, or replaced. Color and placement update live without replaying its sound.",
       "Browse": "Browse",
       "Preview": "Preview",
       "Save": "Save"
