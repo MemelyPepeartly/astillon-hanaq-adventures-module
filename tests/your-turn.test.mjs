@@ -8,6 +8,7 @@ import {
   fitTurnPortrait,
   euclideanOutlineCovers,
   mixTowardWhite,
+  normalizePortraitTransform,
   renderOutlineMask,
   saturatedPanelColor,
   turnHighlight,
@@ -17,6 +18,36 @@ import {
 const MODULE = "astillon-hanaq-adventures-module";
 const ROOT = ".astillon-yt";
 const flush = () => setImmediate();
+
+function assertPortraitTransform(root, { x, y, scale }) {
+  assert.ok(root, "the cut-in is visible");
+  assert.equal(root.style.getPropertyValue("--yt-portrait-x"), `${x}px`);
+  assert.equal(root.style.getPropertyValue("--yt-portrait-y"), `${y}px`);
+  assert.equal(root.style.getPropertyValue("--yt-portrait-scale"), String(scale));
+}
+
+function portraitFields(dialog) {
+  return {
+    x: dialog.querySelector("[name=yourTurnPortraitX]"),
+    y: dialog.querySelector("[name=yourTurnPortraitY]"),
+    scale: dialog.querySelector("[name=yourTurnPortraitScale]"),
+    slider: dialog.querySelector("[name=yourTurnPortraitScaleSlider]"),
+  };
+}
+
+function inputValue(env, input, value, event = "input") {
+  input.value = String(value);
+  input.dispatchEvent(new env.dom.window.Event(event, { bubbles: true }));
+}
+
+function placementButton(env, dialog, action, shiftKey = false) {
+  const button = dialog.querySelector(`[data-action="${action}"]`);
+  assert.ok(button, action);
+  assert.equal(button.type, "button", `${action} cannot submit the editor`);
+  const event = new env.dom.window.MouseEvent("click", { bubbles: true, cancelable: true, shiftKey });
+  button.dispatchEvent(event);
+  assert.equal(event.defaultPrevented, true, `${action} prevents the default action`);
+}
 
 class BooleanFieldStub {
   constructor() {
@@ -499,12 +530,14 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       art,
       color,
       sound,
+      transform,
       documentName = "Actor",
     } = {}) {
       const flags = {};
       if (art !== undefined) flags.yourTurnArt = art;
       if (color !== undefined) flags.yourTurnColor = color;
       if (sound !== undefined) flags.yourTurnSound = sound;
+      if (transform !== undefined) flags.yourTurnPortraitTransform = transform;
       return {
         name,
         img,
@@ -551,14 +584,17 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
       art,
       color,
       sound,
+      transform,
       baseArt,
       baseColor,
+      baseTransform,
       actorName,
     } = {}) {
-      const actor = makeActor({ name: actorName ?? name, img: actorImg, art, color, sound });
-      const baseActor = baseArt !== undefined || baseColor !== undefined
-        ? makeActor({ name: "Base", img: "icons/base.webp", art: baseArt, color: baseColor })
+      const actor = makeActor({ name: actorName ?? name, img: actorImg, art, color, sound, transform });
+      const baseActor = baseArt !== undefined || baseColor !== undefined || baseTransform !== undefined
+        ? makeActor({ name: "Base", img: "icons/base.webp", art: baseArt, color: baseColor, transform: baseTransform })
         : null;
+      if (baseActor) actor.token = { baseActor };
       return {
         id,
         name,
@@ -1412,9 +1448,266 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays()[0].querySelector("[data-layer='banner']").dataset.exitMs, "2050");
   });
 
+  test("portrait transforms normalize defaults, invalid values, bounds, and precision without mutating flags", () => {
+    for (const value of [undefined, null, false, "bad", [], {}, { x: NaN, y: Infinity, scale: -Infinity },
+      { x: "12", y: null, scale: "2" }]) {
+      assert.deepEqual(normalizePortraitTransform(value), { x: 0, y: 0, scale: 1 });
+    }
+    const saved = Object.freeze({ x: 12.6, y: -23.6, scale: 1.236 });
+    assert.deepEqual(normalizePortraitTransform(saved), { x: 13, y: -24, scale: 1.24 });
+    assert.deepEqual(saved, { x: 12.6, y: -23.6, scale: 1.236 });
+    assert.deepEqual(normalizePortraitTransform({ x: 1001.5, y: -2000, scale: 0 }), { x: 1000, y: -1000, scale: 0.25 });
+    assert.deepEqual(normalizePortraitTransform({ x: -1001, y: 2000, scale: 4 }), { x: -1000, y: 1000, scale: 3 });
+    assert.deepEqual(normalizePortraitTransform({ x: 7 }), { x: 7, y: 0, scale: 1 });
+    assert.deepEqual(normalizePortraitTransform({ x: 0, y: 0, scale: 0.25 }), { x: 0, y: 0, scale: 0.25 });
+    assert.deepEqual(normalizePortraitTransform({ x: 1000, y: -1000, scale: 3 }), { x: 1000, y: -1000, scale: 3 });
+  });
+
+  test("saved and draft transforms normalize independently of the world's scale and default portrait width", async t => {
+    const env = setup(t, { scale: 1.5, portraitWidth: 450 });
+    const stored = { x: 1234, y: -12.6, scale: 1.236 };
+    const actor = env.makeActor({ transform: stored });
+    await env.feature.api.preview(actor);
+    const root = env.overlays()[0];
+    assertPortraitTransform(root, { x: 1000, y: -13, scale: 1.24 });
+    assert.equal(root.style.getPropertyValue("--yt-scale"), "1.5");
+    assert.equal(root.querySelector(".astillon-yt-stage").style.transform, "scale(var(--yt-scale))");
+    const character = root.querySelector(".astillon-yt-character");
+    const width = character.style.width;
+
+    await env.feature.api.preview(actor, { art: "icons/draft.webp", color: "#112233",
+      transform: { x: -18.6, y: 2000, scale: 0.01 } });
+    const draft = env.overlays()[0];
+    assertPortraitTransform(draft, { x: -19, y: 1000, scale: 0.25 });
+    assert.equal(draft.style.getPropertyValue("--yt-scale"), "1.5");
+    assert.equal(draft.querySelector(".astillon-yt-character").style.width, width);
+    assert.deepEqual(actor.flags.yourTurnPortraitTransform, stored);
+    assert.equal(env.calls.update, 0);
+    await env.feature.api.preview(env.makeActor());
+    assertPortraitTransform(env.overlays()[0], { x: 0, y: 0, scale: 1 });
+  });
+
+  test("synthetic combatants, API previews, and editors inherit base placement only when their flag is absent", async t => {
+    const env = setup(t);
+    const baseTransform = { x: 40.6, y: -60.6, scale: 1.457 };
+    const current = env.combatant({ baseTransform });
+    const inherited = { x: 41, y: -61, scale: 1.46 };
+    await env.turnChange(env.combat({ combatant: current }), {}, { combatantId: current.id, turn: 0 });
+    assertPortraitTransform(env.overlays()[0], inherited);
+    await env.feature.api.preview(current.actor);
+    assertPortraitTransform(env.overlays()[0], inherited);
+    void env.feature.api.configure(current.actor);
+    const dialog = env.dialogs.at(-1).element;
+    const fields = portraitFields(dialog);
+    assert.equal(fields.x.value, "41");
+    assert.equal(fields.y.value, "-61");
+    assert.equal(fields.scale.value, "146");
+    assert.equal(fields.slider.value, "146");
+    dialog.querySelector("[data-action=preview]").click(); await flush();
+    assertPortraitTransform(env.overlays()[0], inherited);
+
+    placementButton(env, dialog, "reset-portrait");
+    assertPortraitTransform(env.overlays()[0], { x: 0, y: 0, scale: 1 });
+    assert.equal(current.actor.flags.yourTurnPortraitTransform, undefined, "reset remains a draft before Save");
+    assert.deepEqual(current.token.baseActor.flags.yourTurnPortraitTransform, baseTransform);
+    dialog.querySelector("[data-action=save]").click(); await flush();
+    assert.deepEqual(current.actor.updateCalls[0][`flags.${MODULE}.yourTurnPortraitTransform`], { x: 0, y: 0, scale: 1 });
+    assert.equal(current.actor.updateCalls.length, 1);
+    assert.equal(current.token.baseActor.updateCalls.length, 0);
+    assert.equal(env.overlays().length, 0);
+    await env.turnChange(env.combat({ combatant: current }), {}, { combatantId: current.id, turn: 1 });
+    assertPortraitTransform(env.overlays()[0], { x: 0, y: 0, scale: 1 });
+    await env.feature.api.preview(current.actor);
+    assertPortraitTransform(env.overlays()[0], { x: 0, y: 0, scale: 1 });
+    void env.feature.api.configure(current.actor);
+    assert.equal(portraitFields(env.dialogs.at(-1).element).scale.value, "100");
+
+    current.actor.flags.yourTurnPortraitTransform = { x: 7 };
+    await env.turnChange(env.combat({ combatant: current }), {}, { combatantId: current.id, turn: 2 });
+    assertPortraitTransform(env.overlays()[0], { x: 7, y: 0, scale: 1 });
+    assert.deepEqual(current.token.baseActor.flags.yourTurnPortraitTransform, baseTransform);
+    assert.deepEqual(env.errors, []);
+  });
+
+  for (const reduced of [false, true]) {
+    test(`editor preview is held with every layer visible and no animation or expiry timer (reduced=${reduced})`, async t => {
+      const env = setup(t, { enabled: false, reduced });
+      const animations = [];
+      env.dom.window.HTMLElement.prototype.animate = (...args) => {
+        animations.push(args);
+        return { cancel() {} };
+      };
+      const actor = env.makeActor({ sound: "sounds/held.ogg", transform: { x: 25, y: -10, scale: 1.3 } });
+      void env.feature.api.configure(actor);
+      env.dialogs[0].element.querySelector("[data-action=preview]").click(); await flush();
+      const [root] = env.overlays();
+      assert.equal(root.dataset.preview, "held");
+      assertPortraitTransform(root, { x: 25, y: -10, scale: 1.3 });
+      const layers = [...root.querySelectorAll(".astillon-yt-layer")];
+      assert.equal(layers.length, 8);
+      for (const layer of layers) {
+        assert.equal(layer.dataset.motion, "preview");
+        assert.equal(layer.style.opacity, "1");
+        assert.equal(layer.style.transform, "none");
+      }
+      assert.equal(animations.length, 0);
+      assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
+      assert.equal(env.timerCallbacks.has(TURN_INTRO_MS), false);
+      await flush();
+      assert.equal(env.overlays()[0], root);
+      assert.equal(env.audioControl.sounds[0].playCalls.length, 1);
+      assert.equal(env.calls.update, 0);
+    });
+  }
+
+  test("automatic combat replaces a held editor preview and still animates and expires after 2.6 seconds", async t => {
+    const env = setup(t);
+    const animations = [];
+    env.dom.window.HTMLElement.prototype.animate = (frames, options) => {
+      animations.push({ frames, options });
+      return { cancel() {} };
+    };
+    void env.feature.api.configure(env.makeActor({ sound: "sounds/editor.ogg" }));
+    env.dialogs[0].element.querySelector("[data-action=preview]").click(); await flush();
+    const held = env.overlays()[0];
+    assert.equal(animations.length, 0);
+    assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
+    await env.turnChange(env.combat({ combatant: env.combatant({ transform: { x: -70, y: 50, scale: 1.2 } }) }),
+      {}, { combatantId: "c1", round: 1, turn: 0 });
+    const root = env.overlays()[0];
+    assert.notEqual(root, held);
+    assert.equal(held.isConnected, false);
+    assert.equal(root.dataset.preview, undefined);
+    assertPortraitTransform(root, { x: -70, y: 50, scale: 1.2 });
+    assert.equal(env.audioControl.sounds[0].playing, false);
+    assert.equal(TURN_INTRO_MS, 2600);
+    assert.equal(env.scheduled.filter(ms => ms === TURN_INTRO_MS).length, 1);
+    assert.equal(animations.length, 8);
+    assert.ok(animations.every(({ options }) => options.duration === TURN_INTRO_MS));
+    assert.ok([...root.querySelectorAll(".astillon-yt-layer")].every(layer => layer.dataset.motion === "demo"));
+    env.timerCallbacks.get(TURN_INTRO_MS)();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(env.dialogs[0].element.isConnected, true);
+  });
+
+  test("placement buttons nudge and scale precisely, preserve the same preview, and never replay audio or submit", async t => {
+    const env = setup(t, { scale: 1.5 });
+    const actor = env.makeActor({ sound: "sounds/editor.ogg" });
+    void env.feature.api.configure(actor);
+    const dialog = env.dialogs[0].element;
+    const fields = portraitFields(dialog);
+    for (const field of [fields.x, fields.y, fields.scale]) assert.equal(field.type, "number");
+    assert.equal(fields.slider.type, "range");
+    let bubbled = 0;
+    dialog.addEventListener("click", () => { bubbled += 1; });
+    dialog.querySelector("[data-action=preview]").click(); await flush();
+    const root = env.overlays()[0];
+    const character = root.querySelector(".astillon-yt-character");
+    const image = character.querySelector("img");
+    const layerStyles = [...root.querySelectorAll(".astillon-yt-layer")].map(layer => layer.style.cssText);
+    const requested = env.imageControl.requested.length;
+    const generation = root.dataset.generation;
+    const steps = [
+      ["nudge-right", false, 10, 0, 1], ["nudge-left", true, 9, 0, 1],
+      ["nudge-up", false, 9, -10, 1], ["nudge-down", true, 9, -9, 1],
+      ["nudge-right", true, 10, -9, 1], ["nudge-left", false, 0, -9, 1],
+      ["nudge-up", true, 0, -10, 1], ["nudge-down", false, 0, 0, 1],
+      ["scale-up", false, 0, 0, 1.05], ["scale-down", true, 0, 0, 1.04],
+      ["scale-up", true, 0, 0, 1.05], ["scale-down", false, 0, 0, 1],
+    ];
+    for (const [action, shiftKey, x, y, scale] of steps) {
+      placementButton(env, dialog, action, shiftKey);
+      assertPortraitTransform(root, { x, y, scale });
+      assert.equal(fields.x.value, String(x));
+      assert.equal(fields.y.value, String(y));
+      assert.equal(fields.scale.value, String(Math.round(scale * 100)));
+      assert.equal(fields.slider.value, fields.scale.value);
+      assert.equal(env.overlays()[0], root);
+    }
+    inputValue(env, fields.x, 999, "change");
+    inputValue(env, fields.y, -999, "change");
+    inputValue(env, fields.scale, 299, "change");
+    placementButton(env, dialog, "nudge-right");
+    placementButton(env, dialog, "nudge-up");
+    placementButton(env, dialog, "scale-up");
+    assertPortraitTransform(root, { x: 1000, y: -1000, scale: 3 });
+    inputValue(env, fields.scale, 26, "change");
+    placementButton(env, dialog, "scale-down");
+    assertPortraitTransform(root, { x: 1000, y: -1000, scale: 0.25 });
+    placementButton(env, dialog, "reset-portrait");
+    assertPortraitTransform(root, { x: 0, y: 0, scale: 1 });
+    assert.deepEqual(Object.values(fields).map(field => field.value), ["0", "0", "100", "100"]);
+    await flush();
+    assert.equal(env.overlays()[0], root);
+    assert.equal(root.querySelector(".astillon-yt-character"), character);
+    assert.equal(character.querySelector("img"), image);
+    assert.equal(root.dataset.generation, generation);
+    assert.deepEqual([...root.querySelectorAll(".astillon-yt-layer")].map(layer => layer.style.cssText), layerStyles);
+    assert.equal(root.style.getPropertyValue("--yt-scale"), "1.5");
+    assert.equal(env.imageControl.requested.length, requested);
+    assert.equal(env.audioControl.sounds.length, 1);
+    assert.equal(env.audioControl.sounds[0].playCalls.length, 1);
+    assert.equal(env.audioControl.sounds[0].stopCalls.length, 0);
+    assert.equal(bubbled, 0, "placement buttons stop propagation to DialogV2");
+    assert.equal(env.calls.update, 0);
+    assert.equal(actor.flags.yourTurnPortraitTransform, undefined);
+    assert.equal(dialog.isConnected, true);
+    assert.deepEqual(env.errors, []);
+  });
+
+  test("numeric input preserves typing while normalizing the live preview; change and slider commit the fields", async t => {
+    const env = setup(t);
+    const actor = env.makeActor({ sound: "sounds/editor.ogg" });
+    void env.feature.api.configure(actor);
+    const dialog = env.dialogs[0].element;
+    const fields = portraitFields(dialog);
+    dialog.querySelector("[data-action=preview]").click(); await flush();
+    const root = env.overlays()[0];
+    inputValue(env, fields.x, "");
+    assert.equal(fields.x.value, "", "do not overwrite a temporarily empty numeric field");
+    inputValue(env, fields.x, "-12.6");
+    assert.equal(fields.x.value, "-12.6");
+    assertPortraitTransform(root, { x: -13, y: 0, scale: 1 });
+    inputValue(env, fields.x, "-12.6", "change");
+    assert.equal(fields.x.value, "-13");
+    inputValue(env, fields.y, "1200.4");
+    assert.equal(fields.y.value, "1200.4");
+    assertPortraitTransform(root, { x: -13, y: 1000, scale: 1 });
+    inputValue(env, fields.y, "1200.4", "change");
+    assert.equal(fields.y.value, "1000");
+    for (const [raw, factor] of [["", 1], ["1", 0.25], ["13", 0.25], ["137.6", 1.38], ["340", 3]]) {
+      inputValue(env, fields.scale, raw);
+      assert.equal(fields.scale.value, raw, "input cannot interrupt multi-digit percentage entry");
+      assert.equal(fields.slider.value, String(Math.round(factor * 100)));
+      assertPortraitTransform(root, { x: -13, y: 1000, scale: factor });
+    }
+    inputValue(env, fields.scale, "137.6", "change");
+    assert.equal(fields.scale.value, "138");
+    assert.equal(fields.slider.value, "138");
+    inputValue(env, fields.slider, 175);
+    assert.equal(fields.scale.value, "175");
+    assertPortraitTransform(root, { x: -13, y: 1000, scale: 1.75 });
+    inputValue(env, fields.slider, 25, "change");
+    assert.equal(fields.scale.value, "25");
+    assertPortraitTransform(root, { x: -13, y: 1000, scale: 0.25 });
+    inputValue(env, fields.x, "", "change");
+    inputValue(env, fields.y, "", "change");
+    inputValue(env, fields.scale, "", "change");
+    assert.deepEqual(Object.values(fields).map(field => field.value), ["0", "0", "100", "100"]);
+    assertPortraitTransform(root, { x: 0, y: 0, scale: 1 });
+    await flush();
+    assert.equal(env.overlays()[0], root);
+    assert.equal(env.audioControl.sounds.length, 1);
+    assert.equal(env.audioControl.sounds[0].playCalls.length, 1);
+    assert.equal(env.audioControl.sounds[0].stopCalls.length, 0);
+    assert.equal(env.calls.update, 0);
+    assert.equal(actor.flags.yourTurnPortraitTransform, undefined);
+  });
+
   test("editable sheet can preview the draft and save flags", async (t) => {
     const env = setup(t, { enabled: false });
-    const actor = env.makeActor({ name: "Editor", img: "icons/saved-actor.webp", art: "icons/stored.webp", sound: "sounds/stored.ogg" });
+    const actor = env.makeActor({ name: "Editor", img: "icons/saved-actor.webp", art: "icons/stored.webp", sound: "sounds/stored.ogg",
+      transform: { x: 30, y: -20, scale: 1.2 } });
     const host = env.dom.window.document.createElement("section");
     const header = env.dom.window.document.createElement("div");
     header.className = "window-header";
@@ -1441,6 +1734,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     const art = dialog.querySelector("[name=yourTurnArt]");
     const color = dialog.querySelector("[name=yourTurnColor]");
     const sound = dialog.querySelector("[name=yourTurnSound]");
+    const placement = portraitFields(dialog);
+    assert.deepEqual(Object.values(placement).map(field => field.value), ["30", "-20", "120", "120"]);
     assert.equal(sound.value, "sounds/stored.ogg");
     assert.equal(art.value, "icons/stored.webp");
     assert.equal(dialog.querySelector("[data-action=preview]").textContent, "Preview");
@@ -1460,6 +1755,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     art.value = "icons/draft.webp";
     color.value = "#112233";
     sound.value = "  sounds/draft.ogg  ";
+    placement.x.value = "50.6";
+    placement.y.value = "-80.6";
+    placement.scale.value = "145.6";
     dialog.querySelector("[data-action=preview]").click();
     await flush();
     assert.equal(env.overlays().length, 1);
@@ -1470,6 +1768,8 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(env.overlays()[0].style.getPropertyValue("--yt-color"), "#112233");
     assert.equal(env.audioControl.sounds[0].options.src, "sounds/draft.ogg");
     assert.equal(actor.flags.yourTurnSound, "sounds/stored.ogg");
+    assert.deepEqual(actor.flags.yourTurnPortraitTransform, { x: 30, y: -20, scale: 1.2 });
+    assertPortraitTransform(env.overlays()[0], { x: 51, y: -81, scale: 1.46 });
 
     dialog.querySelector("[data-action=save]").click();
     await flush();
@@ -1477,12 +1777,15 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(actor.flags.yourTurnColor, "#112233");
     assert.equal(actor.flags.yourTurnSound, "sounds/draft.ogg");
     assert.equal(dialog.isConnected, false);
-    assert.equal(env.calls.update, 1, "portrait, color, and sound save in one document update");
+    assert.equal(env.calls.update, 1, "portrait, color, sound, and placement save in one document update");
     assert.deepEqual(actor.updateCalls[0], {
       [`flags.${MODULE}.yourTurnArt`]: "icons/draft.webp",
       [`flags.${MODULE}.yourTurnColor`]: "#112233",
       [`flags.${MODULE}.yourTurnSound`]: "sounds/draft.ogg",
+      [`flags.${MODULE}.yourTurnPortraitTransform`]: { x: 51, y: -81, scale: 1.46 },
     });
+    assert.equal(actor.setCalls.length, 0, "Save does not split the fields into setFlag calls");
+    assert.equal(env.overlays().length, 0);
     assert.equal(env.audioControl.sounds[0].playing, false, "saving stops the editor preview");
 
     header.querySelector("button").click();
@@ -1490,6 +1793,9 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(reopened.querySelector("[name=yourTurnArt]").value, "icons/draft.webp");
     assert.equal(reopened.querySelector("[name=yourTurnColor]").value, "#112233");
     assert.equal(reopened.querySelector("[name=yourTurnSound]").value, "sounds/draft.ogg");
+    assert.deepEqual(Object.values(portraitFields(reopened)).map(field => field.value), ["51", "-81", "146", "146"]);
+    placementButton(env, reopened, "reset-portrait");
+    assert.deepEqual(actor.flags.yourTurnPortraitTransform, { x: 51, y: -81, scale: 1.46 }, "reset is draft-only until Save");
     reopened.querySelector("[name=yourTurnArt]").value = "   ";
     reopened.querySelector("[name=yourTurnSound]").value = "   ";
     reopened.querySelector("[data-action=save]").click();
@@ -1498,6 +1804,13 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     assert.equal(actor.flags.yourTurnArt, undefined);
     assert.equal(actor.flags.yourTurnSound, undefined);
     assert.ok(actor.unsetCalls.includes("yourTurnSound"));
+    assert.equal(actor.updateCalls.length, 2);
+    assert.deepEqual(actor.updateCalls[1], {
+      [`flags.${MODULE}.-=yourTurnArt`]: null,
+      [`flags.${MODULE}.yourTurnColor`]: "#112233",
+      [`flags.${MODULE}.-=yourTurnSound`]: null,
+      [`flags.${MODULE}.yourTurnPortraitTransform`]: { x: 0, y: 0, scale: 1 },
+    });
     assert.deepEqual(env.errors, [], "Browse and Preview must not fall through to DialogV2 submit actions");
   });
 
@@ -1575,16 +1888,18 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     });
   }
 
-  test("Stop preview still stops its sound after the preview card expires", async t => {
+  test("Stop preview removes its held card and stops its sound without closing the editor", async t => {
     const env = setup(t);
     void env.feature.api.configure(env.makeActor({ sound: "sounds/long.ogg" }));
     const dialog = env.dialogs[0].element;
     dialog.querySelector('[data-action="preview"]').click(); await flush();
     const [sound] = env.audioControl.sounds;
-    env.timerCallbacks.get(TURN_INTRO_MS)(); await flush();
-    assert.equal(env.overlays().length, 0);
+    assert.equal(env.overlays().length, 1);
+    assert.equal(env.overlays()[0].dataset.preview, "held");
+    assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
     assert.equal(sound.playing, true);
     dialog.querySelector('[data-action="stop-preview"]').click(); await flush();
+    assert.equal(env.overlays().length, 0);
     assert.equal(sound.playing, false);
     assert.equal(dialog.isConnected, true);
   });
@@ -1703,23 +2018,140 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
 
   test("cancel or window dismissal preserves every stored field and stops the editor preview", async t => {
     const env = setup(t);
-    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456", sound: "sounds/saved.ogg" });
+    const transform = { x: 70, y: -90, scale: 1.4 };
+    const actor = env.makeActor({ art: "icons/saved.webp", color: "#123456", sound: "sounds/saved.ogg", transform });
     for (const dismiss of ["cancel", "close"]) {
       void env.feature.api.configure(actor);
       const dialog = env.dialogs.at(-1);
+      assert.deepEqual(Object.values(portraitFields(dialog.element)).map(field => field.value), ["70", "-90", "140", "140"]);
       dialog.element.querySelector("[name=yourTurnArt]").value = "icons/draft.webp";
       dialog.element.querySelector("[name=yourTurnColor]").value = "#abcdef";
       dialog.element.querySelector("[name=yourTurnSound]").value = "sounds/draft.ogg";
       dialog.element.querySelector("[data-action=preview]").click(); await flush();
       const sound = env.audioControl.sounds.at(-1);
       assert.equal(sound.playing, true);
+      placementButton(env, dialog.element, "reset-portrait");
+      assertPortraitTransform(env.overlays()[0], { x: 0, y: 0, scale: 1 });
       if (dismiss === "cancel") dialog.element.querySelector("[data-action=cancel]").click();
       else dialog.close();
       await flush();
       assert.equal(sound.playing, false);
       assert.equal(env.overlays().length, 0);
-      assert.deepEqual(actor.flags, { yourTurnArt: "icons/saved.webp", yourTurnColor: "#123456", yourTurnSound: "sounds/saved.ogg" });
+      assert.deepEqual(actor.flags, { yourTurnArt: "icons/saved.webp", yourTurnColor: "#123456", yourTurnSound: "sounds/saved.ogg",
+        yourTurnPortraitTransform: transform });
     }
+    assert.equal(env.calls.update, 0);
+    assert.deepEqual(env.errors, []);
+  });
+
+  for (const pending of ["image load", "displayed image decode"]) {
+    test(`held preview uses the latest placement edits made during ${pending}`, async t => {
+      const env = setup(t);
+      const actor = env.makeActor({ art: "icons/late-editor.webp", sound: "sounds/editor.ogg",
+        transform: { x: 10, y: 20, scale: 1.1 } });
+      let finishDecode;
+      if (pending === "image load") env.imageControl.auto = false;
+      else env.dom.window.HTMLImageElement.prototype.decode = () => new Promise(resolve => { finishDecode = resolve; });
+      void env.feature.api.configure(actor);
+      const dialog = env.dialogs[0].element;
+      dialog.querySelector("[data-action=preview]").click(); await flush();
+      assert.equal(env.overlays().length, 0);
+      const fields = portraitFields(dialog);
+      inputValue(env, fields.x, 75.6);
+      inputValue(env, fields.y, -95.6, "change");
+      inputValue(env, fields.slider, 165);
+      placementButton(env, dialog, "nudge-left", true);
+      assert.equal(env.audioControl.sounds.length, 0);
+      assert.equal(env.calls.update, 0);
+      if (pending === "image load") {
+        env.imageControl.auto = true;
+        for (const finish of env.imageControl.pending.splice(0)) finish();
+      } else {
+        assert.equal(typeof finishDecode, "function");
+        finishDecode();
+      }
+      await flush();
+      assert.equal(env.overlays().length, 1);
+      assert.equal(env.overlays()[0].dataset.preview, "held");
+      assertPortraitTransform(env.overlays()[0], { x: 75, y: -96, scale: 1.65 });
+      assert.equal(env.audioControl.sounds.length, 1);
+      assert.equal(env.audioControl.sounds[0].playCalls.length, 1);
+      assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
+      assert.deepEqual(actor.flags.yourTurnPortraitTransform, { x: 10, y: 20, scale: 1.1 });
+      assert.equal(env.calls.update, 0);
+    });
+  }
+
+  for (const active of ["another editor", "combat"]) {
+    for (const dismiss of ["stop-preview", "cancel", "save", "close"]) {
+      test(`stale editor edits and ${dismiss} leave ${active}'s root, placement, and sound untouched`, async t => {
+        const env = setup(t);
+        const actor = env.makeActor({ sound: "sounds/editor.ogg", transform: { x: 10, y: 20, scale: 1.2 } });
+        void env.feature.api.configure(actor);
+        const stale = env.dialogs[0];
+        stale.element.querySelector("[data-action=preview]").click(); await flush();
+        if (active === "another editor") {
+          // Same actor, different dialog session: ownership cannot be inferred from actor identity.
+          void env.feature.api.configure(actor);
+          env.dialogs[1].element.querySelector("[data-action=preview]").click(); await flush();
+        } else {
+          await env.turnChange(env.combat({ combatant: env.combatant({ sound: "sounds/combat.ogg",
+            transform: { x: 10, y: 20, scale: 1.2 } }) }), {}, { combatantId: "c1" });
+        }
+        const root = env.overlays()[0];
+        const sound = env.audioControl.sounds.at(-1);
+        const scheduled = env.scheduled.filter(ms => ms === TURN_INTRO_MS).length;
+        const fields = portraitFields(stale.element);
+        inputValue(env, fields.x, 900);
+        inputValue(env, fields.y, -900, "change");
+        inputValue(env, fields.slider, 200);
+        placementButton(env, stale.element, "reset-portrait");
+        if (dismiss === "close") stale.close();
+        else stale.element.querySelector(`[data-action="${dismiss}"]`).click();
+        await flush();
+        assert.equal(env.overlays()[0], root);
+        assertPortraitTransform(root, { x: 10, y: 20, scale: 1.2 });
+        assert.equal(root.dataset.preview, active === "another editor" ? "held" : undefined);
+        assert.equal(sound.playing, true);
+        assert.equal(sound.playCalls.length, 1);
+        assert.equal(sound.stopCalls.length, 0);
+        assert.equal(env.audioControl.sounds.length, 2);
+        assert.equal(env.scheduled.filter(ms => ms === TURN_INTRO_MS).length, scheduled);
+        assert.equal(env.calls.update, dismiss === "save" ? 1 : 0);
+        if (active === "another editor") {
+          assert.deepEqual(Object.values(portraitFields(env.dialogs[1].element)).map(field => field.value), ["10", "20", "120", "120"]);
+        }
+        assert.deepEqual(env.errors, []);
+      });
+    }
+  }
+
+  test("a stale editor cannot alter or cancel another editor's pending held preview", async t => {
+    const env = setup(t);
+    env.imageControl.auto = false;
+    const first = env.makeActor({ name: "First", art: "icons/first-pending.webp", sound: "sounds/first.ogg" });
+    const second = env.makeActor({ name: "Second", art: "icons/second-pending.webp", sound: "sounds/second.ogg" });
+    void env.feature.api.configure(first); void env.feature.api.configure(second);
+    const [a, b] = env.dialogs;
+    a.element.querySelector("[data-action=preview]").click();
+    b.element.querySelector("[data-action=preview]").click();
+    inputValue(env, portraitFields(a.element).x, 900);
+    inputValue(env, portraitFields(b.element).x, -150);
+    inputValue(env, portraitFields(b.element).slider, 175);
+    a.close();
+    env.imageControl.auto = true;
+    for (const finish of env.imageControl.pending.splice(0)) finish();
+    await flush();
+    assert.equal(env.overlays().length, 1);
+    const root = env.overlays()[0];
+    assert.equal(root.querySelector(".astillon-yt-name").textContent, "Second");
+    assert.equal(root.querySelector(".astillon-yt-character img").getAttribute("src"), "icons/second-pending.webp");
+    assertPortraitTransform(root, { x: -150, y: 0, scale: 1.75 });
+    assert.equal(root.dataset.preview, "held");
+    assert.equal(env.audioControl.sounds.length, 1);
+    assert.equal(env.audioControl.sounds[0].options.src, "sounds/second.ogg");
+    assert.equal(env.audioControl.sounds[0].playing, true);
+    assert.equal(env.scheduled.includes(TURN_INTRO_MS), false);
     assert.equal(env.calls.update, 0);
     assert.deepEqual(env.errors, []);
   });

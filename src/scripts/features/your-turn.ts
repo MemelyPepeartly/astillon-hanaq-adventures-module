@@ -9,6 +9,7 @@ const DEFAULT_PORTRAIT_WIDTH = 400;
 const ART_FLAG = "yourTurnArt";
 const COLOR_FLAG = "yourTurnColor";
 const SOUND_FLAG = "yourTurnSound";
+const TRANSFORM_FLAG = "yourTurnPortraitTransform";
 const DEFAULT_COLOR = "#2B8CFF";
 const ROOT_CLASS = "astillon-yt";
 const CONFIGURE_CLASS = "astillon-your-turn-configure";
@@ -63,13 +64,26 @@ type Subject = {
   art: string[];
   color: string;
   sound: string;
+  transform: PortraitTransform;
 };
 
-type ArtDraft = { art: string; color: string; sound?: string };
-type EditorSession = { closed: boolean };
+type PortraitTransform = { x: number; y: number; scale: number };
+type ArtDraft = { art: string; color: string; sound?: string; transform?: PortraitTransform };
+type EditorSession = { closed: boolean; transform?: PortraitTransform };
 type Stinger = { sound?: any; starting?: Promise<unknown> };
 
 type Rgb = { r: number; g: number; b: number };
+
+/** Actor-specific placement, independent of the GM's shared default portrait width. */
+export function normalizePortraitTransform(value: any): PortraitTransform {
+  const bounded = (input: unknown, fallback: number, min: number, max: number) =>
+    typeof input === "number" && Number.isFinite(input) ? Math.min(max, Math.max(min, input)) : fallback;
+  return {
+    x: Math.round(bounded(value?.x, 0, -1000, 1000)),
+    y: Math.round(bounded(value?.y, 0, -1000, 1000)),
+    scale: Math.round(bounded(value?.scale, 1, 0.25, 3) * 100) / 100,
+  };
+}
 
 function portraitWidth(value: unknown): number {
   const width = Number(value);
@@ -471,6 +485,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       ?? DEFAULT_COLOR;
   }
 
+  function transformFrom(actor: any, baseActor = actor?.token?.baseActor): PortraitTransform {
+    return normalizePortraitTransform(flagRaw(actor, TRANSFORM_FLAG) ?? flagRaw(baseActor, TRANSFORM_FLAG));
+  }
+
   function subjectFromCombatant(combatant: any): Subject {
     const actor = combatant?.actor;
     const baseActor = combatant?.token?.baseActor;
@@ -482,6 +500,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       art: artChainFrom(actor, baseActor, actor?.img, combatant?.token?.texture?.src, null),
       color: colorFrom(actor, baseActor, null),
       sound: trimmed(flagRaw(actor ?? baseActor, SOUND_FLAG)),
+      transform: transformFrom(actor, baseActor),
     };
   }
 
@@ -492,6 +511,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       art: artChainFrom(actor, null, actor?.img, null, draft ? draft.art : null),
       color: colorFrom(actor, null, draft ? draft.color : null),
       sound: draft?.sound !== undefined ? trimmed(draft.sound) : trimmed(flagRaw(actor, SOUND_FLAG)),
+      transform: draft?.transform ? normalizePortraitTransform(draft.transform) : transformFrom(actor),
     };
   }
 
@@ -593,6 +613,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     root.style.setProperty("--turn-highlight", turnHighlight(color));
     root.style.setProperty("--yt-scale", String(readScale()));
     root.style.setProperty("--yt-portrait-width", `${portraitWidth(readSetting(SETTING_PORTRAIT_WIDTH))}px`);
+  }
+
+  function applyPortraitTransform(root: HTMLElement, value: PortraitTransform): void {
+    const transform = normalizePortraitTransform(value);
+    root.style.setProperty("--yt-portrait-x", `${transform.x}px`);
+    root.style.setProperty("--yt-portrait-y", `${transform.y}px`);
+    root.style.setProperty("--yt-portrait-scale", String(transform.scale));
   }
 
   function playLayer(root: HTMLElement, layer: HTMLElement, enterMs: number, exitMs: number, reduced: boolean): void {
@@ -826,6 +853,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     portrait.dataset.exitMs = String(PORTRAIT_EXIT_MS);
 
     root.append(stage);
+    applyPortraitTransform(root, subject.transform);
     applyInsets(root);
     const stagePx = Number.parseInt(stage.style.width, 10) || 0;
     const name = stage.querySelector<HTMLElement>(".astillon-yt-name");
@@ -1045,11 +1073,21 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (gen !== generation || (automatic && !isEnabled())) { releaseOverlayBlob(root); return; }
     document.body.append(root);
     overlay = root;
+    if (owner) {
+      root.dataset.preview = "held";
+      applyPortraitTransform(root, owner.transform ?? subject.transform);
+    }
     for (const piece of Array.from(root.querySelectorAll<HTMLElement>(".astillon-yt-layer"))) {
-      playLayer(root, piece, Number(piece.dataset.enterMs), Number(piece.dataset.exitMs), reduced);
+      if (owner) {
+        // Editing is a stationary composition view, not a looping animation.
+        piece.dataset.motion = "preview";
+        piece.style.opacity = "1";
+        piece.style.transform = "none";
+      } else playLayer(root, piece, Number(piece.dataset.enterMs), Number(piece.dataset.exitMs), reduced);
     }
     watchSidebar();
     void playStinger(subject.sound, root, gen, automatic);
+    if (owner) return; // Stop/close/save, another preview, or combat replaces this held view.
     removeTimer = setTimeout(() => {
       try {
         if (gen !== generation || overlay !== root) return;
@@ -1063,6 +1101,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   async function preview(actor: any, draft: ArtDraft | null = null, owner?: EditorSession): Promise<void> {
     try {
       if (owner?.closed) return;
+      if (owner) owner.transform = draft?.transform ? normalizePortraitTransform(draft.transform) : transformFrom(actor);
       await present(subjectFromActor(actor, draft), owner);
     } catch (error) {
       reportEditorError("preview", error);
@@ -1135,17 +1174,18 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  async function writeFlags(actor: any, art: string, color: string, sound: string): Promise<void> {
+  async function writeFlags(actor: any, art: string, color: string, sound: string, transform: PortraitTransform): Promise<void> {
     if (actor?.isOwner === false || typeof actor?.update !== "function") throw new Error("You do not have permission to edit this actor.");
     const trimmedArt = art.trim();
     const trimmedSound = sound.trim();
     const hex = normalizeHexColor(color);
     if (!hex) throw new Error("Choose a valid six-digit hex color.");
-    // One document update: do not leave the art, color, and sound half-saved.
+    // One document update: never leave the artwork and its placement half-saved.
     await actor.update({
       [`flags.${moduleId}.${trimmedArt ? ART_FLAG : `-=${ART_FLAG}`}`]: trimmedArt || null,
       [`flags.${moduleId}.${COLOR_FLAG}`]: hex,
       [`flags.${moduleId}.${trimmedSound ? SOUND_FLAG : `-=${SOUND_FLAG}`}`]: trimmedSound || null,
+      [`flags.${moduleId}.${TRANSFORM_FLAG}`]: normalizePortraitTransform(transform),
     });
     if (trimmedArt) failedArt.delete(trimmedArt);
     warmActor(actor);
@@ -1156,13 +1196,19 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const color = element.querySelector<HTMLInputElement>("[name=yourTurnColor]");
     const sound = element.querySelector<HTMLInputElement>("[name=yourTurnSound]");
     if (!art || !color || !sound) throw new Error("The editor fields are missing; close it and open it again.");
-    return { art: art.value, color: color.value, sound: sound.value };
+    const x = element.querySelector<HTMLInputElement>("[name=yourTurnPortraitX]")?.valueAsNumber;
+    const y = element.querySelector<HTMLInputElement>("[name=yourTurnPortraitY]")?.valueAsNumber;
+    const scale = element.querySelector<HTMLInputElement>("[name=yourTurnPortraitScale]")?.valueAsNumber;
+    return { art: art.value, color: color.value, sound: sound.value,
+      transform: normalizePortraitTransform({ x, y, scale: Number(scale) / 100 }) };
   }
 
   function editorContent(actor: any): string {
     const art = trimmed(flagRaw(actor, ART_FLAG));
     const color = normalizeHexColor(flagRaw(actor, COLOR_FLAG)) ?? DEFAULT_COLOR;
     const sound = trimmed(flagRaw(actor, SOUND_FLAG));
+    const transform = transformFrom(actor);
+    const label = (key: string) => escapeHtml(game.i18n.localize(`ASTILLON.YourTurn.${key}`));
     // DialogV2 owns the surrounding form. Nested forms are discarded by HTML parsing.
     return `<div class="astillon-yt-editor">
       <label class="astillon-yt-editor-label">
@@ -1172,6 +1218,31 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
           <button type="button" data-action="browse">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Browse"))}</button>
         </span>
       </label>
+      <fieldset class="astillon-yt-placement">
+        <legend>${label("Placement")}</legend>
+        <div class="astillon-yt-placement-row">
+          <div class="astillon-yt-nudger" role="group" aria-label="${label("Placement")}">
+            <button type="button" data-action="nudge-up" title="${label("Up")}" aria-label="${label("Up")}">↑</button>
+            <button type="button" data-action="nudge-left" title="${label("Left")}" aria-label="${label("Left")}">←</button>
+            <button type="button" data-action="reset-portrait" title="${label("ResetPlacement")}" aria-label="${label("ResetPlacement")}">↺</button>
+            <button type="button" data-action="nudge-right" title="${label("Right")}" aria-label="${label("Right")}">→</button>
+            <button type="button" data-action="nudge-down" title="${label("Down")}" aria-label="${label("Down")}">↓</button>
+          </div>
+          <div class="astillon-yt-placement-fields">
+            <label>${label("Horizontal")}<input type="number" name="yourTurnPortraitX" value="${transform.x}" min="-1000" max="1000" step="1"></label>
+            <label>${label("Vertical")}<input type="number" name="yourTurnPortraitY" value="${transform.y}" min="-1000" max="1000" step="1"></label>
+          </div>
+        </div>
+        <label class="astillon-yt-editor-label">${label("PortraitScale")}
+          <span class="astillon-yt-scale-controls">
+            <button type="button" data-action="scale-down" aria-label="${label("Smaller")}" title="${label("Smaller")}">−</button>
+            <input type="range" name="yourTurnPortraitScaleSlider" aria-label="${label("PortraitScale")}" min="25" max="300" step="1" value="${Math.round(transform.scale * 100)}">
+            <input type="number" name="yourTurnPortraitScale" aria-label="${label("PortraitScale")}" min="25" max="300" step="1" value="${Math.round(transform.scale * 100)}">
+            <button type="button" data-action="scale-up" aria-label="${label("Larger")}" title="${label("Larger")}">+</button>
+          </span>
+        </label>
+        <p class="hint">${label("PlacementHint")}</p>
+      </fieldset>
       <label class="astillon-yt-editor-label">
         <span>${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Color"))}</span>
         <input type="color" name="yourTurnColor" value="${escapeHtml(color)}">
@@ -1184,6 +1255,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         </span>
       </label>
       <p class="hint">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.SoundHint"))}</p>
+      <p class="hint">${label("PreviewHint")}</p>
       <button type="button" data-action="preview">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Preview"))}</button>
       <button type="button" data-action="stop-preview">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.StopPreview"))}</button>
     </div>`;
@@ -1221,6 +1293,45 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     });
     const sound = form.querySelector<HTMLInputElement>("[name=yourTurnSound]");
     for (const event of ["input", "change"]) sound?.addEventListener(event, () => stopEditorPreview(owner));
+    const x = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitX]")!;
+    const y = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitY]")!;
+    const scale = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitScale]")!;
+    const slider = form.querySelector<HTMLInputElement>("[name=yourTurnPortraitScaleSlider]")!;
+    const updatePlacement = (commit = false) => {
+      const transform = editorDraft(form).transform!;
+      if (commit) {
+        x.value = String(transform.x); y.value = String(transform.y);
+        scale.value = String(Math.round(transform.scale * 100));
+      }
+      slider.value = String(Math.round(transform.scale * 100));
+      owner.transform = transform; // Also used if this preview's artwork is still loading.
+      if (!owner.closed && presentationOwner === owner && overlay?.dataset.preview === "held") {
+        applyPortraitTransform(overlay, transform);
+      }
+    };
+    for (const input of [x, y, scale, slider]) {
+      for (const event of ["input", "change"]) input.addEventListener(event, () => {
+        if (input === slider) scale.value = slider.value;
+        updatePlacement(event === "change" || input === slider);
+      });
+    }
+    for (const button of Array.from(form.querySelectorAll<HTMLButtonElement>(".astillon-yt-placement button"))) {
+      button.addEventListener("click", (event) => {
+        event.preventDefault(); event.stopPropagation();
+        const fine = event.shiftKey;
+        const move = fine ? 1 : 10;
+        const zoom = fine ? 1 : 5;
+        const action = button.dataset.action;
+        if (action === "nudge-left") x.value = String((x.valueAsNumber || 0) - move);
+        if (action === "nudge-right") x.value = String((x.valueAsNumber || 0) + move);
+        if (action === "nudge-up") y.value = String((y.valueAsNumber || 0) - move);
+        if (action === "nudge-down") y.value = String((y.valueAsNumber || 0) + move);
+        if (action === "scale-down") scale.value = String((scale.valueAsNumber || 100) - zoom);
+        if (action === "scale-up") scale.value = String((scale.valueAsNumber || 100) + zoom);
+        if (action === "reset-portrait") { x.value = y.value = "0"; scale.value = "100"; }
+        updatePlacement(true);
+      });
+    }
   }
 
   function editorElement(first: any, second: any): HTMLElement | null {
@@ -1242,6 +1353,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       }
       await DialogV2.wait({
         window: { title: game.i18n.localize("ASTILLON.YourTurn.EditorTitle") },
+        position: { width: 480 },
         content: editorContent(actor),
         buttons: [
           {
@@ -1253,8 +1365,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
               // Read this dialog's form, never another actor's last-opened editor.
               const element = htmlRoot(dialog?.element) ?? button.form;
               if (!element) throw new Error("The editor form is unavailable.");
-              const { art, color, sound } = editorDraft(element);
-              try { await writeFlags(actor, art, color, sound ?? ""); }
+              const { art, color, sound, transform } = editorDraft(element);
+              try { await writeFlags(actor, art, color, sound ?? "", transform!); }
               catch (error) { reportEditorError("save the portrait, color, and sound", error); throw error; }
             },
           },
@@ -1291,6 +1403,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         wrap.querySelector<HTMLInputElement>("[name=yourTurnArt]")?.value ?? "",
         wrap.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
         wrap.querySelector<HTMLInputElement>("[name=yourTurnSound]")?.value ?? "",
+        editorDraft(wrap).transform!,
       ).then(() => { owner.closed = true; stopEditorPreview(owner); wrap.remove(); })
         .catch(error => reportEditorError("save the portrait, color, and sound", error));
     });
