@@ -654,8 +654,9 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (!src) return;
     const run: Stinger = {};
     stinger = run;
-    const current = () => stinger === run && generation === gen && overlay === root
-      && root.isConnected && (!automatic || isEnabled());
+    const active = () => stinger === run && generation === gen && (!automatic || isEnabled());
+    // Only start while the card is visible, but a started clip may outlive the card.
+    const current = () => active() && overlay === root && root.isConnected;
     try {
       const audio = game.audio;
       if (!audio?.interface || typeof audio.create !== "function") throw new Error("Foundry audio is unavailable.");
@@ -671,7 +672,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       run.starting = Promise.resolve(run.sound.play({ loop: false, volume: 1, offset: 0 }));
       await run.starting;
       run.starting = undefined;
-      if (!current()) await stopSound(run.sound);
+      if (!active()) await stopSound(run.sound);
     } catch (error) {
       if (current()) {
         if (automatic) console.warn(`${moduleId} | Your Turn sound playback`, error);
@@ -683,8 +684,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  function removeOverlay(): void {
-    stopStinger();
+  function removeOverlay(stopAudio = true): void {
+    if (stopAudio) stopStinger();
     if (removeTimer !== undefined) {
       clearTimeout(removeTimer);
       removeTimer = undefined;
@@ -1052,7 +1053,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     removeTimer = setTimeout(() => {
       try {
         if (gen !== generation || overlay !== root) return;
-        removeOverlay();
+        removeOverlay(false);
       } catch {
         // Removal is cosmetic.
       }

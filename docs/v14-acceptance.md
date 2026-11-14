@@ -32,7 +32,7 @@ Upgrade check: on V14, save differing personal values for the primary GM and a p
 - Browse beside **Sound stinger** opens the native audio picker without submitting the editor. Choose a short audio file, Preview, and Save. Reopen and verify art, color, and sound persist together. Clear sound and save to return to silence.
 - With the GM's world setting enabled, each GM/player viewer hears exactly one local stinger when the portrait appears; disabling the world setting makes automatic playback silent for everyone. Interface volume and global mute remain local. A preview is heard only by the previewing user.
 - Test Stop preview, Cancel, window-close, sound-path changes, rapid combat turns, scene teardown, and disabling cut-ins during a pending load. No obsolete or overlapping sound should start later, including after the browser's first audio-unlocking gesture.
-- Test slow/broken audio and a long clip. Portrait playback remains functional, and audio stops at the end of the cut-in. Closing one actor editor must not stop another editor's newer preview or an automatic combat cut-in.
+- Test slow/broken audio and a clip longer than 2.6 seconds. Portrait playback remains functional; a playing clip must finish naturally after the card disappears, without restarting or cutting off. Stop preview, scene teardown, a replacement cut-in, and world disable must still stop the sound after visual expiry. A sound still waiting for unlock/download at visual expiry must not start belatedly. Closing one actor editor must not stop another editor's newer preview or an automatic combat cut-in.
 
 ## Existing content
 

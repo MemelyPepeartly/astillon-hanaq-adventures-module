@@ -22,7 +22,7 @@
       "Color": "Color",
       "Sound": "Sound stinger (optional)",
       "SoundPlaceholder": "Leave blank for silence",
-      "SoundHint": "Sound plays once with the cut-in and stops when it ends. Uses your Interface volume.",
+      "SoundHint": "Sound plays once and can finish after the card disappears. Uses your Interface volume. Stop preview stops the sound too.",
       "StopPreview": "Stop preview",
       "Browse": "Browse",
       "Preview": "Preview",

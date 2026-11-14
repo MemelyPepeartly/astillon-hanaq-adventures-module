@@ -343,7 +343,7 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
           "ASTILLON.YourTurn.Save": "Save",
           "ASTILLON.YourTurn.Sound": "Sound stinger (optional)",
           "ASTILLON.YourTurn.SoundPlaceholder": "Leave blank for silence",
-          "ASTILLON.YourTurn.SoundHint": "Sound plays once with the cut-in and stops when it ends. Uses your Interface volume.",
+          "ASTILLON.YourTurn.SoundHint": "Sound plays once and can finish after the card disappears. Uses your Interface volume. Stop preview stops the sound too.",
           "ASTILLON.YourTurn.StopPreview": "Stop preview",
         })[key] ?? key,
         format: (key) => key,
@@ -1523,8 +1523,70 @@ describe("your turn cut-in", { concurrency: 1 }, () => {
     await env.turnChange(combat, history, { ...history });
     assert.equal(env.audioControl.sounds.length, 1);
     env.timerCallbacks.get(TURN_INTRO_MS)(); await flush();
-    assert.equal(sound.playing, false);
+    assert.equal(sound.playing, true, "card timeout must not cut off a longer stinger");
+    assert.equal(sound.stopCalls.length, 0);
     assert.equal(env.overlays().length, 0);
+  });
+
+  test("a play already requested before visual timeout may finish starting afterward", async t => {
+    const env = setup(t);
+    env.audioControl.playAuto = false;
+    await env.feature.api.preview(env.makeActor({ sound: "sounds/long.ogg" })); await flush();
+    const [sound] = env.audioControl.sounds;
+    assert.equal(sound.playCalls.length, 1);
+    env.timerCallbacks.get(TURN_INTRO_MS)();
+    sound.finishPlay(); await flush();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(sound.playing, true);
+    assert.equal(sound.stopCalls.length, 0);
+  });
+
+  for (const pending of ["unlock", "load"]) {
+    test(`visual timeout does not start a stale clip still waiting for ${pending}`, async t => {
+      const env = setup(t);
+      let unlock;
+      if (pending === "unlock") env.game.audio.unlock = new Promise(resolve => { unlock = resolve; });
+      else env.audioControl.loadAuto = false;
+      await env.feature.api.preview(env.makeActor({ sound: "sounds/slow.ogg" })); await flush();
+      env.timerCallbacks.get(TURN_INTRO_MS)();
+      if (pending === "unlock") unlock();
+      else env.audioControl.sounds[0].finishLoad();
+      await flush();
+      assert.equal(env.overlays().length, 0);
+      assert.ok(env.audioControl.sounds.every(sound => sound.playCalls.length === 0));
+    });
+  }
+
+  for (const action of ["cancel", "scene teardown", "world disable"]) {
+    test(`${action} can stop a stinger after its card has disappeared`, async t => {
+      const env = setup(t);
+      await env.feature.api.preview(env.makeActor({ sound: "sounds/long.ogg" })); await flush();
+      const [sound] = env.audioControl.sounds;
+      env.timerCallbacks.get(TURN_INTRO_MS)(); await flush();
+      assert.equal(sound.playing, true);
+      if (action === "cancel") env.feature.api.cancel();
+      if (action === "scene teardown") env.emit("canvasTearDown");
+      if (action === "world disable") {
+        env.settings.set("yourTurnEnabled", false);
+        env.registrations.get("yourTurnEnabled").onChange(false);
+      }
+      await flush();
+      assert.equal(sound.playing, false);
+    });
+  }
+
+  test("Stop preview still stops its sound after the preview card expires", async t => {
+    const env = setup(t);
+    void env.feature.api.configure(env.makeActor({ sound: "sounds/long.ogg" }));
+    const dialog = env.dialogs[0].element;
+    dialog.querySelector('[data-action="preview"]').click(); await flush();
+    const [sound] = env.audioControl.sounds;
+    env.timerCallbacks.get(TURN_INTRO_MS)(); await flush();
+    assert.equal(env.overlays().length, 0);
+    assert.equal(sound.playing, true);
+    dialog.querySelector('[data-action="stop-preview"]').click(); await flush();
+    assert.equal(sound.playing, false);
+    assert.equal(dialog.isConnected, true);
   });
 
   test("blank paths are silent and disabled cut-ins never load sound", async t => {
