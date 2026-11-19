@@ -25,6 +25,35 @@ const operatingNotes = () => blaster.system.details.privateNotes + thrall.system
 const readableDescription = (item) => description(item)
   .replace(/@UUID\[[^\]]+\]\{([^}]+)\}/g, "$1")
   .replace(/\[\[[^\]]+\]\]\{([^}]+)\}/g, "$1");
+const plainText = html => JSDOM.fragment(html.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/g, "$1")).textContent.replace(/\s+/g, " ").trim();
+const sectionText = (html, heading) => {
+  const fragment = JSDOM.fragment(html);
+  const header = [...fragment.querySelectorAll("h2,h3")].find(node => heading.test(node.textContent));
+  assert.ok(header, `Missing notes section ${heading}`);
+  const content = [];
+  for (let node = header.nextElementSibling; node && !/^H[23]$/.test(node.tagName); node = node.nextElementSibling) content.push(node.outerHTML);
+  return plainText(content.join(" "));
+};
+const macroCalls = {
+  BlasterBlast0001: ["blaster", "blast", []],
+  BlasterBlast0002: ["blaster", "blast", [{ charge: 2 }]],
+  BlasterBlast0003: ["blaster", "blast", [{ charge: 3 }]],
+  BlasterClear0001: ["blaster", "clearBlast", []],
+  BlasterUnroot001: ["blaster", "releaseRoot", []],
+  BlasterText00001: ["blaster", "refreshDescriptions", []],
+  BlasterFlash0001: ["blaster", "flashMob", []],
+  BlasterMobCmd001: ["blaster", "commandMob", []],
+  BlasterClash0001: ["beamClash", "start", []],
+  BlasterStop00001: ["beamClash", "stop", []],
+  BlasterMark00001: ["blaster", "markFinale", []],
+  BlasterFire00001: ["blaster", "fireFinale", []],
+  BlasterWipe00001: ["blaster", "clearFinale", []],
+  BlasterBack00001: ["blaster", "blastback", []],
+  BlasterBackFire1: ["blaster", "fireBlastback", []],
+  BlasterBackClear: ["blaster", "clearBlastback", []],
+  BlasterResolve01: ["blaster", "applyBlastEffect", []],
+  BlasterUpgrade01: ["blaster", "upgradeSheet", []],
+};
 // Spell/action references verified against PF2e 8b6df942; condition IDs and native
 // GrantItem alterations rechecked against d507983d (8.7.1). This module does not
 // run PF2e's named-link build step, so rules and prose must use actual IDs.
@@ -82,8 +111,10 @@ const contentItems = [...items, ...actors.flatMap((actor) => actor.items)];
 
 test("expected documents have stable IDs, unique per document collection", () => {
   assert.equal(actors.length, 4);
-  assert.ok(items.length >= 8);
-  assert.ok(macros.length >= 11);
+  assert.deepEqual(items.map(item => item._id).sort(), ["BlasterCommand01", "BlasterExpiry001",
+    ...auraSpecs.flatMap(spec => [spec.id, spec.benefit]), ...blastConditionEffectIds].sort());
+  assert.equal(macros.length, 18);
+  assert.deepEqual(macros.map(macro => macro._id).sort(), Object.keys(macroCalls).sort());
   for (const documents of [actors, items, macros, ...actors.map((actor) => actor.items)]) {
     assert.equal(new Set(documents.map((doc) => doc._id)).size, documents.length);
     for (const doc of documents) assert.match(doc._id, /^[A-Za-z0-9]{16}$/, doc.name);
@@ -190,13 +221,7 @@ test("every module and core compendium link resolves, including the description 
   for (const item of contentItems) for (const rule of item.system.rules) {
     if (rule.key === "GrantItem") assert.ok(sources.has(rule.uuid) || pf2eLinks.has(rule.uuid), `unresolved GrantItem UUID ${rule.uuid}`);
   }
-  const requiredLinked = [
-    "BlasterBlast0001", "BlasterBlast0002", "BlasterBlast0003", "BlasterResolve01",
-    "BlasterFlash0001", "BlasterMobCmd001", "BlasterClash0001", "BlasterStop00001",
-    "BlasterClear0001", "BlasterText00001", "BlasterMark00001", "BlasterFire00001",
-    "BlasterWipe00001", "BlasterBack00001", "BlasterBackFire1", "BlasterBackClear",
-  ];
-  for (const id of requiredLinked) assert.ok(linkedMacros.has(id), "missing linked macro " + id);
+  for (const id of Object.keys(macroCalls)) assert.ok(linkedMacros.has(id), "missing linked macro " + id);
 });
 
 test("Blaster has the selected level-18 defenses and no unrequested immunities", () => {
@@ -370,13 +395,13 @@ test("all three charged blasts are immediate straight 120-foot lines with strong
 });
 
 test("full charge leaves movement manual and retains full-intervening-round recharge references", () => {
-  const text = description(embedded("BlasterBlastAct3"));
-  assert.match(text, /Movement costs and recharge are GM-adjudicated/);
-  assert.match(text, /macro never locks movement/);
-  assert.match(text, /\[\[\/gmr 1d4 #Standing Ovation recharge\]\]\{1d4\}/);
-  assert.match(text, /full intervening rounds/);
-  assert.match(operatingNotes(), /A result of 1 in round 4 is ready in round 6/);
-  assert.match(text, /one- and two-action blasts remain available/);
+  const html = description(embedded("BlasterBlastAct3"));
+  const text = plainText(html);
+  assert.match(text, /movement.*GM.adjudicat|GM.adjudicat.*movement/i);
+  assert.match(text, /macro (?:never|does not) locks? movement|no automatic movement lock/i);
+  assert.match(html, /\[\[\/gmr\s+1d4(?:\s[^\]]*)?\]\]/, "Recharge remains a clickable GM 1d4 roll");
+  assert.match(text, /full intervening rounds/i);
+  assert.match(text, /(?:one-|1-).*?(?:two-|2-)action blasts.*available/i);
 });
 
 test("Grand Finale is a separate free-action eight-point telegraph which fires next round", () => {
@@ -392,9 +417,15 @@ test("Grand Finale is a separate free-action eight-point telegraph which fires n
     /At the start of the next round/, /without spending another action/, /path stays fixed even if Blaster moves/,
     /Each creature other than Blaster attempts one save/, /takes damage only once, even where segments overlap/,
     /Roll damage once/, /BlasterMark00001/, /BlasterFire00001/, /BlasterWipe00001/]) assert.match(text, pattern);
-  const damageLinks = [...text.matchAll(/@Damage\[(\d+)d10\[([a-z]+)\]/g)];
-  assert.deepEqual(damageLinks.map(([, n, type]) => [Number(n), type]), [
-    [36, "fire"], [36, "cold"], [36, "electricity"], [36, "sonic"], [33, "fire"], [33, "mental"], [33, "cold"], [33, "mental"],
+  const damageLinks = [...text.matchAll(/@Damage\[(\d+)d10\[([a-z]+)\]\|traits:([a-z,]+)\|options:area-damage\]/g)];
+  assert.deepEqual(damageLinks.map(([, n, type, traits]) => [Number(n), type, traits]), [
+    [36, "fire", "magical,fire"], [36, "cold", "magical,cold"], [36, "electricity", "magical,electricity"], [36, "sonic", "magical,sonic"],
+    [33, "fire", "magical,fire,light"], [33, "mental", "magical,mental"], [33, "cold", "magical,cold"], [33, "mental", "magical,mental,visual,incapacitation"],
+  ]);
+  const saves = [...text.matchAll(/@Check\[([a-z]+)\|dc:40\|basic\|traits:([a-z,]+)\]/g)].map(([, save, traits]) => [save, traits]);
+  assert.deepEqual(saves, [
+    ["reflex", "magical,fire"], ["reflex", "magical,cold"], ["reflex", "magical,electricity"], ["reflex", "magical,sonic"],
+    ["reflex", "magical,fire,light"], ["will", "magical,mental"], ["fortitude", "magical,cold"], ["will", "magical,mental,visual,incapacitation"],
   ]);
   for (const ability of ["Charged Blast", "Grand Finale", "Beam Clash counter-hit"]) assert.ok(description(embedded("BlasterSpectrum1")).includes(ability));
   assert.match(operatingNotes(), /next global round boundary, not on Blaster's turn/);
@@ -402,18 +433,67 @@ test("Grand Finale is a separate free-action eight-point telegraph which fires n
   assert.match(operatingNotes(), /BlasterClear0001\]\{Clear Blast Areas\} handles only immediate charged beams/);
 });
 
-test("the three Grand Finale macros call the shipped Blaster API without changing combat", async () => {
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const calls = [];
-  const blasterApi = Object.fromEntries(["markFinale", "fireFinale", "clearFinale"].map(name => [name, async () => calls.push(name)]));
-  const game = { astillonHanaqAdventures: { blaster: blasterApi } };
-  const ui = { notifications: { warn: () => assert.fail("Expected an available module API") } };
-  for (const id of ["BlasterMark00001", "BlasterFire00001", "BlasterWipe00001"]) {
-    const macro = macros.find(entry => entry._id === id);
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+for (const [id, [namespace, method, expectedArgs]] of Object.entries(macroCalls)) {
+  test(`${id} awaits exactly ${namespace}.${method} with its intended arguments`, async () => {
+    const macro = macroById.get(id);
     assert.equal(macro.type, "script");
-    await new AsyncFunction("game", "ui", macro.command)(game, ui);
+    const calls = [];
+    let finishCall, finished = false;
+    const feature = { [method](...args) {
+      assert.equal(this, feature);
+      calls.push(args);
+      return new Promise(resolve => { finishCall = resolve; });
+    } };
+    const game = Object.freeze({ astillonHanaqAdventures: Object.freeze({ [namespace]: Object.freeze(feature) }) });
+    const ui = { notifications: { warn: () => assert.fail("Expected an available module API") } };
+    const pending = new AsyncFunction("game", "ui", macro.command)(game, ui).then(result => { finished = true; return result; });
+    await Promise.resolve();
+    assert.deepEqual(calls, [expectedArgs]);
+    assert.equal(finished, false, "The macro must await the feature call");
+    finishCall("feature result");
+    assert.equal(await pending, undefined);
+    assert.equal(finished, true);
+  });
+}
+
+test("all 18 macros warn and return safely when the module, feature, or API method is unavailable", async () => {
+  for (const [id, [namespace]] of Object.entries(macroCalls)) {
+    const execute = new AsyncFunction("game", "ui", macroById.get(id).command);
+    for (const game of [{}, { astillonHanaqAdventures: {} }, { astillonHanaqAdventures: { [namespace]: {} } }]) {
+      const warnings = [];
+      assert.equal(await execute(game, { notifications: { warn: message => warnings.push(message) } }), undefined);
+      assert.equal(warnings.length, 1, id);
+      assert.match(warnings[0], /Astillon Hanaq Adventures/);
+    }
   }
-  assert.deepEqual(calls, ["markFinale", "fireFinale", "clearFinale"]);
+});
+
+test("Blastback banks applied damage into a flat self-excluding force burst", () => {
+  const item = embedded("BlasterBackAct01");
+  const html = description(item), text = plainText(html);
+  assert.equal(item.system.actionType.value, "action");
+  assert.equal(item.system.actions.value, 1);
+  assert.equal(item.system.frequency, undefined);
+  assert.deepEqual(item.system.rules, []);
+  assert.deepEqual(item.system.traits.value, ["concentrate", "magical", "force"]);
+  assert.match(text, /100-foot radius/i);
+  assert.match(text, /centered on Blaster at release/i);
+  assert.match(text, /post-resistance damage|damage after resistances?/i);
+  assert.match(text, /including.*temporary HP/i);
+  assert.match(text, /force damage equal to the bank/i);
+  assert.match(text, /Blaster is excluded/i);
+  assert.match(text, /flat damage/i);
+  assert.match(text, /not.*(?:extra dice|multiplied)|no.*(?:extra dice|multiplier)/i);
+  assert.doesNotMatch(text, /1[.,]5\s*[x×]|150\s*%/);
+  assert.doesNotMatch(html, /@Damage\[[^\]]*\d+d\d+/);
+  assert.ok(html.includes("@Check[reflex|dc:40|basic|immutable|traits:magical,force]"));
+  assert.match(text, /start of his next turn/i);
+  assert.match(text, /Outside combat.*6 world-time seconds/i);
+  for (const id of ["BlasterBack00001", "BlasterBackFire1", "BlasterBackClear"]) {
+    assert.ok(html.includes(`@UUID[Compendium.${moduleId}.astillon-blaster-macros.Macro.${id}]`));
+  }
+  assert.match(text, /GM can adjust.*bank.*fire at any time/i);
 });
 
 test("Curated Spectrum defines all rider outcomes once, after damage and incapacitation adjustment", () => {
@@ -432,7 +512,10 @@ test("Curated Spectrum defines all rider outcomes once, after damage and incapac
   assert.match(modes[4].textContent, /higher-level creature improves its save outcome by one degree/);
   assert.match(text, /Apply riders after damage, using the final save outcome/);
   assert.match(text, /final outcome, after incapacitation/);
-  for (const id of blastConditionEffectIds) assert.ok(description(item).includes(`@UUID[Compendium.${moduleId}.astillon-blaster-items.Item.${id}]`), `clickable rider ${id}`);
+  for (const id of blastConditionEffectIds) {
+    const link = `@UUID[Compendium.${moduleId}.astillon-blaster-items.Item.${id}]`;
+    assert.equal(description(item).split(link).length - 1, 1, `Exactly one clickable rider reference for ${id}`);
+  }
   assert.match(text, /Fascinated ends normally if broken by hostility/);
   assert.match(text, /Critical success has no rider/);
   assert.match(text, /Control cannot compel obviously self-destructive orders/);
@@ -463,25 +546,27 @@ test("Beam Clash is a defensive reaction with automatic severe-loss outcomes", (
 test("Flash Mob summons one support thrall, and Command changes one thrall mode for its lifetime", () => {
   const flash = embedded("BlasterFlashAct1");
   const command = byId.get("BlasterCommand01");
+  const flashText = plainText(description(flash)), commandText = plainText(description(command));
   assert.deepEqual(embedded("BlasterCommand01"), command);
   assert.equal(command.system.frequency, undefined, "Command does not add a native frequency gate");
   assert.equal(flash.system.actions.value, 1);
   assert.deepEqual(flash.system.frequency, round);
-  for (const pattern of [/summons one support thrall/, /within 30 feet and line of effect/, /1-minute lifetime/, /signature aura is active immediately/i]) {
-    assert.match(description(flash), pattern);
+  for (const pattern of [/one support thrall/i, /within 30 feet/i, /line of effect/i, /1.minute lifetime|lasts 1 minute/i, /signature aura.*active/i]) {
+    assert.match(flashText, pattern);
   }
-  assert.match(description(command), /within 60 feet/);
-  assert.match(description(command), /Change one chosen thrall's support mode for its remaining lifetime/);
-  assert.match(description(command), /Other thralls keep their current modes/);
-  assert.match(description(command), /no frequency or combat requirement/);
-  assert.match(description(command), /thrall gains no movement or other actions/);
-  assert.match(description(command), /Higher (?:existing )?(?:unrelated )?temporary HP retain their source and duration/);
-  assert.match(description(command), /Already-granted HP remain after changing mode/);
-  assert.match(description(command), /Bonuses and temporary HP contributions from distinct thralls stack/);
-  assert.match(description(command), /destruction, removal, or expiration ends its support/);
+  const entries = [...JSDOM.fragment(description(flash)).querySelectorAll("li")];
+  for (const variant of BLASTER_THRALLS) {
+    const entry = entries.find(node => node.innerHTML.includes(`.Actor.${variant.id}]`));
+    assert.ok(entry, `Missing Flash Mob choice ${variant.id}`);
+    assert.ok(entry.textContent.includes(variant.routine), `${variant.name} starts with ${variant.routine}`);
+  }
+  for (const pattern of [/within 60 feet/i, /one chosen thrall/i, /remaining lifetime/i,
+    /Other thralls keep.*modes/i, /no frequency or combat requirement/i, /no movement or other actions/i,
+    /Higher.*temporary HP.*source and duration/i, /Already.granted HP remain.*mode/i,
+    /distinct thralls stack/i, /destruction, removal, or expiration/i]) assert.match(commandText, pattern);
   for (const spec of auraSpecs) assert.match(description(command), new RegExp(spec.id));
-  assert.match(description(flash), /with 1 HP/);
-  assert.match(description(flash), /no living-thrall cap/);
+  assert.match(flashText, /1 HP/);
+  assert.match(flashText, /no living.thrall cap|no.*thrall limit|any number of.*thralls/i);
   assert.doesNotMatch(description(flash), /no free support|fewer than 3|maximum of 3|maximum of three/i);
 });
 
@@ -530,7 +615,7 @@ test("portable native auras affect only the summoning Blaster within 60 feet", (
 
 test("aura operating notes explain default support, lifetime modes, inert templates, and no-refill pool", () => {
   for (const actor of actors) {
-    const notes = actor.system.details.privateNotes;
+    const notes = sectionText(actor.system.details.privateNotes, /Flash Mob Auras|Native Support Auras/);
     for (const pattern of [/signature aura|starts with.*Aura/, /60-foot/, /summoner signature/,
       /remaining lifetime/, /receiver templates/i, /distinct thralls stack/,
       /never refill|never refills/, /mode changes|Changing (?:the|a) thrall's mode/,
@@ -538,7 +623,7 @@ test("aura operating notes explain default support, lifetime modes, inert templa
     if (actor !== blaster) {
       assert.match(notes, /ignored/);
       assert.match(notes, /unmatched signature/);
-    } else assert.match(notes, /Receiver templates embedded on thralls are inert/);
+    } else assert.match(notes, /receiver templates.*inert/i);
     assert.doesNotMatch(notes, /none has an active aura|turn-start expiry|6 world-time seconds without combat|grants no free support/);
   }
   assert.doesNotMatch(blaster.system.details.privateNotes, /apply exactly one linked effect to Blaster|Remove the old effect before reapplying/);
@@ -571,14 +656,13 @@ test("support FlatModifiers use inert receiver signatures, untyped stacking, and
 test("Bolster uses helper pool wording and never auto-regenerates", () => {
   const item = byId.get("BlasterTempHP001");
   const aura = byId.get("BlasterAuraBol01");
+  const text = plainText(description(item));
   assert.equal(item.system.slug, "blaster-temp-hp");
   assert.deepEqual(item.system.rules, []);
-  assert.match(description(item), /10 temporary HP to its summoning Blaster's Flash Mob pool once during its lifetime/);
-  assert.match(description(item), /Contributions from distinct thralls add together/);
-  assert.match(description(item), /Changing its mode retains already-granted HP/);
-  assert.match(description(item), /does not add to temporary HP from unrelated sources/);
-  assert.match(description(item), /removes only its unspent HP/);
-  assert.match(description(item), /re-entry, another command, and returning to Bolster never refill spent HP/);
+  for (const pattern of [/10 temporary HP/i, /summoning Blaster/i, /once.*lifetime/i,
+    /distinct thralls.*add together/i, /mode.*retains|retains.*mode/i,
+    /does not add.*unrelated/i, /removes only.*unspent/i,
+    /re.entry/i, /never refill spent HP/i]) assert.match(text, pattern);
   assert.match(description(aura), /unless its mode changes/);
   assert.ok(!aura.system.rules.some(rule => rule.key === "TempHP"));
 });
@@ -619,7 +703,9 @@ test("helper expiration is a separate attack-free one-minute marker with the exa
 });
 
 test("three distinct entourage sheets share the unchanged support shell and ship transparent art", async () => {
-  for (const [i, variant] of BLASTER_THRALLS.entries()) {
+  for (const variant of BLASTER_THRALLS) {
+    const defaultAura = auraSpecs.find(spec => spec.key === variant.support);
+    assert.ok(defaultAura, `${variant.name} has a known default support mode`);
     const actor = actors.find((entry) => entry._id === variant.id);
     assert.ok(actor, variant.name);
     assert.equal(actor.name, `Flash Mob ${variant.name}`);
@@ -636,9 +722,11 @@ test("three distinct entourage sheets share the unchanged support shell and ship
     const actions = actor.items.filter(item => item.type === "action");
     assert.equal(actions.length, 3);
     assert.ok(actions.every(item => item.system.actionType.value === "passive"));
-    assert.deepEqual(actor.items.slice(0, 2), thrall.items.slice(0, 2));
-    const routine = actor.items[2];
-    assert.match(description(routine), new RegExp(auraSpecs[i].id));
+    for (const id of ["BlasterThrallAct", "BlasterStagehand"]) {
+      assert.deepEqual(actor.items.find(item => item._id === id), thrall.items.find(item => item._id === id));
+    }
+    const routine = actions.find(item => !["BlasterThrallAct", "BlasterStagehand"].includes(item._id));
+    assert.match(description(routine), new RegExp(defaultAura.id));
     assert.match(description(routine), /a 60-foot aura granting only its summoning Blaster/);
     assert.match(description(routine), /begins with.*active/);
     assert.match(description(routine), /remaining lifetime/);
@@ -651,7 +739,7 @@ test("three distinct entourage sheets share the unchanged support shell and ship
       assert.deepEqual(receiver, byId.get(spec.benefit), `${variant.name} embeds the inert ${spec.key} receiver template`);
     }
     const activeAuras = actor.items.filter(item => item.system.rules.some(rule => rule.key === "Aura"));
-    assert.deepEqual(activeAuras, [byId.get(auraSpecs[i].id)], "Only the signature aura starts active");
+    assert.deepEqual(activeAuras, [byId.get(defaultAura.id)], "Only the signature aura starts active");
     const png = PNG.sync.read(await readFile(new URL(`../src/assets/blaster-thralls/${variant.key}.png`, import.meta.url)));
     assert.equal(png.width, png.height);
     assert.ok(png.width >= 512);
@@ -675,7 +763,8 @@ test("entourage picker renders three accessible portrait radios and an explicit 
     assert.ok(dom.querySelector('input[value="random"]'));
     assert.match(dom.textContent, /No living-thrall limit/);
     assert.match(dom.textContent, /Each thrall starts with its signature aura/);
-    assert.match(dom.textContent, /Distinct thralls stack; Command changes one thrall's mode for its remaining lifetime/);
+    assert.match(dom.textContent, /Distinct thralls stack/);
+    assert.match(dom.textContent, /Command.*one thrall.*remaining lifetime/);
   } finally {
     if (prior) Object.defineProperty(globalThis, "foundry", prior);
     else delete globalThis.foundry;
@@ -687,7 +776,8 @@ test("abilities follow native PF2e header, divider, effect and outcome structure
     const html = description(embedded(id));
     const dom = JSDOM.fragment(html);
     assert.equal(dom.firstElementChild.querySelector("strong").textContent, id === "BlasterCommand01" ? "Requirements" : "Frequency");
-    assert.match(html, /<hr \/>\s*<p><strong>Effect<\/strong>/);
+    const effect = [...dom.querySelectorAll("p")].find(node => node.firstElementChild?.tagName === "STRONG" && node.firstElementChild.textContent === "Effect");
+    assert.equal(effect?.previousElementSibling?.tagName, "HR", "Effect follows the rules header divider");
     assert.ok(dom.querySelectorAll("hr").length >= 2, "rules and Foundry controls have clear separators");
     assert.doesNotMatch(html, /Without runtime|runtime displays|The GM applies|placeholder|paying extra actions/i);
   }
