@@ -5,7 +5,8 @@ import { readBeamClash } from "./beam-clash-model.js";
 const OUTCOMES = { criticalSuccess: "Critical success", success: "Success", failure: "Failure", criticalFailure: "Critical failure" };
 const HOME_ITEMS = new Set(["BlasterShell0001", "BlasterSpectrum1", "BlasterBlastAct1", "BlasterBlastAct2",
   "BlasterBlastAct3", "BlasterFinaleAct", "BlasterFlashAct1", "BlasterCommand01", "BlasterClashAct1",
-  "BlasterBackAct01", "BlasterHealAct01", "BlasterRange0001", "BlasterMelee0001"]);
+  "BlasterBackAct01", "BlasterHealAct01", "BlasterHaste0001", "BlasterRecoilAct", "BlasterEgoAct001",
+  "BlasterRange0001", "BlasterMelee0001"]);
 const COUNTER_FLAG = "beamClashCounter";
 // Module-scoped, not factory-scoped: repeated feature instances share one local
 // writer while the durable Scene claim protects reloads and other GM clients.

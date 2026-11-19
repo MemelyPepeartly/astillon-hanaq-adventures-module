@@ -8,6 +8,8 @@ Two actions consume one to three living Flash Mob thralls within 60 feet and lin
 
 ## Creature-building benchmarks
 
+Revision 0.10.18 adds permanent native Quickened restricted to Strike/Stride. Its extra Stride includes a 15-foot backward Snapshot from the departure point, independently of Charged Blast's frequency/recharge. The recoil macro arms one subsequent GM move; it never changes or blocks movement. Fragile Ego is a situational weakness (successful Demoralize/Bon Mot or convincing public humiliation): once per round, 30 mental feedback ignoring Dreamshell plus one round off-guard, resolved by the GM. These are requested boss mechanics, not a new balance guarantee.
+
 The [GM Core creature-building rules](https://2e.aonprd.com/Rules.aspx?ID=2874), read on 2026-11-12, are the balance reference. These are encounter-design targets, not proof of play balance.
 
 | Statistic | Selected | Level-18 comparison |

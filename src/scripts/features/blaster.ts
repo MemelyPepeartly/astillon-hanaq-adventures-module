@@ -6,6 +6,7 @@ import { createBlastPicker } from "./blaster-placement.js";
 import { createBlasterFinale } from "./blaster-finale.js";
 import { createBlasterBlastback } from "./blaster-blastback.js";
 import { createBlasterResolution } from "./blaster-resolution.js";
+import { createBlasterRecoil } from "./blaster-recoil.js";
 
 type BlastUse = { combatId: string | null; round: number; mode?: BlastMode; rechargeCombatId?: string | null; readyRound?: number; readyTime?: number };
 
@@ -16,6 +17,7 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
   const finale = createBlasterFinale(moduleId, { selectToken: selected, picker });
   const blastback = createBlasterBlastback(moduleId, { selectToken: selected });
   const resolution = createBlasterResolution(moduleId, { selectToken: selected });
+  const recoil = createBlasterRecoil(moduleId, { selectToken: selected });
   const escape = (s: string) => foundry.utils.escapeHTML(s);
   const combatFor = (scene: any) => game.combat?.scene?.id === scene.id ? game.combat : null;
   const notifyError = (error: unknown) => {
@@ -154,8 +156,10 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       markFinale: finale.mark, fireFinale: finale.fire, clearFinale: finale.clear,
       blastback: blastback.start, fireBlastback: blastback.fire, clearBlastback: blastback.clear,
       applyBlastEffect: resolution.applyEffect, counterblast: resolution.counterblast, upgradeSheet: resolution.upgradeSheet,
-      flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => picker.cancel() },
+      recoilStride: recoil.arm,
+      flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => { picker.cancel(); recoil.cancel(); } },
     async ready() {
+      recoil.ready();
       await Promise.all([summons.ready(), finale.ready(), blastback.ready()]);
     },
   };

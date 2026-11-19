@@ -62,6 +62,16 @@ Target inspected: Foundry **14.370**, PF2e **8.7.1** at `d507983d7611aad7bee01b4
 
 ## Validation boundary
 
+### 0.10.18 — real Foundry only
+
+- Upgrade an existing Blaster: permanent native Quickened, Recoil Stride, and Fragile Ego should appear without changing wounds or custom items.
+- Arm Recoil Stride, choose a mode, then drag once: a 15-foot, one-square-wide line should start at the departure point and extend opposite that move. Ordinary unarmed movement should do nothing. Escape cancels the pending recoil.
+- Arm Blastback: inward blue energy strands should follow the token for all viewers. Switch Charge visual in the bank editor to complete strands and back; bank value must be unchanged.
+- Release: the blue no-debris fireball should play six complete loops over the 100-foot radius, then fade out. Clear/rearm/reconnect must not leave old charge effects or replay past explosions.
+- Resolve Fragile Ego manually for a successful Demoralize/Bon Mot or GM-judged humiliation: 30 mental feedback bypasses Dreamshell; Bruised Ego grants off-guard for one round.
+
+No real Foundry instance was available during implementation; these functional checks were not performed.
+
 - Release 0.10.17 was packaged only. No tests or simulated previews were run. Only functional checks in a real Foundry instance are permitted by the project policy.
 - Live-world acceptance still requires manual GM/client verification for placement, ownership, timing, aura rendering, and multiplayer authority transfer.
 

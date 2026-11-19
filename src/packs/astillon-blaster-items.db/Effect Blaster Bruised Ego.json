@@ -1,0 +1,59 @@
+{
+  "_id": "BlasterEgoHurt01",
+  "name": "Effect: Blaster — Bruised Ego",
+  "type": "effect",
+  "img": "systems/pf2e/icons/conditions/off-guard.webp",
+  "system": {
+    "description": {
+      "value": "<p>The bearer is @UUID[Compendium.pf2e.conditionitems.Item.AJh5ex99aV6VTggg]{Off-Guard} for 1 round. Apply after resolving Fragile Ego's feedback damage. The GM may place, edit, or remove this effect freely.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "GrantItem",
+        "inMemoryOnly": true,
+        "uuid": "Compendium.pf2e.conditionitems.Item.AJh5ex99aV6VTggg"
+      }
+    ],
+    "slug": "blaster-bruised-ego",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": 1,
+      "unit": "rounds",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterEgoEffect": true
+    }
+  }
+}

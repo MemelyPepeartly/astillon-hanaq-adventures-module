@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterRecoil001",
+  "name": "Blaster — Recoil Stride",
+  "type": "script",
+  "img": "icons/magic/light/beam-rays-red-small.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.recoilStride) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and reload the world.\");\n  return;\n}\nawait feature.recoilStride();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

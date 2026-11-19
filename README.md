@@ -12,7 +12,7 @@ Blaster's portrait and prototype token both use the world asset `common/portrait
 
 **Updating an existing Blaster:** module updates refresh compendia, not actors already imported into a world. Use **Blaster — Upgrade Existing Sheet** (`upgradeSheet`) for mechanics/content upgrades on existing world actors; by default it preserves wounds and leaves art/custom/native spell uses untouched. **Blaster — Refresh Sheet Descriptions** remains description-only and replaces matching shipped description text without changing HP, statistics, effects, notes, or other items. Fresh imports already include the updated data.
 
-### Blaster 0.10.17
+### Blaster 0.10.18
 
 The current encounter kit deliberately increases boss endurance and damage beyond the original level-18 baseline; live encounter balance still needs playtesting.
 
@@ -52,6 +52,14 @@ The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigg
 
 **Clear Blast Areas** removes only the selected Blaster's immediate beam areas, not Grand Finale's warning/fired path. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
 
+### Permanent quickened, recoil, and ego weakness
+
+**Self-Propelled Superstar** grants permanent native Quickened, with its extra action usable for Strike or Stride. The extra Stride includes a **15-foot backward line**, one square wide, using Snapshot damage and any Curated Spectrum mode. This does not spend another action, the ordinary Charged Blast use, or recharge.
+
+Run **Blaster — Recoil Stride**, choose the mode, then drag Blaster normally. The macro uses that one move's direction and places the line behind the departure point. Escape cancels; unarmed movement never fires automatically. Movement distance, costs, and trigger legality remain GM-adjudicated. Clear Blast Areas also clears recoil lines.
+
+**Fragile Ego:** once per round, successful Demoralize, Bon Mot, or convincing public humiliation (GM judgment) deals **30 mental feedback damage ignoring Dreamshell** and leaves Blaster **off-guard for one round**. Exposing his lies or turning his fans against him can qualify. Apply the damage manually and drag **Effect: Blaster — Bruised Ego** onto him; the triggering action also resolves normally.
+
 ### Feed the Ego and turn stinger
 
 **Feed the Ego** costs two actions: destroy up to three living Flash Mob thralls within 60 feet and line of effect to heal **40 HP each**, up to **120 HP**. Remove the chosen adds and click the corresponding healing amount on Blaster's sheet. Consumed adds lose their support.
@@ -59,6 +67,8 @@ The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigg
 Blaster's Your Turn sound is configured to `common/sound-effects/combat/blaster-yeahs/Random%20Screams_5.mp3`. Fresh imports include it; **Upgrade Existing Sheet** adds the heal and applies this stinger to an existing Blaster. Other Your Turn settings are preserved.
 
 ### Blastback
+
+Charging uses **jb2a.energy_strands.in.blue.01.0**, attached to Blaster so it follows movement. Run Start Blastback again to open the bank editor; its **Charge visual** dropdown switches immediately to the larger **jb2a.energy_strands.complete.blue.01**, or back, for everyone viewing the scene. The visual choice does not change the damage bank, and closing the editor keeps it. On release, **jb2a.fireball.loop_no_debris.blue** plays **six times**, sized to the 100-foot blast radius, then fades out. Sequencer and the matching installed JB2A assets are cosmetic dependencies; missing assets never block the ability.
 
 **Start Blastback** arms a one-action charge, **once per day**. Use its native sheet frequency to track the daily use; GM override macros remain available. Blaster takes damage normally; native PF2e damage after resistance, including temporary-HP damage, accumulates in its bank. A 100-foot-radius warning follows his movement. At his next turn—or after six world-time seconds without a matching active combat—the charge releases a **flat force-damage card equal to the bank**, DC 40 basic Reflex, excluding Blaster. HP application is manual.
 
@@ -169,6 +179,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse, Preview, and placement controls do not submit the dialog; Save reads that specific editor and updates art, placement, color, and sound together. Two actor editors can be open without mixing drafts or moving each other's preview. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.18 adds permanent Quickened, the arm-next-move Recoil Stride macro, Fragile Ego and its off-guard effect, live-swappable Blastback charging visuals, and the six-loop blue explosion. Update/reload, import Recoil Stride, and run Upgrade Existing Sheet to add the new abilities to a world copy. Packaging only; functionality has not been tested in a real Foundry instance.
 
 Version 0.10.17 adds Feed the Ego, raises Snapshot to 10d10 (7d10 with riders), makes Blastback once per day on the sheet, sets Blaster's Your Turn stinger, allows unrestricted GM effect/aura drops, and restores compact Beam Clash UI. Only release packaging is performed; no automated suites or simulated previews are run. Functional validation requires a real Foundry instance.
 

@@ -1,3 +1,5 @@
+import { createBlastbackVisuals } from "./blaster-blastback-visuals.js";
+
 const PLAN_FLAG = "blasterBlastbackPlans";
 const MARK_FLAG = "blasterBlastback";
 const ABILITY = "blaster-blastback";
@@ -10,6 +12,7 @@ type Plan = {
   armedTurn: number | null; dueRound: number | null; expiresAt: number | null;
   regionIDs: string[]; messageId: string; claim: string | null;
   snapshotDamage: number | null; center: Point | null;
+  visual?: "inward" | "complete";
 };
 type Session = { scene: any; token: any; actorUuid: string; cancelled: boolean };
 
@@ -24,6 +27,7 @@ type Session = { scene: any; token: any; actorUuid: string; cancelled: boolean }
  * claim, and NEVER retry an uncertain publication (even after reload/handover).
  */
 export function createBlasterBlastback(moduleId: string, { selectToken }: { selectToken: () => any }) {
+  const visuals = createBlastbackVisuals(moduleId);
   let registered = false;
   let queue: Promise<unknown> = Promise.resolve();
   const jobs = new Set<Promise<unknown>>();
@@ -68,6 +72,7 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
       && typeof value.actorUuid === "string" && !!value.actorUuid && safeId(value.messageId)
       && ["charging", "publishing", "fired", "recovery", "clearing"].includes(value.status)
       && amount(value.bank) && (value.claim === null || safeId(value.claim))
+      && (value.visual === undefined || value.visual === "inward" || value.visual === "complete")
       && Array.isArray(value.regionIDs) && value.regionIDs.length === 1 && safeId(value.regionIDs[0])
       && (value.snapshotDamage === null || amount(value.snapshotDamage))
       && (value.center === null || (Number.isFinite(value.center?.x) && Number.isFinite(value.center?.y)))
@@ -223,7 +228,7 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
       validate(session);
       if (created.length !== 1) throw new Error("Blastback did not create its warning Region.");
       plan = { id, tokenId: token.id, actorUuid, status: "charging", bank: 0, ...schedule(scene, token.id),
-        regionIDs: [created[0].id], messageId: foundry.utils.randomID(), claim: null, snapshotDamage: null, center: null };
+        regionIDs: [created[0].id], messageId: foundry.utils.randomID(), claim: null, snapshotDamage: null, center: null, visual: "inward" };
       await save(scene, plan);
       validate(session);
       // Movement is allowed during arming; refresh the warning at the current position.
@@ -265,6 +270,26 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
       const editable = collecting(original);
       const decision = await foundry.applications.api.DialogV2.wait({
         window: { title: "Blaster · Blastback" }, rejectClose: false,
+        render: (_event: any, dialog: any) => {
+          if (!editable) return;
+          const element = dialog.element as HTMLElement;
+          if (element.querySelector('[name="chargeVisual"]')) return;
+          const visual = document.createElement("div");
+          visual.className = "form-group";
+          visual.innerHTML = `<label>Charge visual<select name="chargeVisual" aria-label="Charge visual"><option value="inward" ${original.visual !== "complete" ? "selected" : ""}>Drawing power inward</option><option value="complete" ${original.visual === "complete" ? "selected" : ""}>Full power — larger complete strands</option></select></label><p>Changes apply immediately for everyone, without altering the bank. Closing this window keeps your visual choice.</p>`;
+          const bankInput = element.querySelector('[name="bank"]');
+          bankInput?.closest(".form-group")?.before(visual);
+          visual.querySelector("select")!.addEventListener("change", event => {
+            const selected = (event.currentTarget as HTMLSelectElement).value;
+            if (selected !== "inward" && selected !== "complete") return;
+            void serial(async () => {
+              validate(context);
+              const live = current(context.scene, original);
+              if (!live || !collecting(live)) return;
+              await save(context.scene, { ...live, visual: selected });
+            });
+          });
+        },
         content: `<p>Bank: <strong>${original.bank}</strong> force damage. Status: ${original.status}.</p><p>Blaster takes damage normally. Native post-resistance damage is banked, including temporary HP. Manual HP edits and temporary-HP-only undo require a bank adjustment here.</p>${editable ? `<div class="form-group"><label>Banked damage</label><input type="number" name="bank" min="0" step="1" value="${original.bank}"></div><p>Saving applies your adjustment while retaining damage received since this dialog opened.</p>` : ""}<p>Rearm discards this charge and starts from zero (1 action, GM adjudicated). Clear removes it. If publication is uncertain, inspect chat history before explicitly rearming; the previous card is never retried.</p>`,
         buttons: [
           ...(editable ? [{ action: "save", label: "Save adjustment", default: true,
@@ -478,6 +503,7 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
     }
   }
   async function ready(): Promise<void> {
+    visuals.ready();
     if (!registered) {
       registered = true;
       Hooks.on("updateActor", onDamage);
