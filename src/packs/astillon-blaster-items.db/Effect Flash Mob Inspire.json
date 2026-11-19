@@ -5,7 +5,7 @@
   "img": "icons/svg/sound.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains a +1 status bonus to attack rolls, damage rolls, and saves against fear only while within 60 feet of the thrall emitting @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraIns01]{Inspire Aura}. The benefit ends when the aura ends, at the start of his next turn, or if the thrall is destroyed or removed.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraIns01]{Inspire Aura}</p>\n<p>Its summoning Blaster gains a +1 untyped bonus to attack rolls, damage rolls, and saves against fear while inside this thrall's 60-foot aura. Bonuses from distinct thralls stack; one thrall never supplies multiple copies of its own benefit.</p>\n<p>The benefit ends on leaving the aura, changing this thrall's mode, or the thrall's destruction, removal, or expiration.</p>",
       "gm": ""
     },
     "publication": {
@@ -21,8 +21,13 @@
           "attack-roll",
           "damage"
         ],
-        "type": "status",
-        "value": 1
+        "type": "untyped",
+        "value": 1,
+        "slug": "blaster-inspire-attack-damage",
+        "predicate": [
+          "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"
+        ],
+        "ignored": true
       },
       {
         "key": "FlatModifier",
@@ -30,10 +35,13 @@
           "saving-throw"
         ],
         "predicate": [
+          "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}",
           "fear"
         ],
-        "type": "status",
-        "value": 1
+        "type": "untyped",
+        "value": 1,
+        "slug": "blaster-inspire-fear",
+        "ignored": true
       }
     ],
     "slug": "blaster-inspire",
@@ -49,9 +57,9 @@
       "value": 18
     },
     "duration": {
-      "value": 1,
-      "unit": "rounds",
-      "expiry": "turn-start",
+      "value": -1,
+      "unit": "unlimited",
+      "expiry": null,
       "sustained": false
     },
     "start": {
@@ -65,5 +73,11 @@
     "badge": null,
     "context": null,
     "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterSupport": "inspire",
+      "blasterReceiverSignature": "unassigned-flash-mob-receiver"
+    }
   }
 }

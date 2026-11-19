@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterResolve01",
+  "name": "Blaster - Apply Blast Effect",
+  "type": "script",
+  "img": "icons/magic/control/hypnosis-mesmerism-eye.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.applyBlastEffect) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.applyBlastEffect();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

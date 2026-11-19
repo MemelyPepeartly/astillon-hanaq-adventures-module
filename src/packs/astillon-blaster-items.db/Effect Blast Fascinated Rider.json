@@ -1,0 +1,59 @@
+{
+  "_id": "BlasterFascin001",
+  "name": "Effect: Blaster Blast - Fascinated Rider",
+  "type": "effect",
+  "img": "systems/pf2e/icons/conditions/fascinated.webp",
+  "system": {
+    "description": {
+      "value": "<p>Apply after blast damage and after incapacitation adjustment. Granted by Blaster's Hypno-Beam rider on a success.</p>\n<p>Target gains @UUID[Compendium.pf2e.conditionitems.Item.AdPVz7rbaVSRxHFg]{Fascinated} for 1 round. If the target performs or is subjected to hostile actions, remove this effect and the granted condition normally.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "GrantItem",
+        "inMemoryOnly": true,
+        "uuid": "Compendium.pf2e.conditionitems.Item.AdPVz7rbaVSRxHFg"
+      }
+    ],
+    "slug": "blaster-fascinated-rider",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": 1,
+      "unit": "rounds",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterBlastEffect": "fascinated"
+    }
+  }
+}

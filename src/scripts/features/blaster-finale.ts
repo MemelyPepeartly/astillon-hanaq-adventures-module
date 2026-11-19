@@ -1,4 +1,5 @@
-import { BLAST_MODES, FINALE, lineShapes, type BlastMode, type Point } from "./blaster-model.js";
+import { BLAST_MODES, FINALE, blastDamage, blastTraits, blastRiderLinks, lineShapes, type BlastMode, type Point } from "./blaster-model.js";
+import { blastChoiceContent, bindBlastChoices } from "./blaster-controls.js";
 
 const PLAN_FLAG = "blasterFinalePlans";
 const REGION_FLAG = "blasterFinale";
@@ -148,7 +149,8 @@ export function createBlasterFinale(moduleId: string, { selectToken, picker }: {
       };
       const chosen = await foundry.applications.api.DialogV2.prompt({
         window: { title: "Blaster · Grand Finale" }, rejectClose: false,
-        content: `<p>Free action at round start (GM adjudicated). Choose eight points for seven legs, up to 120 feet each, three squares wide. The amber warning never deals damage. It fires at the next global round start, using this exact path.</p><div class="form-group"><label>Spectrum</label><select name="mode">${Object.entries(BLAST_MODES).map(([key, mode]) => `<option value="${key}">${mode.label}${mode.penalty ? " (−2 damage dice; condition on failure)" : ""}</option>`).join("")}</select></div><p>Without a started combat this is manual-only: use Fire Finale. Saves, damage, and riders are manual.</p>`,
+        content: blastChoiceContent(3, "fire", true) + "<p>Free action at round start (GM adjudicated). The amber warning never deals damage. Without a started combat this is manual-only: use Fire Finale.</p>",
+        render: (_event: any, dialog: any) => bindBlastChoices(dialog?.element, true),
         ok: { label: "Mark eight points", callback: (_event: Event, button: any) => ({ mode: button.form.elements.mode.value }) },
       });
       if (!chosen || session.cancelled) return false;
@@ -172,7 +174,7 @@ export function createBlasterFinale(moduleId: string, { selectToken, picker }: {
         const previousRaw = clone(planMap(scene)[token.id] ?? null);
         const id = foundry.utils.randomID();
         const sources = shapes.map((shape, index) => ({
-          name: `${token.name} — Grand Finale warning ${index + 1}/7`, shapes: [shape], levels,
+          name: `${token.name} — Grand Finale ${BLAST_MODES[mode].label} warning ${index + 1}/7`, shapes: [shape], levels,
           color: AMBER, highlightMode: "coverage", displayMeasurements: true, hidden: false,
           visibility: (globalThis as any).CONST.REGION_VISIBILITY.ALWAYS,
           ownership: { default: 2, [game.user.id]: 3 }, behaviors: [],
@@ -240,12 +242,12 @@ export function createBlasterFinale(moduleId: string, { selectToken, picker }: {
     }
     if (automatic && plan.status !== "pending") return false;
     const spectrum = BLAST_MODES[plan.mode];
-    const traits = ["magical", spectrum.damage, ...(plan.mode === "dazzling" ? ["light"] : [])].join(",");
+    const traits = blastTraits(plan.mode).join(",");
     const escape = foundry.utils.escapeHTML;
     // These are base dice/DC. Native PF2e enrichment retains Inspire, elite/weak,
     // and other system adjustments, matching the immediate blast and statblock.
     const action = token.actor.items?.find?.((item: any) => item.slug === "blaster-grand-finale");
-    const card = `<h3>${escape(token.name)} · ${FINALE.name}</h3><p>${spectrum.label} · DC ${FINALE.dc} · ${plan.width} square${plan.width === 1 ? "" : "s"} wide · seven connected legs</p><p>@Check[${spectrum.save}|dc:${FINALE.dc}|basic|traits:${traits}] @Damage[${FINALE.dice - spectrum.penalty}d6[${spectrum.damage}]|traits:${traits}|options:area-damage]</p><p>One save and damage application per creature, even where legs overlap. Blaster is excluded. Resolve cover and line of effect normally. Apply HP changes, saves, and riders manually. The fixed area remains until cleared or replaced.</p>${spectrum.rider ? `<p>${spectrum.rider}</p>` : ""}`;
+    const card = `<h3>${escape(token.name)} · ${FINALE.name} · ${spectrum.label}</h3><p>DC ${FINALE.dc} · ${plan.width} square${plan.width === 1 ? "" : "s"} wide · seven connected legs</p><p>@Check[${spectrum.save}|dc:${FINALE.dc}|basic|traits:${traits}] @Damage[${blastDamage(FINALE.dice, FINALE.die, plan.mode)}[${spectrum.damage}]|traits:${traits}|options:area-damage]</p><p>One save and damage application per creature, even where legs overlap. Blaster is excluded. Resolve cover and line of effect normally. Apply HP changes, saves, and riders manually. The fixed area remains until cleared or replaced.</p>${blastRiderLinks(moduleId, plan.mode)}${spectrum.rider ? `<p>After damage, target creatures with the same final save outcome and use @UUID[Compendium.${moduleId}.astillon-blaster-macros.Macro.BlasterResolve01]{Apply Blast Effect}. Choose ${spectrum.label} and the degree after incapacitation.</p>` : ""}`;
     const content = await game.pf2e.TextEditor.enrichHTML(card, { rollData: action?.getRollData() ?? token.actor.getRollData(), relativeTo: action ?? token.actor });
     assertAuthority();
     plan = current(scene, plan);
@@ -266,7 +268,7 @@ export function createBlasterFinale(moduleId: string, { selectToken, picker }: {
       }
       const shapes = lineShapes(claimed.points, claimed.gridSize, claimed.width);
       await scene.updateEmbeddedDocuments("Region", claimed.regionIDs.map((id, index) => ({
-        _id: id, shapes: [shapes[index]], color: spectrum.color, name: `${token.name} — Grand Finale active ${index + 1}/7`,
+        _id: id, shapes: [shapes[index]], color: spectrum.color, name: `${token.name} — Grand Finale ${spectrum.label} active ${index + 1}/7`,
         [`flags.${moduleId}.${REGION_FLAG}.status`]: "active",
       })));
       assertAuthority();

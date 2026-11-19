@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterBackClear",
+  "name": "Blaster - Clear Blastback",
+  "type": "script",
+  "img": "icons/magic/fire/embers-ashes-burning-yellow.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.clearBlastback) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.clearBlastback();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

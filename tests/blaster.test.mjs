@@ -2,10 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate } from "node:timers/promises";
 import { JSDOM } from "jsdom";
-import { BLAST_TIERS, FINALE, lineShapes, isBlastRooted } from "../dist/scripts/features/blaster-model.js";
+import { BLAST_MODES, BLAST_TIERS, FINALE, lineShapes } from "../dist/scripts/features/blaster-model.js";
 import { createBlasterFeature } from "../dist/scripts/features/blaster.js";
 
 const MODULE = "astillon-hanaq-adventures-module";
+const DAMAGE = { 1: "6d8", 2: "14d8", 3: "27d10" };
+const CONDITION_DAMAGE = { 1: "3d8", 2: "11d8", 3: "24d10" };
+const MODES = {
+  fire: { damage: "fire", save: "reflex", traits: "magical,fire", effects: [] },
+  cold: { damage: "cold", save: "reflex", traits: "magical,cold", effects: [] },
+  electricity: { damage: "electricity", save: "reflex", traits: "magical,electricity", effects: [] },
+  sonic: { damage: "sonic", save: "reflex", traits: "magical,sonic", effects: [] },
+  dazzling: { damage: "fire", save: "reflex", traits: "magical,fire,light", effects: [["Failure", "BlasterDazzle001"], ["Critical failure", "BlasterDazzle001"]] },
+  humiliation: { damage: "mental", save: "will", traits: "magical,mental", effects: [["Failure", "BlasterStupor001"], ["Critical failure", "BlasterStupor001"]] },
+  slowing: { damage: "cold", save: "fortitude", traits: "magical,cold", effects: [["Success", "BlasterSlow00001"], ["Failure", "BlasterSlow00002"], ["Critical failure", "BlasterSlow00003"]] },
+  hypnotic: { damage: "mental", save: "will", traits: "magical,mental,visual,incapacitation", effects: [["Success", "BlasterFascin001"], ["Failure", "BlasterControl01"], ["Critical failure", "BlasterControl02"]] },
+};
 const origin = { x: 50, y: 50 };
 const aim = { x: 150, y: 50 };
 const points = [origin, aim, { x: 150, y: 150 }, { x: 250, y: 150 }, { x: 350, y: 150 }, { x: 350, y: 250 }, { x: 450, y: 250 }, { x: 550, y: 250 }];
@@ -24,27 +36,17 @@ test("two through eight waypoints retain native line geometry and full three-squ
   assert.throws(() => lineShapes([{ x: NaN, y: 0 }, ...points.slice(1)], 100, 1), /Invalid/);
 });
 
-test("normal tiers use 120 feet with unchanged damage and width, and Grand Finale has separate constants", () => {
-  assert.deepEqual(Object.values(BLAST_TIERS).map(({ range, dice, width }) => ({ range, dice, width })), [
-    { range: 120, dice: 4, width: 1 },
-    { range: 120, dice: 9, width: 1 },
-    { range: 120, dice: 18, width: 3 },
+test("normal tiers use 6d8, 14d8 and 27d10 at 120 feet, and Grand Finale uses 36d10", () => {
+  assert.deepEqual(Object.values(BLAST_TIERS).map(({ range, dice, die, width }) => ({ range, dice, die, width })), [
+    { range: 120, dice: 6, die: 8, width: 1 },
+    { range: 120, dice: 14, die: 8, width: 1 },
+    { range: 120, dice: 27, die: 10, width: 3 },
   ]);
-  assert.deepEqual(FINALE, { name: "Grand Finale", pointCount: 8, range: 120, width: 3, dice: 24, dc: 40 });
-});
-
-test("root survives intervening turns and round boundary but ends on next own turn", () => {
-  const root = { combatId: "combat", round: 2, turn: 3, expires: 6 };
-  const combat = { id: "combat", started: true, round: 2, turn: 3, combatant: { tokenId: "blaster" } };
-  assert.equal(isBlastRooted(root, combat, "blaster", 0), true);
-  combat.turn = 4; combat.combatant.tokenId = "player";
-  assert.equal(isBlastRooted(root, combat, "blaster", 0), true);
-  combat.round = 3; combat.turn = 0;
-  assert.equal(isBlastRooted(root, combat, "blaster", 0), true);
-  combat.turn = 3; combat.combatant.tokenId = "blaster";
-  assert.equal(isBlastRooted(root, combat, "blaster", 0), false);
-  assert.equal(isBlastRooted(root, null, "blaster", 0), false);
-  assert.equal(isBlastRooted({ ...root, combatId: null }, null, "blaster", 6), false);
+  assert.deepEqual(FINALE, { name: "Grand Finale", pointCount: 8, range: 120, width: 3, dice: 36, die: 10, dc: 40 });
+  assert.deepEqual(Object.keys(BLAST_MODES).sort(), Object.keys(MODES).sort());
+  for (const [mode, expected] of Object.entries(MODES)) {
+    assert.equal(BLAST_MODES[mode].penalty, expected.effects.length ? 3 : 0, `${mode} condition tradeoff`);
+  }
 });
 
 function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
@@ -55,6 +57,7 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
   const warnings = [], errors = [], messages = [], regions = [], prompts = [], measurements = [];
   const flags = { blasterRole: "blaster" };
   const tokenFlags = {};
+  const tokenFlagWrites = [];
   const actor = {
     uuid: "Actor.blaster", isOwner: true, getFlag: (_m, key) => flags[key],
     setFlag: async (_m, key, value) => { flags[key] = value; },
@@ -64,8 +67,8 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
     id: "blaster", x: 0, y: 0, width: 1, height: 1, actor, isOwner: true,
     getCenterPoint() { return { x: this.x + this.width * canvas.grid.size / 2, y: this.y + this.height * canvas.grid.size / 2 }; },
     getFlag: (_m, key) => tokenFlags[key],
-    setFlag: async (_m, key, value) => { tokenFlags[key] = value; },
-    unsetFlag: async (_m, key) => { delete tokenFlags[key]; },
+    setFlag: async (_m, key, value) => { tokenFlagWrites.push({ operation: "set", key, value }); tokenFlags[key] = value; },
+    unsetFlag: async (_m, key) => { tokenFlagWrites.push({ operation: "unset", key }); delete tokenFlags[key]; },
   };
   const token = { id: "blaster", name: "Blaster", actor, document: tokenDoc, get center() { return tokenDoc.getCenterPoint(); } };
   let regionId = 0;
@@ -87,6 +90,7 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
     Hooks: {
       on(name, fn) { const listeners = callbacks.get(name) ?? []; listeners.push(fn); callbacks.set(name, listeners); return fn; },
       off(name, fn) { callbacks.set(name, (callbacks.get(name) ?? []).filter(f => f !== fn)); },
+      call(name, ...args) { return (callbacks.get(name) ?? []).every(fn => fn(...args) !== false); },
     },
     ui: { notifications: { warn: text => warnings.push(text), info() {}, error: text => errors.push(text) } },
     CONST: { REGION_VISIBILITY: { ALWAYS: 2 } },
@@ -120,11 +124,75 @@ function setup(t, { charge = 3, mode = "fire", isGM = true } = {}) {
   Object.assign(globalThis, globals);
   t.after(() => { for (const k of Object.keys(globals)) { if (prior[k] === undefined) delete globalThis[k]; else globalThis[k] = prior[k]; } dom.window.close(); });
   return {
-    feature: createBlasterFeature(MODULE), warnings, errors, messages, regions, flags, tokenFlags, combat, scene, callbacks, globals, prompts, measurements,
+    feature: createBlasterFeature(MODULE), warnings, errors, messages, regions, flags, tokenFlags, tokenFlagWrites, combat, scene, callbacks, globals, prompts, measurements,
     click(p, button = 0) { view.dispatchEvent(new dom.window.MouseEvent("pointerdown", { clientX: p.x, clientY: p.y, button, bubbles: true, cancelable: true })); },
     move(p) { view.dispatchEvent(new dom.window.MouseEvent("pointermove", { clientX: p.x, clientY: p.y, bubbles: true })); },
     key(key) { dom.window.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key, bubbles: true })); },
   };
+}
+
+test("blast chooser renders its saved mode, updates live, and commits the actual submitted selection", async t => {
+  const env = setup(t);
+  env.flags.blastUse = { combatId: "combat", round: 1, mode: "slowing", readyRound: 99 };
+  env.globals.foundry.applications.api.DialogV2.prompt = async options => {
+    env.prompts.push(options);
+    const form = document.createElement("form");
+    form.innerHTML = options.content;
+    document.body.append(form);
+    options.render(new window.Event("render"), { element: form });
+    assert.equal(form.elements.charge.value, "2");
+    assert.equal(form.elements.mode.value, "slowing");
+    const summary = form.querySelector(".aha-blast-choice-preview");
+    assert.match(summary.textContent, /11d8 cold/);
+    assert.match(summary.textContent, /DC 40 basic fortitude/);
+    form.elements.charge.value = "3";
+    form.elements.charge.dispatchEvent(new window.Event("input", { bubbles: true }));
+    assert.match(summary.textContent, /24d10 cold/);
+    form.elements.mode.value = "hypnotic";
+    form.elements.mode.dispatchEvent(new window.Event("change", { bubbles: true }));
+    assert.match(summary.textContent, /Hypno-Beam: 24d10 mental/);
+    assert.match(summary.textContent, /DC 40 basic will/);
+    assert.match(summary.textContent, /permanently controlled until removed/);
+    const choice = options.ok.callback(new window.Event("click"), { form });
+    form.remove();
+    return choice;
+  };
+  const pending = env.feature.api.blast({ charge: 2 }); await setImmediate();
+  assert.match(document.querySelector(".aha-blast-instructions").textContent, /Standing Ovation.*Hypno-Beam/);
+  env.click(aim);
+  await pending;
+  assert.deepEqual(env.errors, []);
+  assert.equal(env.regions[0].flags[MODULE].blast.mode, "hypnotic");
+  assert.equal(env.regions[0].flags[MODULE].blast.charge, 3);
+  assert.match(env.messages[0].content, /24d10\[mental\]/);
+  assert.equal(env.flags.blastUse.mode, "hypnotic");
+  assert.deepEqual(env.tokenFlagWrites, []);
+});
+
+for (const [label, savedMode, preset, expectedCharge, expectedMode] of [
+  ["remembered mode", "hypnotic", {}, "1", "hypnotic"],
+  ["explicit preset", "hypnotic", { charge: 3, mode: "cold" }, "3", "cold"],
+  ["invalid legacy mode", "removed-mode", {}, "1", "fire"],
+]) {
+  test(`blast chooser uses ${label} defaults and cancellation leaves bookkeeping untouched`, async t => {
+    const env = setup(t);
+    const priorUse = { combatId: "combat", round: 1, mode: savedMode, readyRound: 99 };
+    env.flags.blastUse = structuredClone(priorUse);
+    env.globals.foundry.applications.api.DialogV2.prompt = async options => {
+      const form = document.createElement("form");
+      form.innerHTML = options.content;
+      options.render(new window.Event("render"), { element: form });
+      assert.equal(form.elements.charge.value, expectedCharge);
+      assert.equal(form.elements.mode.value, expectedMode);
+      return null;
+    };
+    await env.feature.api.blast(preset);
+    assert.deepEqual(env.errors, []);
+    assert.deepEqual(env.flags.blastUse, priorUse);
+    assert.deepEqual(env.tokenFlagWrites, []);
+    assert.equal(env.regions.length, 0);
+    assert.equal(env.messages.length, 0);
+  });
 }
 
 for (const charge of [1, 2, 3]) {
@@ -136,7 +204,8 @@ for (const charge of [1, 2, 3]) {
       prompt.innerHTML = env.prompts[0].content;
       const options = [...prompt.querySelectorAll('select[name="charge"] option')];
       assert.equal(options.length, 3);
-      assert.ok(options.every(option => option.textContent.includes("120 ft")));
+      assert.ok(options.every(option => option.textContent.includes(DAMAGE[option.value])));
+      assert.match(prompt.textContent, /full 120-foot beam/);
       assert.doesNotMatch(prompt.textContent, /five clicks|four connected legs|80 ft/i);
       env.move(target);
       const preview = document.querySelector(".aha-blast-preview polyline");
@@ -155,13 +224,61 @@ for (const charge of [1, 2, 3]) {
       assert.equal(shape.width, charge === 3 ? 300 : 100);
       assert.equal(shape.rotation, 0);
       assert.equal(env.messages.length, 1);
-      assert.ok(env.messages[0].content.includes(`${BLAST_TIERS[charge].dice}d6[fire]`));
+      assert.ok(env.messages[0].content.includes(`${DAMAGE[charge]}[fire]`));
       assert.match(env.messages[0].content, /120(?: ft|-foot)/);
       assert.equal(env.flags.blastUse.round, 1);
+      assert.equal(env.flags.blastUse.mode, "fire");
       assert.equal(env.flags.blastUse.readyRound, charge === 3 ? 4 : undefined);
-      assert.equal(env.tokenFlags.blastRoot?.round, charge === 3 ? 1 : undefined);
+      assert.deepEqual(env.tokenFlags, {});
+      assert.deepEqual(env.tokenFlagWrites, []);
       assert.equal(document.querySelector(".aha-blast-preview"), null);
       assert.equal(document.querySelector(".aha-blast-instructions"), null);
+    });
+  }
+}
+
+for (const charge of [1, 2, 3]) {
+  for (const [mode, expected] of Object.entries(MODES)) {
+    test(`${charge} action ${mode} blast never writes a movement lock and explains manual adjudication`, async t => {
+      const env = setup(t, { charge, mode });
+      await env.feature.ready();
+      const pending = env.feature.api.blast(); await setImmediate();
+      env.click(aim);
+      await pending;
+      assert.deepEqual(env.errors, []);
+      assert.equal(env.regions.length, 1);
+      assert.equal(env.messages.length, 1);
+      assert.equal(env.regions[0].flags[MODULE].blast.mode, mode);
+      const card = env.messages[0].content;
+      const damage = expected.effects.length ? CONDITION_DAMAGE[charge] : DAMAGE[charge];
+      assert.ok(card.includes(`@Damage[${damage}[${expected.damage}]|traits:${expected.traits}|options:area-damage]`));
+      assert.ok(card.includes(`@Check[${expected.save}|dc:40|basic|traits:${expected.traits}]`));
+      assert.equal(env.flags.blastUse.mode, mode);
+      for (const [outcome, effectId] of expected.effects) {
+        assert.ok(card.includes(`@UUID[Compendium.${MODULE}.astillon-blaster-items.Item.${effectId}]{${outcome} effect}`));
+      }
+      assert.equal((card.match(/astillon-blaster-items\.Item\./g) ?? []).length, expected.effects.length);
+      if (expected.effects.length) {
+        assert.ok(card.includes(`@UUID[Compendium.${MODULE}.astillon-blaster-macros.Macro.BlasterResolve01]{Apply Blast Effect}`));
+        assert.match(card, /After applying damage/);
+      } else assert.doesNotMatch(card, /Apply Blast Effect/);
+      if (mode === "slowing") {
+        assert.match(card, /Success: slowed 1\. Failure: slowed 2\. Critical failure: slowed 3/);
+        assert.match(card, /Lasts 1 round; critical success has no effect/);
+      }
+      if (mode === "hypnotic") {
+        assert.match(card, /Success: fascinated for 1 round\. Failure: controlled for 1 round/);
+        assert.match(card, /Critical failure: permanently controlled until removed/);
+        assert.match(card, /normal fascinated hostility breaks still apply/);
+        assert.match(card, /degree after incapacitation adjustments/);
+      }
+      assert.deepEqual(env.tokenFlags, {});
+      assert.deepEqual(env.tokenFlagWrites, []);
+      for (const content of [env.prompts[0].content, env.messages[0].content]) {
+        assert.match(content, /no automatic movement lock/i);
+        assert.match(content, /adjudicat.*movement|movement.*adjudicat/i);
+        assert.doesNotMatch(content, /roots Blaster|Rooted until|cannot move until/i);
+      }
     });
   }
 }
@@ -213,12 +330,14 @@ test("placement commits one region, one chat card and recharge metadata; clear r
   assert.equal(env.regions.length, 1);
   assert.ok(env.regions.every(r => r.shapes[0].width === 300 && r.flags.pf2e.areaShape === "line"));
   assert.equal(env.messages.length, 1);
-  assert.match(env.messages[0].content, /16d6\[mental\]/);
+  assert.match(env.messages[0].content, /24d10\[mental\]/);
   assert.match(env.messages[0].content, /@Check\[will/);
   assert.match(env.messages[0].content, /options:area-damage/);
-  assert.match(env.messages[0].content, /@UUID\[Compendium\.pf2e\.conditionitems\.Item\.e1XGnhKNSQIm5IXg\]\{Stupefied 1\}/);
+  assert.ok(env.messages[0].content.includes(`@UUID[Compendium.${MODULE}.astillon-blaster-items.Item.BlasterStupor001]{Failure effect}`));
+  assert.equal(env.flags.blastUse.mode, "humiliation");
   assert.equal(env.flags.blastUse.readyRound, 4);
-  assert.equal(env.tokenFlags.blastRoot.round, 1);
+  assert.deepEqual(env.tokenFlags, {});
+  assert.deepEqual(env.tokenFlagWrites, []);
   assert.match(env.messages[0].content, /recharge \(reference\): 2 full rounds; available round 4/);
   assert.match(env.messages[0].content, /Adjudicate recharge from the sheet/);
   env.regions.push({ id: "other", getFlag: () => ({ tokenId: "other-token" }) });
@@ -246,7 +365,8 @@ for (const cancel of ["Escape", "right-click", "api"]) {
     assert.deepEqual(env.errors, []);
     assert.equal(env.regions.length, 0);
     assert.equal(env.flags.blastUse, undefined);
-    assert.equal(env.tokenFlags.blastRoot, undefined);
+    assert.deepEqual(env.tokenFlags, {});
+    assert.deepEqual(env.tokenFlagWrites, []);
     assert.equal(document.querySelector(".aha-blast-preview"), null);
     assert.equal(document.querySelector(".aha-blast-instructions"), null);
     assert.equal(env.callbacks.get("canvasTearDown").length, 0);
@@ -286,12 +406,10 @@ for (const charge of [1, 2, 3]) {
       }
       assert.equal(env.flags.blastUse.combatId, timing === "no combat" ? null : "combat");
       assert.ok(env.regions.every(r => r.shapes[0].width === (charge === 3 ? 300 : 100)));
-      assert.match(env.prompts[0].content, /Adjudicate action costs, frequency, and recharge from the sheet/);
-      if (charge === 3) {
-        assert.equal(env.tokenFlags.blastRoot.combatId, timing === "no combat" ? null : "combat");
-        assert.equal(isBlastRooted(env.tokenFlags.blastRoot, env.globals.game.combat, "blaster", 0), true);
-        if (timing === "no combat") assert.doesNotMatch(env.messages[0].content, /available round/);
-      } else assert.equal(env.tokenFlags.blastRoot, undefined);
+      assert.match(env.prompts[0].content, /Action costs, frequency, and recharge remain GM-adjudicated/);
+      assert.deepEqual(env.tokenFlags, {});
+      assert.deepEqual(env.tokenFlagWrites, []);
+      if (charge === 3 && timing === "no combat") assert.doesNotMatch(env.messages[0].content, /available round/);
     });
   }
 }
@@ -323,11 +441,10 @@ for (const change of ["turn", "round", "ended", "deleted", "replaced"]) {
       const current = env.globals.game.combat?.started ? env.globals.game.combat : null;
       assert.deepEqual(env.flags.blastUse, {
         combatId: current?.id ?? null, round: current?.round ?? 0, rechargeCombatId: current?.id ?? null,
-        readyRound: (current?.round ?? 0) + 3, readyTime: 60,
+        readyRound: (current?.round ?? 0) + 3, readyTime: 60, mode: "fire",
       });
-      assert.deepEqual(env.tokenFlags.blastRoot, {
-        combatId: current?.id ?? null, round: current?.round ?? 0, turn: current?.turn ?? 0, expires: 48,
-      });
+      assert.deepEqual(env.tokenFlags, {});
+      assert.deepEqual(env.tokenFlagWrites, []);
       assert.ok(env.regions.every(r => r.shapes[0].width === 300 && r.flags.pf2e.areaShape === "line"));
     });
   }
@@ -341,7 +458,9 @@ const invalidations = [
   ["selection change", env => { env.globals.canvas.tokens.controlled = [{ ...env.globals.canvas.tokens.controlled[0], id: "another-blaster" }]; }, /scene or selected token changed/],
   ["token movement", env => { env.scene.tokens.get("blaster").x = 100; }, /scene or selected token changed/],
   ["token deletion", env => { env.scene.tokens.delete("blaster"); }, /scene or selected token changed/],
+  ["same-id token replacement", env => { env.scene.tokens.set("blaster", { ...env.scene.tokens.get("blaster") }); }, /scene or selected token changed/],
   ["scene change", env => { env.globals.canvas.scene = { id: "another-scene" }; }, /scene or selected token changed/],
+  ["same-id scene replacement", env => { env.globals.canvas.scene = { ...env.scene }; }, /scene or selected token changed/],
 ];
 
 for (const [label, invalidate, expected] of invalidations) {
@@ -365,7 +484,8 @@ for (const [label, invalidate, expected] of invalidations) {
       assert.equal(env.regions.length, 0);
       assert.equal(env.messages.length, 0);
       assert.equal(env.flags.blastUse, undefined);
-      assert.equal(env.tokenFlags.blastRoot, undefined);
+      assert.deepEqual(env.tokenFlags, {});
+      assert.deepEqual(env.tokenFlagWrites, []);
       assert.equal(document.querySelector(".aha-blast-preview"), null);
     });
   }
@@ -415,27 +535,49 @@ test("normal blasts and Finale share the picker busy guard and cancel API", asyn
   assert.deepEqual(env.errors, []);
 });
 
-test("actual movement hooks prevent rooted movement, allow GM forced moves, and clear on next own turn", async t => {
+for (const timing of ["combat", "outside combat"]) {
+  test(`movement stays unrestricted with an active legacy root ${timing}`, async t => {
+    const env = setup(t);
+    if (timing === "outside combat") env.globals.game.combat = null;
+    const legacyRoot = { combatId: timing === "combat" ? "combat" : null, round: 1, turn: 0, expires: 6 };
+    env.tokenFlags.blastRoot = legacyRoot;
+    await env.feature.ready();
+    const pending = env.feature.api.blast(); await setImmediate();
+    env.click(aim);
+    await pending;
+    assert.equal(env.regions.length, 1);
+    assert.equal(env.messages.length, 1);
+    const token = env.scene.tokens.get("blaster");
+    const changed = { x: 100, y: 200, elevation: 10, level: "roof" };
+    assert.equal(Hooks.call("preMoveToken", token, { destination: changed }, {}), true);
+    assert.equal(Hooks.call("preUpdateToken", token, changed, {}), true);
+    Object.assign(token, changed);
+    assert.deepEqual({ x: token.x, y: token.y, elevation: token.elevation, level: token.level }, changed);
+    assert.deepEqual(env.callbacks.get("preMoveToken") ?? [], []);
+    assert.deepEqual(env.callbacks.get("preUpdateToken") ?? [], []);
+    assert.deepEqual(env.tokenFlags.blastRoot, legacyRoot);
+    assert.deepEqual(env.tokenFlagWrites, []);
+    assert.deepEqual(env.warnings, []);
+    assert.deepEqual(env.errors, []);
+  });
+}
+
+test("public API preserves Release Blast Root for legacy macros and clears only the legacy flag", async t => {
   const env = setup(t);
-  await env.feature.ready();
+  for (const name of ["blast", "clearBlast", "releaseRoot", "refreshDescriptions", "markFinale", "fireFinale", "clearFinale", "blastback", "fireBlastback", "clearBlastback", "applyBlastEffect", "counterblast", "upgradeSheet", "flashMob", "commandMob", "cancelPlacement"]) {
+    assert.equal(typeof env.feature.api[name], "function", `${name} remains exposed`);
+  }
   env.tokenFlags.blastRoot = { combatId: "combat", round: 1, turn: 0, expires: 6 };
-  const token = env.scene.tokens.get("blaster");
-  const preMove = env.callbacks.get("preMoveToken").at(-1);
-  const preUpdate = env.callbacks.get("preUpdateToken").at(-1);
-  assert.equal(preMove(token, {}, {}), false);
-  assert.equal(preUpdate(token, { x: 100 }, {}), false);
-  assert.equal(preUpdate(token, { rotation: 90 }, {}), undefined);
-  assert.equal(preMove(token, {}, { blasterForcedMovement: true }), undefined);
-  env.combat.round = 2; env.combat.combatant.tokenId = "player";
-  assert.equal(preMove(token, {}, {}), false);
-  env.combat.combatant.tokenId = "blaster";
-  for (const hook of env.callbacks.get("updateCombat")) hook(env.combat, { round: 2, turn: 0 });
-  await setImmediate();
-  assert.equal(env.tokenFlags.blastRoot, undefined);
-  assert.equal(preMove(token, {}, {}), undefined);
+  env.tokenFlags.unrelated = { keep: true };
+  await env.feature.api.releaseRoot();
+  assert.deepEqual(env.tokenFlags, { unrelated: { keep: true } });
+  assert.deepEqual(env.tokenFlagWrites, [{ operation: "unset", key: "blastRoot" }]);
+  await env.feature.api.releaseRoot();
+  assert.deepEqual(env.tokenFlags, { unrelated: { keep: true } });
+  assert.deepEqual(env.errors, []);
 });
 
-test("failed bookkeeping rolls back only just-created areas and never leaves Blaster rooted", async t => {
+test("failed bookkeeping rolls back only just-created areas without writing token flags", async t => {
   const env = setup(t);
   t.mock.method(console, "error", () => {});
   env.scene.tokens.get("blaster").actor.setFlag = async () => { throw new Error("simulated failed actor write"); };
@@ -443,18 +585,20 @@ test("failed bookkeeping rolls back only just-created areas and never leaves Bla
   env.click(aim);
   await pending;
   assert.equal(env.regions.length, 0);
-  assert.equal(env.tokenFlags.blastRoot, undefined);
+  assert.deepEqual(env.tokenFlags, {});
+  assert.deepEqual(env.tokenFlagWrites, []);
   assert.equal(env.messages.length, 0);
   assert.match(env.errors.at(-1), /failed actor write/);
 });
 
-test("failed repeated blast preserves the previous root, use metadata and areas", async t => {
+test("failed repeated blast preserves legacy flags, previous use metadata and areas without root rollback", async t => {
   const env = setup(t);
   t.mock.method(console, "error", () => {});
+  const legacyRoot = { combatId: "combat", round: 1, turn: 0, expires: 6 };
+  env.tokenFlags.blastRoot = legacyRoot;
   const first = env.feature.api.blast(); await setImmediate();
   env.click(aim);
   await first;
-  const previousRoot = structuredClone(env.tokenFlags.blastRoot);
   const previousUse = structuredClone(env.flags.blastUse);
   const previousRegions = [...env.regions];
   env.scene.tokens.get("blaster").actor.setFlag = async () => { throw new Error("simulated failed actor write"); };
@@ -466,9 +610,9 @@ test("failed repeated blast preserves the previous root, use metadata and areas"
   await repeated;
   assert.match(env.errors.at(-1), /failed actor write/);
   assert.deepEqual(env.regions, previousRegions);
-  assert.deepEqual(env.tokenFlags.blastRoot, previousRoot);
+  assert.deepEqual(env.tokenFlags.blastRoot, legacyRoot);
+  assert.deepEqual(env.tokenFlagWrites, []);
   assert.deepEqual(env.flags.blastUse, previousUse);
-  assert.equal(isBlastRooted(env.tokenFlags.blastRoot, env.combat, "blaster", 3), true);
   assert.equal(env.messages.length, 1);
 });
 
@@ -484,7 +628,7 @@ test("refresh updates only matched ability descriptions, preserving actor state 
     { id: "effect", slug: "blaster-inspire", type: "effect", system: { description: { value: "active effect" } } },
   ];
   const originals = [
-    { id: "same", slug: "blaster-charged-blast-1", type: "action", toObject: () => ({ system: { description: { value: "@Damage[4d6[fire]]" } } }) },
+    { id: "same", slug: "blaster-charged-blast-1", type: "action", toObject: () => ({ system: { description: { value: "@Damage[6d8[fire]]" } } }) },
     { id: "source-clash", slug: "blaster-beam-clash", type: "action", toObject: () => ({ system: { description: { value: "new clash" } } }) },
     { id: "missing", slug: "deleted-by-gm", type: "action", toObject: () => ({ system: { description: { value: "do not recreate" } } }) },
   ];

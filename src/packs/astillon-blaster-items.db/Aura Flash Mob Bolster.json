@@ -5,7 +5,7 @@
   "img": "icons/svg/upgrade.svg",
   "system": {
     "description": {
-      "value": "<p><strong>Requirements</strong> A living Flash Mob thrall activated by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}.</p>\n<p><strong>Duration</strong> until the start of Blaster's next turn</p>\n<hr />\n<p><strong>Effect</strong> The thrall emits a 60-foot aura granting @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster} only to its summoning Blaster. No other creature benefits.</p>\n<p>Bolster grants temporary HP once per activation. Leaving the aura retains them; re-entry does not refill them. Only Bolster-granted HP expire with this aura; higher existing temporary HP keep their original duration.</p>\n<p>The aura and its benefits end if the thrall is destroyed or removed.</p>",
+      "value": "<p><strong>Requirements</strong> A living Flash Mob thrall linked to its summoning Blaster.</p>\n<p><strong>Duration</strong> the thrall's remaining lifetime, unless its mode changes</p>\n<hr />\n<p><strong>Effect</strong> The thrall emits a 60-foot aura granting @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001]{Bolster} only to its summoning Blaster. No other creature benefits.</p>\n<p>Each distinct thrall contributes 10 temporary HP once during its lifetime. Contributions add together in one tracked Flash Mob pool. Leaving retains unspent HP; re-entry and mode changes never refill them. Changing this thrall's mode retains already-granted HP until the thrall is destroyed, removed, or expires. Higher unrelated temporary HP retain their source and duration.</p>\n<p>The aura and its linked benefits end if the thrall is destroyed, removed, or expires.</p>",
       "gm": ""
     },
     "publication": {
@@ -25,7 +25,7 @@
         "traits": [],
         "effects": [
           {
-            "uuid": "Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterTempHP001",
+            "uuid": "{actor|uuid}.Item.BlasterTempHP001",
             "affects": "all",
             "includesSelf": false,
             "events": [
@@ -62,9 +62,9 @@
       "value": 18
     },
     "duration": {
-      "value": 1,
-      "unit": "rounds",
-      "expiry": "turn-start",
+      "value": -1,
+      "unit": "unlimited",
+      "expiry": null,
       "sustained": false
     },
     "start": {

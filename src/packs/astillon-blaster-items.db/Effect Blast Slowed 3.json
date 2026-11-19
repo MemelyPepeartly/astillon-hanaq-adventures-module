@@ -1,0 +1,66 @@
+{
+  "_id": "BlasterSlow00003",
+  "name": "Effect: Blaster Blast - Slowed 3",
+  "type": "effect",
+  "img": "systems/pf2e/icons/conditions/slowed.webp",
+  "system": {
+    "description": {
+      "value": "<p>Apply after blast damage and after incapacitation adjustment. Granted by Blaster's Slowing Beam rider on a critical failure.</p>\n<p>Target gains @UUID[Compendium.pf2e.conditionitems.Item.xYTAsEpcJE1Ccni3]{Slowed 3} for 1 round.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "GrantItem",
+        "inMemoryOnly": true,
+        "uuid": "Compendium.pf2e.conditionitems.Item.xYTAsEpcJE1Ccni3",
+        "alterations": [
+          {
+            "mode": "override",
+            "property": "badge-value",
+            "value": 3
+          }
+        ]
+      }
+    ],
+    "slug": "blaster-slowed-3",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": 1,
+      "unit": "rounds",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterBlastEffect": "slowed-3"
+    }
+  }
+}

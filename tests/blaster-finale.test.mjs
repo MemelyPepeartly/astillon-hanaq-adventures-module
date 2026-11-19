@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
 import test from "node:test";
+import { JSDOM } from "jsdom";
 import { createBlasterFinale } from "../dist/scripts/features/blaster-finale.js";
 import { BLAST_MODES } from "../dist/scripts/features/blaster-model.js";
 
@@ -10,6 +11,16 @@ const POINTS = [
   { x: 50, y: 50 }, { x: 2450, y: 50 }, { x: 2450, y: 150 }, { x: 2350, y: 150 },
   { x: 2350, y: 250 }, { x: 2250, y: 250 }, { x: 2250, y: 350 }, { x: 2150, y: 350 },
 ];
+const SPECTRA = {
+  fire: { damage: "36d10[fire]", save: "reflex", traits: "magical,fire", effects: {} },
+  cold: { damage: "36d10[cold]", save: "reflex", traits: "magical,cold", effects: {} },
+  electricity: { damage: "36d10[electricity]", save: "reflex", traits: "magical,electricity", effects: {} },
+  sonic: { damage: "36d10[sonic]", save: "reflex", traits: "magical,sonic", effects: {} },
+  dazzling: { damage: "33d10[fire]", save: "reflex", traits: "magical,fire,light", effects: { Failure: "BlasterDazzle001", "Critical failure": "BlasterDazzle001" } },
+  humiliation: { damage: "33d10[mental]", save: "will", traits: "magical,mental", effects: { Failure: "BlasterStupor001", "Critical failure": "BlasterStupor001" } },
+  slowing: { damage: "33d10[cold]", save: "fortitude", traits: "magical,cold", effects: { Success: "BlasterSlow00001", Failure: "BlasterSlow00002", "Critical failure": "BlasterSlow00003" } },
+  hypnotic: { damage: "33d10[mental]", save: "will", traits: "magical,mental,visual,incapacitation", effects: { Success: "BlasterFascin001", Failure: "BlasterControl01", "Critical failure": "BlasterControl02" } },
+};
 const copy = value => value === undefined ? undefined : structuredClone(value);
 const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const getPath = (object, path) => path.split(".").reduce((current, key) => current?.[key], object);
@@ -281,8 +292,8 @@ test("next global round fires once across duplicate hooks, independent of whose 
   ]);
   await env.drain();
   assert.equal(env.messages.length, 1);
-  assert.match(env.messages[0].content, /24d6\[cold\]/);
-  assert.match(env.messages[0].content, /@Damage\[24d6\[cold\]\|traits:magical,cold\|options:area-damage\]/);
+  assert.match(env.messages[0].content, /36d10\[cold\]/);
+  assert.match(env.messages[0].content, /@Damage\[36d10\[cold\]\|traits:magical,cold\|options:area-damage\]/);
   assert.match(env.messages[0].content, /@Check\[reflex\|dc:40\|basic\|traits:magical,cold\]/);
   assert.doesNotMatch(env.messages[0].content, /immutable|\[\[\/r /);
   assert.match(env.messages[0].content, /manual/i);
@@ -299,7 +310,7 @@ test("next global round fires once across duplicate hooks, independent of whose 
   assert.equal(env.messages.length, 1);
 });
 
-for (const mode of ["fire", "dazzling", "humiliation"]) {
+for (const [mode, expected] of Object.entries(SPECTRA)) {
   test(`manual fire outside combat uses ${mode} spectrum and manual riders without HP writes`, async t => {
     const env = setup(t, { inCombat: false, mode });
     await env.feature.ready();
@@ -309,11 +320,71 @@ for (const mode of ["fire", "dazzling", "humiliation"]) {
     await env.feature.fire();
     assert.equal(env.messages.length, 1);
     const spectrum = BLAST_MODES[mode];
-    assert.match(env.messages[0].content, new RegExp(`${24 - spectrum.penalty}d6\\[${spectrum.damage}\\]`));
-    assert.match(env.messages[0].content, new RegExp(`@Check\\[${spectrum.save}\\|dc:40\\|basic`));
+    const content = env.messages[0].content;
+    assert.ok(content.includes(`@Damage[${expected.damage}|traits:${expected.traits}|options:area-damage]`));
+    assert.ok(content.includes(`@Check[${expected.save}|dc:40|basic|traits:${expected.traits}]`));
+    assert.equal(env.plan().mode, mode);
+    assert.ok(env.regions.contents.every(region => region.color === spectrum.color));
     if (spectrum.rider) assert.ok(env.messages[0].content.includes(spectrum.rider));
+    for (const [outcome, id] of Object.entries(expected.effects)) {
+      assert.ok(content.includes(`@UUID[Compendium.${MODULE}.astillon-blaster-items.Item.${id}]{${outcome} effect}`));
+    }
+    if (Object.keys(expected.effects).length) {
+      assert.ok(content.includes(`@UUID[Compendium.${MODULE}.astillon-blaster-macros.Macro.BlasterResolve01]{Apply Blast Effect}`));
+      assert.match(content, /After damage, target creatures with the same final save outcome/);
+    } else assert.doesNotMatch(content, /Apply Blast Effect|\{(?:Success|Failure|Critical failure) effect\}/);
+    if (mode === "slowing") {
+      assert.match(content, /Success: slowed 1\. Failure: slowed 2\. Critical failure: slowed 3\./);
+      assert.match(content, /Lasts 1 round; critical success has no effect/);
+    }
+    if (mode === "hypnotic") {
+      assert.match(content, /Success: fascinated for 1 round\. Failure: controlled for 1 round\. Critical failure: permanently controlled until removed/);
+      assert.match(content, /Critical success has no effect/);
+      assert.match(content, /Apply after damage; normal fascinated hostility breaks still apply/);
+      assert.match(content, /degree after incapacitation/);
+    }
     await env.feature.fire();
     assert.equal(env.messages.length, 1);
+    assert.deepEqual(env.errors, []);
+  });
+}
+
+for (const mode of ["slowing", "hypnotic"]) {
+  test(`Grand Finale chooser renders and submits ${mode} with its live 33d10 summary`, async t => {
+    const env = setup(t, { inCombat: false });
+    const dom = new JSDOM("<!doctype html><form></form>");
+    t.after(() => dom.window.close());
+    const form = dom.window.document.querySelector("form");
+    const expected = SPECTRA[mode];
+    t.mock.method(foundry.applications.api.DialogV2, "prompt", async options => {
+      env.prompts.push(options);
+      form.innerHTML = options.content;
+      assert.equal(form.elements.namedItem("charge"), null, "Finale has no immediate-blast charge selector");
+      const selector = form.elements.namedItem("mode");
+      assert.deepEqual([...selector.options].map(option => option.value), Object.keys(SPECTRA));
+      assert.equal(selector.value, "fire");
+      assert.equal(typeof options.render, "function");
+      options.render(null, { element: form });
+      const summary = form.querySelector(".aha-blast-choice-preview");
+      assert.equal(summary.getAttribute("aria-live"), "polite");
+      assert.match(summary.textContent, /Fire: 36d10 fire/);
+      selector.value = mode;
+      selector.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+      assert.ok(summary.textContent.includes(`${BLAST_MODES[mode].label}: 33d10 ${BLAST_MODES[mode].damage}`));
+      assert.ok(summary.textContent.includes(`DC 40 basic ${expected.save}`));
+      assert.match(summary.textContent, /3 square\(s\) wide/);
+      assert.ok(summary.textContent.includes(BLAST_MODES[mode].rider));
+      assert.match(form.textContent, /No automatic movement lock/);
+      assert.match(options.ok.label, /Mark eight points/);
+      return options.ok.callback(null, { form });
+    });
+    assert.equal(await env.feature.mark(), true);
+    assert.equal(env.plan().mode, mode);
+    assert.ok(env.regions.contents.every(region => region.name.includes(BLAST_MODES[mode].label)));
+    assert.equal(await env.feature.fire(), true);
+    assert.equal(env.messages.length, 1);
+    assert.ok(env.messages[0].content.includes(`@Damage[${expected.damage}|traits:${expected.traits}|options:area-damage]`));
+    assert.ok(env.messages[0].content.includes(`@Check[${expected.save}|dc:40|basic|traits:${expected.traits}]`));
     assert.deepEqual(env.errors, []);
   });
 }
@@ -332,7 +403,7 @@ test("native PF2e enrichment uses the Grand Finale action's roll data and relati
   assert.equal(env.enrichments.length, 1);
   assert.equal(env.enrichments[0].options.relativeTo, action);
   assert.deepEqual(env.enrichments[0].options.rollData, actionRollData);
-  assert.match(env.enrichments[0].content, /@Damage\[22d6\[mental\]\|traits:magical,mental\|options:area-damage\]/);
+  assert.match(env.enrichments[0].content, /@Damage\[33d10\[mental\]\|traits:magical,mental\|options:area-damage\]/);
   assert.match(env.enrichments[0].content, /@Check\[will\|dc:40\|basic\|traits:magical,mental\]/);
   assert.doesNotMatch(env.enrichments[0].content, /immutable|\[\[\/r /);
 });
@@ -345,7 +416,7 @@ test("native PF2e enrichment falls back to actor context when Grand Finale has n
   assert.equal(env.messages.length, 1);
   assert.equal(env.enrichments[0].options.relativeTo, env.token.actor);
   assert.deepEqual(env.enrichments[0].options.rollData, env.token.actor.getRollData());
-  assert.match(env.enrichments[0].content, /@Damage\[24d6\[fire\]\|traits:magical,fire\|options:area-damage\]/);
+  assert.match(env.enrichments[0].content, /@Damage\[36d10\[fire\]\|traits:magical,fire\|options:area-damage\]/);
 });
 
 test("cancelled replacement leaves the old plan and regions untouched", async t => {

@@ -1,0 +1,59 @@
+{
+  "_id": "BlasterControl02",
+  "name": "Effect: Blaster Blast - Controlled (Permanent)",
+  "type": "effect",
+  "img": "systems/pf2e/icons/conditions/controlled.webp",
+  "system": {
+    "description": {
+      "value": "<p>Apply after blast damage and after incapacitation adjustment. Granted by Blaster's Hypno-Beam rider on a critical failure.</p>\n<p>Target gains @UUID[Compendium.pf2e.conditionitems.Item.9qGBRpbX9NEwtAAr]{Controlled} with unlimited duration. The GM directs actions only; this does not transfer ownership or permission controls, and no obviously self-destructive orders are implied. This effect remains until removed, counteracted, or ended by the GM.</p>",
+      "gm": ""
+    },
+    "publication": {
+      "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
+      "authors": "",
+      "license": "ORC",
+      "remaster": true
+    },
+    "rules": [
+      {
+        "key": "GrantItem",
+        "inMemoryOnly": true,
+        "uuid": "Compendium.pf2e.conditionitems.Item.9qGBRpbX9NEwtAAr"
+      }
+    ],
+    "slug": "blaster-controlled-permanent",
+    "_migration": {
+      "version": 0.961,
+      "previous": null
+    },
+    "traits": {
+      "value": [],
+      "otherTags": []
+    },
+    "level": {
+      "value": 18
+    },
+    "duration": {
+      "value": -1,
+      "unit": "unlimited",
+      "expiry": null,
+      "sustained": false
+    },
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "badge": null,
+    "context": null,
+    "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterBlastEffect": "controlled-permanent"
+    }
+  }
+}

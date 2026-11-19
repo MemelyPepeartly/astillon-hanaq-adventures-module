@@ -1,0 +1,12 @@
+{
+  "_id": "BlasterBack00001",
+  "name": "Blaster - Start Blastback",
+  "type": "script",
+  "img": "icons/magic/fire/explosion-embers-orange.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.blaster;\nif (!feature?.blastback) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and wait for the world to finish loading.\");\n  return;\n}\nawait feature.blastback();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}

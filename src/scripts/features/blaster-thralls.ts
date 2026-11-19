@@ -1,8 +1,8 @@
 /** Portable actor IDs and bundled artwork shared by the picker and content tests. */
 export const BLASTER_THRALLS = [
-  { key: "hype-fan", id: "BlasterThrall001", name: "Hype Fan", tagline: "Glowsticks up. Ego higher.", routine: "Inspire", detail: "A cheering superfan with an impossible grin." },
-  { key: "ego-guard", id: "BlasterThrall002", name: "Ego Guard", tagline: "Nobody touches the talent.", routine: "Guard", detail: "A smug stage bouncer with a violet energy shield." },
-  { key: "paparazzo", id: "BlasterThrall003", name: "Paparazzo", tagline: "Every angle is his good angle.", routine: "Bolster", detail: "An obsessive photographer firing magenta flashes." },
+  { key: "hype-fan", id: "BlasterThrall001", name: "Hype Fan", tagline: "Glowsticks up. Ego higher.", routine: "Inspire", support: "inspire", detail: "A cheering superfan with an impossible grin." },
+  { key: "ego-guard", id: "BlasterThrall002", name: "Ego Guard", tagline: "Nobody touches the talent.", routine: "Guard", support: "guard", detail: "A smug stage bouncer with a violet energy shield." },
+  { key: "paparazzo", id: "BlasterThrall003", name: "Paparazzo", tagline: "Every angle is his good angle.", routine: "Bolster", support: "tempHP", detail: "An obsessive photographer firing magenta flashes." },
 ] as const;
 
 export function thrallArtwork(moduleId: string, key: string): string {
@@ -23,6 +23,6 @@ export function thrallPickerContent(moduleId: string): string {
       </label>`).join("")}
     </div>
     <label class="aha-thrall-random"><input type="radio" name="variant" value="random"> Surprise me — randomly choose one of the three</label>
-    <p class="aha-thrall-limits">GM tool: usable at any time, in or out of combat. Action costs and frequency are GM-adjudicated.<br>3 living thralls maximum · 1 HP · lasts 1 minute.<br>All three can Inspire, Guard, or Bolster when commanded; choosing a look grants no free support.</p>
+    <p class="aha-thrall-limits">GM tool: usable at any time, in or out of combat. Action costs are GM-adjudicated.<br>No living-thrall limit · 1 HP · lasts 1 minute.<br>Each thrall starts with its signature aura. Distinct thralls stack; Command changes one thrall's mode for its remaining lifetime.</p>
   </div>`;
 }

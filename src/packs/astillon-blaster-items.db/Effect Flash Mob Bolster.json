@@ -5,7 +5,7 @@
   "img": "icons/svg/upgrade.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterCommand01]{Command Flash Mob}</p>\n<p>Blaster gains 10 temporary HP once per activation, until used or the start of his next turn, whichever comes first. Leaving the 60-foot aura retains them; re-entry does not refill them. Only Bolster-granted HP expire when the aura ends. If his existing temporary HP are higher, he keeps them with their original duration.</p>",
+      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraBol01]{Bolster Aura}</p>\n<p>This thrall contributes 10 temporary HP to its summoning Blaster's Flash Mob pool once during its lifetime. Contributions from distinct thralls add together. Leaving the aura retains the remaining HP; re-entry, another command, and returning to Bolster never refill spent HP.</p>\n<p>The module tracks each contribution and removes only its unspent HP when the thrall is destroyed, removed, or expires. Changing its mode retains already-granted HP until then. Flash Mob does not add to temporary HP from unrelated sources; higher existing temporary HP retain their source and duration.</p>",
       "gm": ""
     },
     "publication": {
@@ -14,16 +14,7 @@
       "license": "ORC",
       "remaster": true
     },
-    "rules": [
-      {
-        "key": "TempHP",
-        "value": 10,
-        "events": {
-          "onCreate": true,
-          "onTurnStart": false
-        }
-      }
-    ],
+    "rules": [],
     "slug": "blaster-temp-hp",
     "_migration": {
       "version": 0.961,
@@ -37,9 +28,9 @@
       "value": 18
     },
     "duration": {
-      "value": 1,
-      "unit": "rounds",
-      "expiry": "turn-start",
+      "value": -1,
+      "unit": "unlimited",
+      "expiry": null,
       "sustained": false
     },
     "start": {
@@ -53,5 +44,11 @@
     "badge": null,
     "context": null,
     "fromSpell": false
+  },
+  "flags": {
+    "astillon-hanaq-adventures-module": {
+      "blasterSupport": "tempHP",
+      "blasterReceiverSignature": "unassigned-flash-mob-receiver"
+    }
   }
 }

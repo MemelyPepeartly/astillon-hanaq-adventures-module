@@ -32,8 +32,19 @@ const EFFECT_FILES = {
   auraBolster: "Aura Flash Mob Bolster.json",
 };
 const effectUuid = (kind) => `Compendium.${MODULE}.astillon-blaster-items.Item.${EFFECT_IDS[kind]}`;
+const received = (actor, kind) => actor.items.filter(item => item.flags?.pf2e?.aura && (!kind || item.getFlag(MODULE, "blasterSupport") === kind));
+const emitters = (actor) => actor.items.filter(item => item.getFlag(MODULE, "blasterAura"));
 const clone = (value) => structuredClone(value);
 const flush = () => setImmediate();
+
+// Foundry 14 operators expose ordinary object properties, while document updates
+// replace the entire field or remove it before persisting plain source data.
+class ForcedReplacement {
+  constructor(value) { Object.assign(this, clone(value)); }
+  static create(value) { return new ForcedReplacement(value); }
+}
+class ForcedDeletion {}
+const _del = new ForcedDeletion();
 
 function deferred() {
   let resolve;
@@ -59,14 +70,23 @@ function setProperty(object, path, value) {
   const last = keys.pop();
   let target = object;
   for (const key of keys) target = target[key] ??= {};
-  target[last] = value;
+  if (value instanceof ForcedDeletion) delete target[last];
+  else if (last.startsWith("-=")) delete target[last.slice(2)];
+  else target[last] = value;
   return true;
 }
 
 function mergeObject(target, source, { inplace = true } = {}) {
   const result = inplace ? target : clone(target);
   for (const [key, value] of Object.entries(source)) {
-    if (key.includes(".")) setProperty(result, key, clone(value));
+    if (value instanceof ForcedDeletion) setProperty(result, key, value);
+    else if (value instanceof ForcedReplacement) setProperty(result, key, clone(value));
+    else if (key.startsWith("-=")) delete result[key.slice(2)];
+    else if (key.includes(".")) {
+      const merged = value && typeof value === "object" && !Array.isArray(value)
+        ? mergeObject(getProperty(result, key) ?? {}, value) : clone(value);
+      setProperty(result, key, merged);
+    }
     else if (value && typeof value === "object" && !Array.isArray(value)) {
       result[key] = mergeObject(result[key] ?? {}, value);
     } else result[key] = clone(value);
@@ -103,7 +123,7 @@ function setup(t) {
   const callbacks = new Map();
   let nextId = 0;
   const calls = { helper: [], dialogs: [], chat: [], loads: [], warnings: [], errors: [], actorUpdates: [], itemCreates: [], itemDeletes: [] };
-  const state = { helperBehavior: null, dialogBehavior: null, choice: undefined, flashMobVariant: undefined, emitCreation: true };
+  const state = { helperBehavior: null, dialogBehavior: null, beforeActorUpdate: null, choice: undefined, flashMobVariant: undefined, emitCreation: true };
   const Hooks = {
     on(name, callback) {
       const id = ++nextId;
@@ -176,17 +196,35 @@ function setup(t) {
       items: new Collection(), prototypeToken: { name: "Blaster" },
       getActiveTokens() { return canvas.tokens.placeables.filter((token) => token.actor === this); },
       getRollData() { return {}; },
-      async update(changes) { calls.actorUpdates.push({ actor: this, changes: clone(changes) }); mergeObject(this, changes); return this; },
-      async createEmbeddedDocuments(type, sources) {
+      async update(changes, options = {}) {
+        if (state.beforeActorUpdate) await state.beforeActorUpdate(this, changes, options);
+        for (const callback of callbacks.get("preUpdateActor")?.values() ?? []) {
+          if (callback(this, changes, options, game.user.id) === false) return this;
+        }
+        calls.actorUpdates.push({ actor: this, changes: clone(changes) });
+        mergeObject(this, changes);
+        await emit("updateActor", this, changes, options, game.user.id);
+        return this;
+      },
+      async updateEmbeddedDocuments(type, changes) {
+        assert.equal(type, "Item");
+        for (const change of changes) {
+          const item = this.items.get(change._id);
+          if (item) { item.updateSource(change); await emit("updateItem", item, change); }
+        }
+        return changes.map(change => this.items.get(change._id)).filter(Boolean);
+      },
+      async createEmbeddedDocuments(type, sources, options = {}) {
         assert.equal(type, "Item");
         const created = [];
         for (const source of sources) {
           const data = clone(source);
-          const item = flagDocument({ ...data, id: `effect${++nextId}`, documentName: "Item", actor: this, parent: this,
+          const item = flagDocument({ ...data, id: options.keepId && data._id ? data._id : `effect${++nextId}`, documentName: "Item", actor: this, parent: this,
             get isExpired() { return !!this.system.expired; },
             get sourceId() { return this._stats?.duplicateSource ?? this._stats?.compendiumSource ?? null; },
-            toObject() { return clone({ ...data, system: this.system, flags: this.flags }); },
+            toObject() { return clone({ ...data, _id: this.id, _stats: this._stats, system: this.system, flags: this.flags }); },
             updateSource(changes) { mergeObject(this, changes); },
+            async update(changes) { this.updateSource(changes); await emit("updateItem", this, changes); return this; },
             async delete() { return result.deleteEmbeddedDocuments("Item", [this.id]); },
           });
           item._id = item.id;
@@ -218,9 +256,9 @@ function setup(t) {
           if (!item) continue;
           this.items.delete(id);
           allDocuments.delete(item.uuid);
-          if (this.system.attributes.hp.tempSource === id) {
-            this.system.attributes.hp.temp = 0;
-            delete this.system.attributes.hp.tempSource;
+          if (this.system.attributes.hp.tempSource === id && item.system.rules?.some(rule => rule.key === "TempHP")) {
+            // Native TempHP.onDelete schedules this update after its source item is gone.
+            await this.update({ system: { attributes: { hp: { temp: 0, tempSource: _del } } } });
           }
           removed.push(item);
           await emit("deleteItem", item, { parent: this });
@@ -235,6 +273,26 @@ function setup(t) {
     return result;
   }
 
+  // Actor source items already exist when PF2e prepares a newly placed summon.
+  // Preserve their IDs, without pretending they passed a separate preCreateItem.
+  function embedSourceItems(target, sources) {
+    for (const source of sources) {
+      const data = clone(source);
+      const item = flagDocument({ ...data, id: data._id, uuid: `${target.uuid}.Item.${data._id}`,
+        actor: target, parent: target, documentName: "Item",
+        get isExpired() { return !!this.system.expired; },
+        get sourceId() { return this._stats?.duplicateSource ?? this._stats?.compendiumSource ?? null; },
+        get slug() { return this.system.slug; },
+        toObject() { return clone({ ...data, system: this.system, flags: this.flags, _stats: this._stats }); },
+        updateSource(changes) { mergeObject(this, changes); },
+        async update(changes) { this.updateSource(changes); await emit("updateItem", this, changes); return this; },
+        async delete() { return target.deleteEmbeddedDocuments("Item", [this.id]); },
+      });
+      target.items.set(item.id, item);
+      allDocuments.set(item.uuid, item);
+    }
+  }
+
   function token({ actor: tokenActor = actor(), id = `token${++nextId}`, distance = 20, flags = {}, actorLink = false, name = tokenActor.name, texture = null } = {}) {
     const doc = flagDocument({
       id, _id: id, uuid: `${scene.uuid}.Token.${id}`, name, documentName: "Token", actor: tokenActor,
@@ -247,6 +305,14 @@ function setup(t) {
       distanceTo(other) { return other.distance; }, isOwner: true,
     };
     doc.object = object;
+    doc.auras = { get(slug) {
+      const rule = tokenActor.items.contents.flatMap(item => item.system.rules ?? []).find(rule => rule.key === "Aura" && rule.slug === slug);
+      return rule ? { containsToken(target) {
+        const targetDocument = target.document ?? target;
+        return !object.blockedArea && !doc.hidden && !targetDocument.hidden && !!targetDocument.object && targetDocument.parent?.id === doc.parent.id && object.distance <= rule.radius;
+      } } : undefined;
+    } };
+    object.auras = doc.auras;
     tokenActor.token = doc;
     scene.tokens.set(id, doc);
     canvas.tokens.placeables.push(object);
@@ -267,6 +333,7 @@ function setup(t) {
 
   function ownThrall({ owner = selected, hp = 1, distance = 20, expired = false, helperOwner = owner.actor.uuid, role = "hype-thrall" } = {}) {
     const thrallActor = actor({ role, hp });
+    embedSourceItems(thrallActor, ["inspire", "guard", "tempHP"].map(packEffect));
     thrallActor.flags[HELPER] = { summoner: { uuid: helperOwner, id: owner.actor.id, signature: owner.actor.signature } };
     const expiry = flagDocument({ ...packEffect("expiration"), id: `expiry${++nextId}`, isExpired: expired, actor: thrallActor, parent: thrallActor });
     expiry.system.expired = expired;
@@ -277,7 +344,7 @@ function setup(t) {
     } } } });
   }
 
-  // Contract fixture for PF2e 8b6df942 ActorPF2e.applyAreaEffects/checkAreaEffects:
+  // Contract fixture for PF2e d507983d ActorPF2e.applyAreaEffects/checkAreaEffects:
   // signature predicates, source-ID dedupe, native aura origin flags, unlimited
   // recipient duration, and removeOnExit. This is not live canvas/wall rendering.
   async function applyAuras() {
@@ -287,21 +354,24 @@ function setup(t) {
         if (!aura?.removeOnExit) continue;
         const origin = scene.tokens.find(token => token.actor.uuid === aura.origin);
         const emitter = origin?.actor.items.find(item => item.system.rules?.some(rule => rule.key === "Aura" && rule.slug === aura.slug));
-        if (!emitter || origin.object.distance > 60) await target.actor.deleteEmbeddedDocuments("Item", [effect.id]);
+        if (!emitter || !origin.auras.get(aura.slug)?.containsToken(target)) await target.actor.deleteEmbeddedDocuments("Item", [effect.id]);
       }
       for (const origin of scene.tokens) {
         for (const emitter of origin.actor.items) {
           for (const rule of emitter.system.rules ?? []) {
-            if (rule.key !== "Aura" || emitter.isExpired || origin.hidden || origin.object.distance > rule.radius) continue;
+            if (rule.key !== "Aura" || emitter.isExpired || origin.hidden || !origin.auras.get(rule.slug)?.containsToken(target)) continue;
             for (const entry of rule.effects) {
               if (!entry.includesSelf && origin.actor === target.actor) continue;
               const options = new Set([`target:signature:${target.actor.signature}`]);
               const predicates = entry.predicate.map(value => value.replace("{actor|flags.pf2e-summons-assistant.summoner.signature}", origin.actor.getFlag(HELPER, "summoner")?.signature));
               if (!predicates.every(value => options.has(value))) continue;
-              if (target.actor.items.some(item => item.sourceId === entry.uuid)) continue;
-              const source = packDocuments.get(entry.uuid).toObject();
+              const receiverUuid = entry.uuid.replace("{actor|uuid}", origin.actor.uuid);
+              if (target.actor.items.some(item => item.sourceId === receiverUuid)) continue;
+              const receiver = allDocuments.get(receiverUuid) ?? packDocuments.get(receiverUuid);
+              assert.ok(receiver, `Native aura receiver ${receiverUuid} must resolve`);
+              const source = receiver.toObject();
               source.flags = { ...(source.flags ?? {}), pf2e: { aura: { slug: rule.slug, origin: origin.actor.uuid, removeOnExit: entry.removeOnExit } } };
-              source._stats = { duplicateSource: entry.uuid };
+              source._stats = { duplicateSource: receiverUuid };
               source.system.duration = { value: -1, unit: "unlimited", expiry: null, sustained: false };
               source.system.context = { origin: { actor: origin.actor.uuid, token: origin.uuid, item: null } };
               await target.actor.createEmbeddedDocuments("Item", [source]);
@@ -324,6 +394,7 @@ function setup(t) {
     thrallActor.img = source.img;
     thrallActor.flags[MODULE] = clone(source.flags?.[MODULE] ?? {});
     thrallActor.prototypeToken = clone(source.prototypeToken ?? { name: source.name });
+    embedSourceItems(thrallActor, source.items ?? []);
     mergeObject(thrallActor, details.modifications ?? {});
     delete details.modifications?.["system.traits.value"];
     const summoned = token({
@@ -336,6 +407,7 @@ function setup(t) {
     if (state.emitCreation) await emit("createToken", summoned.document, {}, game.user.id);
     await thrallActor.createEmbeddedDocuments("Item", details.itemsToAdd);
     await thrallActor.setFlag(HELPER, "summoner", { uuid: payload.summonerActor.uuid, id: payload.summonerActor.id, signature: payload.summonerActor.signature });
+    await applyAuras();
     return undefined;
   }
 
@@ -368,11 +440,11 @@ function setup(t) {
   };
   const ChatMessage = { getSpeaker: ({ token: doc }) => ({ token: doc.id, actor: doc.actor.id, scene: scene.id }), create: async (data) => { calls.chat.push(data); return data; } };
   const globals = {
-    window: dom.window, document: dom.window.document, Hooks, game, canvas, fromUuid,
+    window: dom.window, document: dom.window.document, Hooks, game, canvas, fromUuid, _del,
     ui: { notifications: { warn: (message) => calls.warnings.push(message), error: (message) => calls.errors.push(message), info() {} } },
     foundry: { utils: { randomID: () => `nonce${++nextId}`, deepClone: clone, duplicate: clone, getProperty, setProperty, mergeObject,
       escapeHTML: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;"), fromUuid },
-      applications: { api: { DialogV2 } }, documents: { ChatMessage } },
+      applications: { api: { DialogV2 } }, documents: { ChatMessage }, data: { operators: { ForcedReplacement } } },
     ChatMessage,
   };
   dom.window[HELPER] = helper;
@@ -449,8 +521,26 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       assert.equal(summoned.name, group.tokenModifications.name);
       assert.equal(summoned.texture.src, `modules/${MODULE}/assets/blaster-thralls/${fixture.variant}.png`);
       assert.equal(summoned.actor.getFlag(MODULE, "blasterVariant"), fixture.variant);
+      const support = { "hype-fan": "inspire", "ego-guard": "guard", paparazzo: "tempHP" }[fixture.variant];
+      assert.equal(emitters(summoned.actor).length, 1);
+      assert.equal(emitters(summoned.actor)[0].getFlag(MODULE, "blasterAura"), support);
+      assert.equal(received(env.selected.actor, support).length, 1);
+      assert.equal(received(summoned.actor).length, 0);
+      assert.equal(summoned.actor.system.attributes.hp.value, 1);
+      assert.equal(summoned.actor.system.attributes.hp.max, 1);
+      assert.equal(support === "tempHP" ? env.selected.actor.system.attributes.hp.temp : 0, support === "tempHP" ? 10 : 0);
     });
   }
+
+  test("multiple Paparazzo placements grant their default cumulative pools without Command", async t => {
+    const env = setup(t);
+    env.state.flashMobVariant = "paparazzo";
+    for (let index = 0; index < 4; index += 1) assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 40);
+    assert.equal(received(env.selected.actor, "tempHP").length, 4);
+    assert.equal(new Set(received(env.selected.actor, "tempHP").map(item => item.sourceId)).size, 4);
+    assert.equal(env.scene.tokens.filter(token => token.actor.getFlag(MODULE, "blasterVariant") === "paparazzo").length, 4);
+  });
 
   test("Flash Mob allows the random picker option and resolves to one supported actor UUID", async (t) => {
     const env = setup(t);
@@ -482,12 +572,11 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     });
   }
 
-  for (const change of ["gm", "cap"]) {
+  for (const change of ["gm"]) {
     test(`Flash Mob revalidates ${change} after waiting on the picker`, async (t) => {
       const env = setup(t);
       env.state.dialogBehavior = async (options) => {
         if (change === "gm") env.game.users.activeGM.id = "otherGM";
-        if (change === "cap") { env.ownThrall(); env.ownThrall(); env.ownThrall(); }
         const form = globalThis.document.createElement("form");
         form.innerHTML = options.content;
         for (const radio of form.querySelectorAll('input[type="radio"][name="variant"]')) radio.checked = radio.value === THRALLS[0].variant;
@@ -562,7 +651,7 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(env.calls.helper.length, 0);
   });
 
-  test("simultaneous clicks share a per-Blaster lock while sequential summons remain available until cap", async (t) => {
+  test("simultaneous clicks share a per-Blaster lock while many sequential summons remain available", async (t) => {
     const env = setup(t);
     const started = deferred();
     const finish = deferred();
@@ -574,9 +663,8 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     finish.resolve();
     assert.equal(await first, true);
     assert.equal(await createBlasterSummons(MODULE).flashMob(), true);
-    assert.equal(await env.api.flashMob(), true);
-    assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.calls.helper.length, 3);
+    for (let index = 0; index < 6; index += 1) assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.calls.helper.length, 8);
   });
 
   test("the helper's null-token cancellation bug releases the lock", async (t) => {
@@ -648,11 +736,11 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(await env.api.flashMob(), false);
   });
 
-  test("the three-thrall limit counts only live summons owned by this Blaster", async (t) => {
+  test("existing live, dead, expired, and foreign thralls never impose a living summon cap", async (t) => {
     const env = setup(t);
     env.ownThrall(); env.ownThrall(); env.ownThrall();
-    assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.calls.helper.length, 0);
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.calls.helper.length, 1);
     const own = env.scene.tokens.find((doc) => doc.actor.getFlag(MODULE, "blasterRole") === "hype-thrall");
     own.actor.system.attributes.hp.value = 0;
     const other = env.token({ actor: env.actor({ id: "otherBlaster" }) });
@@ -738,19 +826,15 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.match(env.calls.dialogs[0].content, new RegExp(first.document.uuid.replaceAll(".", "\\.")));
     const created = env.calls.itemCreates.find((entry) => entry.actor === env.selected.actor)?.sources[0];
     assert.ok(created);
-    assert.deepEqual(created.system.rules, packEffect("inspire").system.rules);
-    assert.equal(created.system.duration.value, 1);
-    assert.equal(created.system.duration.unit, "rounds");
-    assert.equal(created.system.context.origin.actor, env.selected.actor.uuid);
+    assert.equal(created.system.rules.find(rule => rule.key === "FlatModifier").value, 1);
+    assert.equal(created.system.rules.find(rule => rule.key === "FlatModifier").type, "untyped");
+    assert.equal(created.system.duration.unit, "unlimited");
     assert.equal(created.flags[MODULE].commandMobSource.thrallUuid, selectedThrall.document.uuid);
-    assert.equal(created.flags[MODULE].commandMobSource.combatUuid, env.combat.uuid);
-    assert.equal(created.flags[MODULE].commandMobSource.round, env.combat.round);
-    assert.equal(created.flags[MODULE].commandMobSource.turn, env.combat.turn);
-    assert.equal(created.flags[MODULE].commandMobSource.expiresAt, null);
+    assert.equal(created.flags[MODULE].commandMobSource.expiresAt, selectedThrall.document.getFlag(MODULE, "blasterSummon").expiresAt);
     assert.equal(env.selected.actor.items.size, 1);
-    assert.equal(selectedThrall.actor.items.size, 2);
+    assert.equal(emitters(selectedThrall.actor).length, 1);
     const emitter = selectedThrall.actor.items.find(item => item.getFlag(MODULE, "blasterAura") === "inspire");
-    assert.deepEqual(emitter.system.rules, packEffect("auraInspire").system.rules);
+    assert.equal(emitter.system.rules.find(rule => rule.key === "Aura").radius, 60);
     assert.equal(created.flags[MODULE].commandMobSource.auraEmitterUuid, emitter.uuid);
     assert.equal(await env.api.commandMob(), true);
   });
@@ -793,8 +877,8 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     const content = env.calls.dialogs[0].content;
     assert.equal(content.includes(far.document.uuid), false);
     assert.equal(content.includes(foreign.document.uuid), false);
-    assert.deepEqual(env.calls.itemCreates.find(entry => entry.actor === own.actor).sources[0].system.rules, packEffect("auraGuard").system.rules);
-    assert.deepEqual(env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0].system.rules, packEffect("guard").system.rules);
+    assert.equal(emitters(own.actor)[0].getFlag(MODULE, "blasterAura"), "guard");
+    assert.equal(received(env.selected.actor, "guard").length, 1);
   });
 
   test("a forged dialog choice cannot command another Blaster's otherwise valid thrall", async (t) => {
@@ -823,17 +907,18 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(env.calls.helper.length, 0);
   });
 
-  test("Temp HP support keeps the pack's rule and never stacks over a larger existing pool", async (t) => {
+  test("Bolster uses its tracked pool and preserves a larger unrelated temporary HP source", async (t) => {
     const env = setup(t);
     const thrall = env.ownThrall();
+    const [external] = await env.selected.actor.createEmbeddedDocuments("Item", [{ name: "Unrelated temporary HP source", type: "effect", system: { rules: [], duration: { value: -1, unit: "unlimited" } } }]);
     env.selected.actor.system.attributes.hp.temp = 15;
-    env.selected.actor.system.attributes.hp.tempSource = "existingOtherEffect";
+    env.selected.actor.system.attributes.hp.tempSource = external.id;
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
     assert.equal(await env.api.commandMob(), true);
-    assert.deepEqual(env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0].system.rules, packEffect("tempHP").system.rules);
+    assert.deepEqual(received(env.selected.actor, "tempHP")[0].system.rules, packEffect("tempHP").system.rules);
     assert.equal(env.selected.actor.system.attributes.hp.temp, 15);
-    assert.equal(env.selected.actor.system.attributes.hp.tempSource, "existingOtherEffect");
-    assert.equal(env.calls.actorUpdates.some((entry) => JSON.stringify(entry.changes).includes('"temp"')), false);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, external.id);
+    assert.equal(packEffect("tempHP").system.rules.some(rule => rule.key === "TempHP"), false);
   });
 
   test("ready registers once, blocks autonomous thrall turns, and enforces the minute lifetime", async (t) => {
@@ -876,114 +961,74 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     assert.equal(drained, true);
   });
 
-  test("support survives another creature's turn and expires at the start of Blaster's next turn", async (t) => {
+  test("support survives combat turns and combat removal until the thrall lifetime ends", async (t) => {
     const env = setup(t);
-    env.api.ready();
     const thrall = env.ownThrall();
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
     assert.equal(await env.api.commandMob(), true);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
-    const blasterCombatant = env.combat.combatant;
-    env.combat.turn = 1;
-    env.combat.combatant = { id: "other", tokenId: "other", actor: env.actor() };
-    await env.emit("updateCombat", env.combat, { turn: 1 }, {}, env.game.user.id);
-    assert.equal(env.selected.actor.items.size, 1);
-    env.combat.round = 2;
-    env.combat.turn = 0;
-    env.combat.combatant = blasterCombatant;
-    await env.emit("updateCombat", env.combat, { round: 2, turn: 0 }, {}, env.game.user.id);
-    assert.equal(env.selected.actor.items.size, 0);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
-  });
-
-  test("combatTurnChange and updateCombat together delete support only once", async (t) => {
-    const env = setup(t);
-    env.api.ready();
-    const thrall = env.ownThrall();
-    env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
-    assert.equal(await env.api.commandMob(), true);
+    await env.api.ready();
     env.combat.round = 2;
     await Promise.all([
       env.emit("combatTurnChange", env.combat, {}, {}),
       env.emit("updateCombat", env.combat, { round: 2 }, {}, env.game.user.id),
     ]);
-    assert.equal(env.calls.itemDeletes.filter((entry) => entry.actor === env.selected.actor).length, 1);
-  });
-
-  test("off-turn summon and command are allowed; support expires on Blaster's next turn in the same round", async t => {
-    const env = setup(t);
-    const blasterTurn = env.combat.combatant;
-    env.combat.combatant = { token: { uuid: "Scene.scene1.Token.other" }, initiative: 40 };
-    assert.equal(await env.api.flashMob(), true);
-    const thrall = env.scene.tokens.find(token => token.actor.getFlag(MODULE, "blasterRole") === "hype-thrall");
-    env.state.choice = { thrallUuid: thrall.uuid, support: "tempHP" };
-    assert.equal(await env.api.commandMob(), true);
-    const created = env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0];
-    assert.equal(created.system.start.initiative, blasterTurn.initiative);
-    assert.equal(created.flags[MODULE].commandMobSource.turn, 0);
+    env.combat.started = false;
+    await env.emit("deleteCombat", env.combat);
+    await env.api.ready();
     assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
+    assert.equal(received(env.selected.actor, "tempHP").length, 1);
+    env.game.time.worldTime = 155;
+    await env.emit("updateWorldTime", 155);
     await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 1);
-    env.combat.turn = 1;
-    env.combat.combatant = blasterTurn;
-    await env.emit("combatTurnChange", env.combat, {}, {});
-    await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 0);
     assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+    assert.equal(received(env.selected.actor).length, 0);
   });
 
   for (const timing of ["no combat", "unstarted", "unrelated scene", "not a combatant"]) {
-    test(`Command Mob uses a six-world-second fallback with ${timing}`, async t => {
+    test(`Command Mob lasts for the existing summon lifetime with ${timing}`, async t => {
       const env = setup(t);
       const thrall = env.ownThrall();
       if (timing === "no combat") env.game.combat = null;
       if (timing === "unstarted") env.combat.started = false;
       if (timing === "unrelated scene") env.combat.scene = { id: "other-scene" };
       if (timing === "not a combatant") env.combat.combatants.clear();
+      env.game.time.worldTime = 120;
       env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
       assert.equal(await env.api.commandMob(), true);
-      const source = env.calls.itemCreates.find(entry => entry.actor === env.selected.actor).sources[0];
-      assert.deepEqual(source.system.duration, { value: 1, unit: "rounds", expiry: "turn-start", sustained: false });
-      assert.equal(source.system.start.initiative, null);
-      assert.equal(source.flags[MODULE].commandMobSource.combatUuid, null);
-      assert.equal(source.flags[MODULE].commandMobSource.expiresAt, 106);
-      const unrelated = await env.selected.actor.createEmbeddedDocuments("Item", [packEffect("guard")]);
+      const source = received(env.selected.actor, "tempHP")[0];
+      assert.equal(source.system.duration.unit, "unlimited");
+      assert.equal(source.getFlag(MODULE, "commandMobSource").expiresAt, 155);
       await env.api.ready();
-      env.game.time.worldTime = 105;
-      await env.emit("updateWorldTime", 105);
+      env.game.time.worldTime = 154;
+      await env.emit("updateWorldTime", 154);
       assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
-      env.game.time.worldTime = 106;
-      await env.emit("updateWorldTime", 106);
+      env.game.time.worldTime = 155;
+      await env.emit("updateWorldTime", 155);
       await env.api.ready();
       assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
-      assert.deepEqual(env.selected.actor.items.contents.map(item => item.id), [unrelated[0].id]);
     });
   }
 
-  test("repeated Bolster refreshes its own HP without stacking effects or clearing a higher unrelated pool", async t => {
+  test("repeating Bolster and switching away and back never grants a second lifetime pool", async t => {
     const env = setup(t);
     const thrall = env.ownThrall();
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
     assert.equal(await env.api.commandMob(), true);
-    const firstSource = env.selected.actor.system.attributes.hp.tempSource;
-    env.selected.actor.system.attributes.hp.temp = 4;
+    const first = received(env.selected.actor, "tempHP")[0];
+    await env.selected.actor.update({ "system.attributes.hp.temp": 4 });
     assert.equal(await env.api.commandMob(), true);
-    assert.equal(env.selected.actor.items.size, 1);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
-    assert.notEqual(env.selected.actor.system.attributes.hp.tempSource, firstSource);
-    env.selected.actor.system.attributes.hp.temp = 20;
-    env.selected.actor.system.attributes.hp.tempSource = "unrelated-higher-source";
+    assert.equal(received(env.selected.actor, "tempHP")[0].id, first.id);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 4);
+    env.state.choice.support = "guard";
     assert.equal(await env.api.commandMob(), true);
-    assert.equal(env.selected.actor.items.size, 1);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
-    assert.equal(env.selected.actor.system.attributes.hp.tempSource, "unrelated-higher-source");
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 4);
+    assert.equal(emitters(thrall.actor).length, 1);
+    env.state.choice.support = "tempHP";
+    assert.equal(await env.api.commandMob(), true);
+    await env.applyAuras();
     await env.api.ready();
-    env.combat.round = 2;
-    await env.emit("combatTurnChange", env.combat, {}, {});
-    await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 0);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
-    assert.equal(env.selected.actor.system.attributes.hp.tempSource, "unrelated-higher-source");
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 4);
+    assert.equal(emitters(thrall.actor).length, 1);
   });
 
   test("native aura signature targets only the summoner, never another Blaster, player, or thrall", async t => {
@@ -994,98 +1039,279 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     const otherThrall = env.ownThrall();
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
     assert.equal(await env.api.commandMob(), true);
-    assert.equal(env.selected.actor.items.some(item => item.sourceId === effectUuid("guard")), true);
-    for (const token of [otherBlaster, player, thrall, otherThrall]) {
-      assert.equal(token.actor.items.some(item => item.sourceId === effectUuid("guard")), false);
+    assert.equal(received(env.selected.actor, "guard").length, 1);
+    for (const token of [otherBlaster, player, thrall, otherThrall]) assert.equal(received(token.actor).length, 0);
+    for (const kind of ["inspire", "guard"]) {
+      const template = thrall.actor.items.get(EFFECT_IDS[kind]);
+      assert.equal(template.system.rules.find(rule => rule.key === "FlatModifier").ignored, true);
+      assert.equal(template.flags?.pf2e?.aura, undefined);
     }
   });
 
   for (const support of ["inspire", "guard"]) {
-    test(`${support} removes on native exit and re-enters without extending the command`, async t => {
+    test(`${support} uses unique per-emitter native source UUIDs and untyped modifier slugs`, async t => {
+      const env = setup(t);
+      const thralls = [env.ownThrall(), env.ownThrall(), env.ownThrall()];
+      for (const thrall of thralls) {
+        env.state.choice = { thrallUuid: thrall.document.uuid, support };
+        assert.equal(await env.api.commandMob(), true);
+      }
+      const effects = received(env.selected.actor, support);
+      assert.equal(effects.length, 3);
+      assert.deepEqual(new Set(effects.map(item => item.sourceId)), new Set(thralls.map(thrall => `${thrall.actor.uuid}.Item.${EFFECT_IDS[support]}`)));
+      const modifiers = effects.map(item => item.system.rules.find(rule => rule.key === "FlatModifier"));
+      assert.equal(new Set(modifiers.map(rule => rule.slug)).size, 3);
+      assert.equal(modifiers.every(rule => rule.type === "untyped" && rule.value === 1 && rule.ignored === false), true);
+      assert.equal(effects.every(item => item.getFlag(MODULE, "blasterReceiverSignature") === env.selected.actor.signature), true);
+      await env.applyAuras();
+      await env.api.ready();
+      assert.equal(received(env.selected.actor, support).length, 3);
+      assert.equal(thralls.every(thrall => emitters(thrall.actor).length === 1), true);
+    });
+
+    test(`${support} uses native containment and re-enters without extending the summon lifetime`, async t => {
       const env = setup(t);
       const thrall = env.ownThrall();
       env.state.choice = { thrallUuid: thrall.document.uuid, support };
       await env.api.commandMob();
-      const first = env.selected.actor.items.contents[0];
+      const first = received(env.selected.actor, support)[0];
       const timing = clone(first.flags[MODULE].commandMobSource);
-      thrall.distance = 65;
+      thrall.blockedArea = true; // Close by distance, but outside PF2e's native area (e.g. a wall).
       await env.applyAuras();
-      assert.equal(env.selected.actor.items.size, 0);
+      await env.api.ready();
+      assert.equal(received(env.selected.actor, support).length, 0);
       env.game.time.worldTime += 2;
-      thrall.distance = 60;
+      thrall.blockedArea = false;
       await env.applyAuras();
-      const second = env.selected.actor.items.contents[0];
+      const second = received(env.selected.actor, support)[0];
       assert.notEqual(first.id, second.id);
       assert.deepEqual(second.flags[MODULE].commandMobSource, timing);
-      assert.equal(second.system.start.value, 100);
+      assert.equal(second.getFlag(MODULE, "commandMobSource").expiresAt, 155);
     });
   }
 
-  test("Bolster retains its pool on exit and never refills on re-entry", async t => {
+  test("a delayed native received entry outside native containment is rejected even within 60 feet", async t => {
+    const env = setup(t);
+    const thrall = env.ownThrall();
+    env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
+    await env.api.commandMob();
+    const late = received(env.selected.actor, "guard")[0].toObject();
+    thrall.blockedArea = true;
+    await env.applyAuras();
+    assert.deepEqual(await env.selected.actor.createEmbeddedDocuments("Item", [late]), []);
+    assert.equal(received(env.selected.actor).length, 0);
+  });
+
+  test("Bolster combines independent lifetime contributions and never refills on movement or reconciliation", async t => {
+    const env = setup(t);
+    const thralls = [env.ownThrall(), env.ownThrall(), env.ownThrall()];
+    for (const thrall of thralls) {
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+    }
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 30);
+    assert.equal(received(env.selected.actor, "tempHP").length, 3);
+    const beforeDamage = env.calls.actorUpdates.length;
+    await env.selected.actor.update({ "system.attributes.hp.temp": 17 });
+    const damage = env.calls.actorUpdates[beforeDamage].changes;
+    assert.equal(getProperty(damage, "system.attributes.hp.temp"), 17);
+    assert.equal(Object.values(getProperty(damage, `flags.${MODULE}.blasterMobPool.contributions`)).reduce((total, remaining) => total + remaining, 0), 17);
+    for (const thrall of thralls) thrall.blockedArea = true;
+    await env.applyAuras();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 17);
+    for (const thrall of thralls) thrall.blockedArea = false;
+    await env.applyAuras();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 17);
+    assert.equal(received(env.selected.actor, "tempHP").length, 3);
+    await env.selected.actor.update({ "system.attributes.hp.temp": 0 });
+    await env.applyAuras();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+  });
+
+  test("source death removes only that thrall's unspent contribution and preserves the other spent ledger", async t => {
+    const env = setup(t);
+    const first = env.ownThrall();
+    const second = env.ownThrall();
+    for (const thrall of [first, second]) {
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+    }
+    await env.selected.actor.update({ system: { attributes: { hp: { temp: 17 } } } });
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 17);
+    await second.actor.update({ "system.attributes.hp.value": 0 });
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 7);
+    assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [7, 0]);
+    await env.applyAuras();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 7);
+    await first.actor.update({ "system.attributes.hp.value": 0 });
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+    assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [0, 0]);
+    await first.document.delete();
+    await second.document.delete();
+    await env.api.ready();
+    assert.deepEqual(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions, {});
+  });
+
+  for (const recovery of ["revival", "owner-link repair"]) {
+    test(`${recovery} cannot grant Bolster twice within the same summon lifetime`, async t => {
+      const env = setup(t);
+      const thrall = env.ownThrall();
+      const lifetime = clone(thrall.document.getFlag(MODULE, "blasterSummon"));
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+      await env.selected.actor.update({ "system.attributes.hp.temp": 4 }, { damageTaken: 6 });
+      if (recovery === "revival") await thrall.actor.update({ "system.attributes.hp.value": 0 });
+      else await thrall.actor.update({ [`flags.${HELPER}.summoner.uuid`]: "Actor.foreign" });
+      await env.api.ready();
+      assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+      assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [0]);
+      assert.equal(received(env.selected.actor, "tempHP").length, 0);
+
+      if (recovery === "revival") await thrall.actor.update({ "system.attributes.hp.value": 1 });
+      else await thrall.actor.update({ [`flags.${HELPER}.summoner.uuid`]: env.selected.actor.uuid });
+      await env.api.ready();
+      assert.equal(await env.api.commandMob(), true);
+      await env.applyAuras();
+      await env.api.ready();
+      assert.equal(received(env.selected.actor, "tempHP").length, 1);
+      assert.deepEqual(thrall.document.getFlag(MODULE, "blasterSummon"), lifetime);
+      assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+      assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [0]);
+
+      const nextLifetime = env.ownThrall();
+      env.state.choice.thrallUuid = nextLifetime.document.uuid;
+      assert.equal(await env.api.commandMob(), true);
+      assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
+    });
+  }
+
+  test("Bolster cleanup protects higher unrelated temporary HP and never recreates its spent pool", async t => {
     const env = setup(t);
     const thrall = env.ownThrall();
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
     await env.api.commandMob();
-    const granted = env.selected.actor.system.attributes.hp.tempSource;
-    env.selected.actor.system.attributes.hp.temp = 3;
-    thrall.distance = 70;
-    await env.applyAuras();
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 3);
-    thrall.distance = 20;
-    await env.applyAuras();
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 3);
-    assert.equal(env.selected.actor.system.attributes.hp.tempSource, granted);
-    assert.equal(env.selected.actor.items.size, 1);
+    await env.selected.actor.update({ "system.attributes.hp.temp": 4 });
+    const [external] = await env.selected.actor.createEmbeddedDocuments("Item", [{ name: "Unrelated temporary HP source", type: "effect", system: { rules: [], duration: { value: -1, unit: "unlimited" } } }]);
+    await env.selected.actor.update({ "system.attributes.hp.temp": 20, "system.attributes.hp.tempSource": external.id });
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, external.id);
+    await thrall.document.delete();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, external.id);
   });
 
-  for (const removal of ["aura", "thrall token", "owner token", "zero HP", "owner link", "expired", "ended combat"]) {
+  test("native external TempHP source deletion reveals unspent Bolster instead of recording damage", async t => {
+    const env = setup(t);
+    const [external] = await env.selected.actor.createEmbeddedDocuments("Item", [{
+      name: "External 40 temporary HP", type: "effect",
+      system: { rules: [{ key: "TempHP", value: 40 }], duration: { value: -1, unit: "unlimited" } },
+    }]);
+    const thralls = [env.ownThrall(), env.ownThrall()];
+    for (const thrall of thralls) {
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+    }
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 40);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, external.id);
+    await external.delete();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 20);
+    assert.equal(env.selected.actor.system.attributes.hp.tempSource, `${MODULE}.blasterMobPool`);
+    const ledger = env.selected.actor.getFlag(MODULE, "blasterMobPool");
+    assert.deepEqual(Object.values(ledger.contributions), [10, 10]);
+    assert.equal(ledger.external, null);
+    assert.equal(ledger instanceof ForcedReplacement, false);
+  });
+
+  test("damage before a pending pool update commits cannot restore already spent temporary HP", async t => {
+    const env = setup(t);
+    const first = env.ownThrall();
+    const second = env.ownThrall();
+    env.state.choice = { thrallUuid: first.document.uuid, support: "tempHP" };
+    assert.equal(await env.api.commandMob(), true);
+    let interleaved = false;
+    env.state.beforeActorUpdate = async (actor, changes, options) => {
+      if (actor !== env.selected.actor || !options.blasterMobPoolUpdate) return;
+      env.state.beforeActorUpdate = null;
+      interleaved = true;
+      assert.equal(actor.system.attributes.hp.temp, 10);
+      await actor.update({ "system.attributes.hp.temp": 4 }, { damageTaken: 6 });
+    };
+    env.state.choice.thrallUuid = second.document.uuid;
+    assert.equal(await env.api.commandMob(), true);
+    await env.api.ready();
+    assert.equal(interleaved, true);
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 14);
+    assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [4, 10]);
+  });
+
+  test("a delayed source-death cleanup cannot overwrite damage taken before its actor update commits", async t => {
+    const env = setup(t);
+    const first = env.ownThrall();
+    const second = env.ownThrall();
+    for (const thrall of [first, second]) {
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+      assert.equal(await env.api.commandMob(), true);
+    }
+    const started = deferred();
+    const finish = deferred();
+    env.state.beforeActorUpdate = async (actor, changes, options) => {
+      if (actor !== env.selected.actor || !options.blasterMobPoolUpdate) return;
+      env.state.beforeActorUpdate = null;
+      started.resolve();
+      await finish.promise;
+    };
+    await first.actor.update({ "system.attributes.hp.value": 0 });
+    await started.promise;
+    await env.selected.actor.update({ "system.attributes.hp.temp": 5 }, { damageTaken: 15 });
+    finish.resolve();
+    await env.api.ready();
+    assert.equal(env.selected.actor.system.attributes.hp.temp, 5);
+    assert.deepEqual(Object.values(env.selected.actor.getFlag(MODULE, "blasterMobPool").contributions), [0, 5]);
+  });
+
+  for (const removal of ["thrall token", "owner token", "zero HP", "owner link", "expired"]) {
     test(`retained Bolster cleans up after ${removal}, without waiting for native exit`, async t => {
       const env = setup(t);
       const thrall = env.ownThrall();
       env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
       await env.api.commandMob();
-      const emitter = thrall.actor.items.find(item => item.getFlag(MODULE, "blasterAura"));
-      if (removal === "aura") await emitter.delete();
       if (removal === "thrall token") await thrall.document.delete();
       if (removal === "owner token") await env.selected.document.delete();
-      if (removal === "zero HP") {
-        thrall.actor.system.attributes.hp.value = 0;
-        await env.emit("updateActor", thrall.actor, { "system.attributes.hp.value": 0 });
-      }
-      if (removal === "owner link") {
-        thrall.actor.flags[HELPER].summoner.uuid = "Actor.foreign";
-        await env.emit("updateActor", thrall.actor, { flags: thrall.actor.flags });
-      }
+      if (removal === "zero HP") await thrall.actor.update({ "system.attributes.hp.value": 0 });
+      if (removal === "owner link") await thrall.actor.update({ [`flags.${HELPER}.summoner.uuid`]: "Actor.foreign" });
       if (removal === "expired") {
-        emitter.system.expired = true;
-        await env.emit("updateItem", emitter, {});
-      }
-      if (removal === "ended combat") {
-        env.combat.started = false;
-        await env.emit("deleteCombat", env.combat);
+        env.game.time.worldTime = 155;
+        await env.emit("updateWorldTime", 155);
       }
       await env.api.ready();
-      assert.equal(env.selected.actor.items.size, 0);
+      assert.equal(received(env.selected.actor).length, 0);
       assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
     });
   }
 
-  test("manual aura drop stamps the owner's turn and applies only its linked benefit", async t => {
+  test("manual aura drop adopts remaining thrall lifetime and stays through the next Blaster turn", async t => {
     const env = setup(t);
     const thrall = env.ownThrall();
-    env.combat.combatant = { token: { uuid: "Scene.scene1.Token.other" }, initiative: 40 };
+    env.game.time.worldTime = 120;
     await env.api.ready();
     const [emitter] = await thrall.actor.createEmbeddedDocuments("Item", [packEffect("auraGuard")]);
-    assert.equal(emitter.system.context.origin.actor, env.selected.actor.uuid);
-    assert.equal(emitter.system.start.initiative, 30);
     assert.equal(emitter.flags[MODULE].commandMobSource.ownerTokenUuid, env.selected.document.uuid);
-    assert.equal(env.selected.actor.items.size, 1);
-    env.combat.turn = 1;
-    env.combat.combatant = env.combat.turns[0];
+    assert.equal(emitter.flags[MODULE].commandMobSource.expiresAt, 155);
+    assert.equal(received(env.selected.actor, "guard").length, 1);
+    env.combat.round = 2;
     await env.emit("combatTurnChange", env.combat, {}, {});
     await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 0);
-    assert.equal(thrall.actor.items.some(item => item.getFlag(MODULE, "blasterAura")), false);
+    assert.equal(received(env.selected.actor, "guard").length, 1);
+    assert.equal(emitters(thrall.actor).length, 1);
   });
 
   test("manual aura drops reject wrong actors, broken owner signatures, and dead thralls", async t => {
@@ -1105,28 +1331,23 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
   test("late native entry from a removed emitter cannot grant a dangling effect", async t => {
     const env = setup(t);
     const thrall = env.ownThrall();
-    env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
+    env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
     await env.api.commandMob();
-    const late = env.selected.actor.items.contents[0].toObject();
-    delete late.flags[MODULE]; // Native entry has only pf2e.aura until preCreateItem.
-    await thrall.actor.items.find(item => item.getFlag(MODULE, "blasterAura")).delete();
+    const late = received(env.selected.actor, "guard")[0].toObject();
+    await emitters(thrall.actor)[0].delete();
     await env.api.ready();
     assert.deepEqual(await env.selected.actor.createEmbeddedDocuments("Item", [late]), []);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
+    assert.equal(received(env.selected.actor).length, 0);
   });
 
-  test("late native entry after world-time expiry is rejected before the cleanup hook runs", async t => {
+  test("late native entry after lifetime expiry is rejected before the cleanup hook runs", async t => {
     const env = setup(t);
-    env.game.combat = null;
     const thrall = env.ownThrall();
     env.state.choice = { thrallUuid: thrall.document.uuid, support: "tempHP" };
     await env.api.commandMob();
-    await env.api.ready();
-    const late = env.selected.actor.items.contents[0].toObject();
-    delete late.flags[MODULE];
-    env.game.time.worldTime = 106;
+    const late = received(env.selected.actor, "tempHP")[0].toObject();
+    env.game.time.worldTime = 155;
     assert.deepEqual(await env.selected.actor.createEmbeddedDocuments("Item", [late]), []);
-    assert.equal(env.calls.itemCreates.filter(entry => entry.actor === env.selected.actor).length, 1);
   });
 
   test("only the primary GM cleans retained benefits and a handover reconciles them", async t => {
@@ -1139,34 +1360,55 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     thrall.actor.system.attributes.hp.value = 0;
     await env.emit("updateActor", thrall.actor, {});
     await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 1);
+    assert.equal(received(env.selected.actor).length, 1);
     env.game.users.activeGM.id = env.game.user.id;
     await env.emit("userConnected", { id: "anotherGM" }, false);
     await env.api.ready();
-    assert.equal(env.selected.actor.items.size, 0);
+    assert.equal(received(env.selected.actor).length, 0);
     assert.equal(env.selected.actor.system.attributes.hp.temp, 0);
   });
 
-  test("same support on a different thrall replaces only this owner's emitter and recipient", async t => {
+  test("Command changes only the selected thrall while same-kind benefits from other thralls remain", async t => {
     const env = setup(t);
     const first = env.ownThrall();
     const second = env.ownThrall();
     const other = env.token({ actor: env.actor({ id: "secondBlaster" }) });
     const foreign = env.ownThrall({ owner: other });
     await env.api.ready();
-    const [foreignEmitter] = await foreign.actor.createEmbeddedDocuments("Item", [packEffect("auraBolster")]);
-    env.state.choice = { thrallUuid: first.document.uuid, support: "tempHP" };
-    await env.api.commandMob();
-    env.selected.actor.system.attributes.hp.temp = 2;
-    env.state.choice.thrallUuid = second.document.uuid;
-    await env.api.commandMob();
+    const [foreignEmitter] = await foreign.actor.createEmbeddedDocuments("Item", [packEffect("auraGuard")]);
+    for (const thrall of [first, second]) {
+      env.state.choice = { thrallUuid: thrall.document.uuid, support: "guard" };
+      assert.equal(await env.api.commandMob(), true);
+    }
+    assert.equal(received(env.selected.actor, "guard").length, 2);
+    env.state.choice = { thrallUuid: first.document.uuid, support: "inspire" };
+    assert.equal(await env.api.commandMob(), true);
     await env.api.ready();
-    assert.equal(first.actor.items.some(item => item.getFlag(MODULE, "blasterAura")), false);
-    assert.equal(second.actor.items.some(item => item.getFlag(MODULE, "blasterAura")), true);
+    assert.equal(emitters(first.actor).length, 1);
+    assert.equal(emitters(first.actor)[0].getFlag(MODULE, "blasterAura"), "inspire");
+    assert.equal(emitters(second.actor)[0].getFlag(MODULE, "blasterAura"), "guard");
     assert.equal(foreign.actor.items.has(foreignEmitter.id), true);
-    assert.equal(other.actor.system.attributes.hp.temp, 10);
-    assert.equal(env.selected.actor.system.attributes.hp.temp, 10);
-    assert.equal(env.selected.actor.items.size, 1);
+    assert.equal(received(other.actor, "guard").length, 1);
+    assert.equal(received(env.selected.actor, "guard").length, 1);
+    assert.equal(received(env.selected.actor, "inspire").length, 1);
+  });
+
+  test("GM handoff during Command aura removal prevents the replacement mode from being created", async t => {
+    const env = setup(t);
+    assert.equal(await env.api.flashMob(), true);
+    const thrall = env.scene.tokens.find(token => token.actor.getFlag(MODULE, "blasterVariant") === "hype-fan");
+    assert.equal(emitters(thrall.actor)[0].getFlag(MODULE, "blasterAura"), "inspire");
+    const originalDelete = thrall.actor.deleteEmbeddedDocuments;
+    thrall.actor.deleteEmbeddedDocuments = async function (type, ids) {
+      const deleted = await originalDelete.call(this, type, ids);
+      env.game.users.activeGM.id = "gm2";
+      return deleted;
+    };
+    env.state.choice = { thrallUuid: thrall.uuid, support: "guard" };
+    assert.equal(await env.api.commandMob(), false);
+    assert.equal(emitters(thrall.actor).length, 0);
+    assert.equal(received(env.selected.actor, "guard").length, 0);
+    assert.equal(env.calls.itemCreates.some(entry => entry.actor === thrall.actor && entry.sources.some(source => source.flags?.[MODULE]?.blasterAura === "guard")), false);
   });
 
   for (const action of ["flashMob", "commandMob"]) {
@@ -1187,7 +1429,7 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
     }
   }
 
-  test("recovered placement counts toward the cap and receives timed cleanup", async t => {
+  test("recovered placement permits later summons and receives timed cleanup", async t => {
     const env = setup(t);
     env.ownThrall(); env.ownThrall();
     let recovered;
@@ -1201,9 +1443,8 @@ describe("Blaster summons integration", { concurrency: 1 }, () => {
       throw new Error("Placed before helper owner linkage");
     };
     assert.equal(await env.api.flashMob(), true);
-    assert.equal(await env.api.flashMob(), false);
-    assert.equal(env.calls.helper.length, 1);
-    assert.match(env.calls.warnings.at(-1), /three live/);
+    assert.equal(await env.api.flashMob(), true);
+    assert.equal(env.calls.helper.length, 2);
     await env.api.ready();
     env.game.time.worldTime += 60;
     await env.emit("updateWorldTime", env.game.time.worldTime);

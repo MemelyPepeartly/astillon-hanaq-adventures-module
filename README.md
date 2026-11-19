@@ -10,7 +10,27 @@ The **Blaster — NPCs**, **Blaster — Support Effects**, and **Blaster — Enc
 
 Blaster's portrait and prototype token both use the world asset `common/portraits/moon/blaster_portrait.png`. This is a reference to the existing Foundry data file, not an image bundled in the module.
 
-**Updating an existing Blaster:** module updates refresh compendia, not actors already imported into a world. Select Blaster and run **Blaster — Refresh Sheet Descriptions** from the encounter macros compendium. It replaces only matching shipped ability description text; HP, statistics, artwork, effects, private item notes, and other items remain unchanged. Fresh imports already include the updated descriptions.
+**Updating an existing Blaster:** module updates refresh compendia, not actors already imported into a world. Use **Blaster — Upgrade Existing Sheet** (`upgradeSheet`) for mechanics/content upgrades on existing world actors; by default it preserves wounds and leaves art/custom/native spell uses untouched. **Blaster — Refresh Sheet Descriptions** remains description-only and replaces matching shipped description text without changing HP, statistics, effects, notes, or other items. Fresh imports already include the updated data.
+
+### Blaster 0.10.16
+
+The current encounter kit deliberately increases boss endurance and damage beyond the original level-18 baseline; live encounter balance still needs playtesting.
+
+- **Runtime/source pin:** Foundry `14.370`, PF2e `8.7.1`, source commit `d507983d7611aad7bee01b473ba918436c6ea380`.
+- **Core chassis:** HP 700 and current-HP resistance thresholds of 10/15/20 at 525/350/175. `dream` remains native extraplanar.
+- **Main blasts:** 120-foot straight line, width 1/1/3, with base damage 6d8 / 14d8 / 27d10.
+- **Condition modes:** roll three fewer dice than the matching base blast.
+- **Slowing Beam mode:** basic Fortitude; success slow 1 (1 round), failure slow 2 (1 round), critical failure slow 3 (1 round).
+- **Hypnotic mode:** mental basic Will with incapacitation; success fascinated 1 round, failure controlled 1 round, critical failure permanent. Resolve the final grade after incap, then apply the manual control tool after damage. Do not transfer ownership. Fascinated hostility-break/manual-remove behavior stays manual.
+- **Grand Finale:** eight clicked points (seven 120-foot legs), width 3, base damage 36d10 (condition modes still three fewer dice).
+- **Invocation gates:** no automatic combat/turn/frequency invocation locks.
+- **Blastback:** one-action arm, native `damageTaken` bank after IWR (including temp HP interactions), 100-foot radius force, flat bank with DC 40 basic Reflex, Blaster excluded, expiry at next own turn or six world seconds, with manual editor/fire/clear controls and documented manual undo quirks (do not infer HP differences).
+- **Beam Clash:** loss takes incoming critical-hit/critical-failed-save grade; win negates only against Blaster and enables the normal 2-action counterblast hit (14d8 or 11d8 rider). GM resolves via one explicit counterblast damage card; otherwise keep zero chat chatter. Rider grade follows failure grade unless higher-level hypnotic incapacitation downgrades it to success.
+- **Flash Mob:** no 3-thrall runtime cap; each thrall remains 1 HP/1 minute with 30-foot helper placement and default 60-foot native owner-only aura support.
+- **Command behavior:** one thrall mode for that thrall's remaining lifetime. Inspire/Guard are +1 untyped, unique per emitter, and can stack across emitters.
+- **Bolster behavior:** aggregate +10 once per thrall lifetime using FIFO spent-ledger accounting, no re-entry refill, persists through mode changes until thrall death/expiry, maxes against external temporary HP, and respects native 999 ceiling.
+- **Existing actors:** use **NEW Upgrade Existing Sheet** (`upgradeSheet`) to upgrade known module content while preserving wounds by default (optional full-heal). Art/custom/native spell uses stay untouched. New imports are already correct.
+- **Descriptions only:** **Refresh Sheet Descriptions** remains description-only.
 
 ### Charged Blast
 
@@ -18,25 +38,31 @@ Select Blaster and run **Blaster — Charged Blast** as the active GM. Pick the 
 
 | Actions | Mode | Damage | Length | Full width |
 | --- | --- | --- | --- | --- |
-| 1 | Snapshot | 4d6 | 120 feet | 1 square |
-| 2 | Spotlight | 9d6 | 120 feet | 1 square |
-| 3 | Standing Ovation | 18d6 | 120 feet | 3 squares |
+| 1 | Snapshot | 6d8 | 120 feet | 1 square |
+| 2 | Spotlight | 14d8 | 120 feet | 1 square |
+| 3 | Standing Ovation | 27d10 | 120 feet | 3 squares |
 
-The sheet's rules give all modes one shared use per round and Standing Ovation a **1d4-full-round recharge**. These are **GM-adjudicated, not macro locks**: Charged Blast can be invoked at any time, in or out of combat, including repeatedly in a round. The macro reports the recharge guidance and still applies the three-action movement root until Blaster's next turn (six world-time seconds outside combat); Release Blast Root remains available for GM correction.
+Action/frequency/recharge text on the sheet remains **GM-adjudicated guidance, not runtime locks**. Charged Blast can be invoked in or out of combat, off-turn, and repeatedly in a round. The macro does not enforce combat/turn/frequency invocation gates.
 
-Curated Spectrum selects fire, cold, electricity, or sonic with a DC 40 basic Reflex save. Dazzling light uses fire with two fewer damage dice and dazzles on a failed save; psychic humiliation uses mental damage with two fewer dice, a basic Will save, and stupefied 1 on a failed save. Conditions last one round. The chat card supplies PF2e save/damage links. Resolve saves, HP, condition application, cover, and line of effect normally; each creature is affected **once**, even where segments overlap, and Blaster is excluded. The tool does not debit PF2e actions automatically.
+Curated Spectrum selects fire, cold, electricity, or sonic with a DC 40 basic Reflex save. Condition-bearing modes roll **three fewer dice** than the matching base blast. **Slowing Beam** uses a basic Fortitude save (success slowed 1, failure slowed 2, critical failure slowed 3; one round each). **Hypno-Beam** uses mental damage, a basic Will save, and incapacitation (success fascinated 1 round, failure controlled 1 round, critical failure permanent). Resolve final grade after incapacitation, then apply manual control after damage; do not transfer ownership. Fascinated hostility-break and manual remove remain manual. The chat card supplies PF2e save/damage links. Resolve saves, HP, condition application, cover, and line of effect normally; each creature is affected **once**, even where segments overlap, and Blaster is excluded. The tool does not debit PF2e actions automatically.
 
-Each charge's sheet description also has six labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Recharge has an inline GM die, and Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. Use the macro to aim these straight beams and preserve the selected full width.
+Each charge's sheet description also has eight labeled save/damage rows using [PF2e inline syntax](https://github.com/foundryvtt/pf2e/wiki/Style-Guide#inline-automation). Choose one spectrum row and roll damage once. Condition and support-effect links open the referenced documents; they do not automatically apply or expire conditions. Beam Clash has a clearly marked manual d20 fallback that does not advance the shared automated contest. Use the macro to aim these straight beams and preserve the selected full width.
 
 The ability text uses native PF2e-style **Frequency**, **Requirements**, **Trigger**, and **Effect** labels, horizontal separators, compact spectrum/support choices, and separate Beam Clash outcomes. Long operating instructions live under **Foundry Operating Notes** on the compendium NPC's Notes tab, not in the ability summaries. Existing world Blasters get the shorter rules text by selecting their token and running **Blaster — Refresh Sheet Descriptions** after updating/reloading. This preserves their HP, statistics, artwork, effects, item GM notes, and actor Notes; consult the compendium Notes for the new operating reference. Newly summoned/imported hype thralls and support effects also use the concise source descriptions.
 
-**Clear Blast Areas** removes only the selected Blaster's immediate beam areas, not Grand Finale's warning/fired path. **Release Blast Root** is a GM adjudication tool for forced movement or corrections; clearing areas does not refund a use or end the root. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
+**Clear Blast Areas** removes only the selected Blaster's immediate beam areas, not Grand Finale's warning/fired path. With multiple connected GMs, the blast and mob tools use Foundry's active GM to prevent concurrent uses.
+
+### Blastback
+
+**Start Blastback** arms a one-action charge. Blaster takes damage normally; native PF2e damage after resistance, including temporary-HP damage, accumulates in its bank. A 100-foot-radius warning follows his movement. At his next turn—or after six world-time seconds without a matching active combat—the charge releases a **flat force-damage card equal to the bank**, DC 40 basic Reflex, excluding Blaster. HP application is manual.
+
+Run Start again to inspect or edit the bank; **Fire Blastback** overrides timing and **Clear Blastback** cancels it. Manual HP edits are not inferred. Native undo only reports restored ordinary HP, so temporary-HP-only undo needs a manual bank adjustment. Uncertain chat publication is never retried automatically; inspect chat before explicitly rearming.
 
 ### Grand Finale — delayed path
 
 **Blaster — Mark Grand Finale** is a separate free-action tool. At the start of a round, choose a spectrum and click **eight points**, starting in Blaster's square. This makes seven connected legs, each up to **120 feet**, with a **three-square full width**. Backspace undoes a point; Escape/right-click cancels. The amber warning Regions are shared with the party and deal **no damage** while they reposition.
 
-At the **start of the following global round**, the active GM resolves the saved path: its color changes to the chosen spectrum and one clickable **DC 40 basic save / 24d6 damage** card appears (22d6 for the condition-bearing spectra). The path stays fixed even if Blaster moves. Each creature is affected once across all seven legs; HP, saves, and riders remain manual. It costs no further action, root, or Charged Blast recharge when firing.
+At the **start of the following global round**, the active GM resolves the saved path: its color changes to the chosen spectrum and one clickable **DC 40 basic save / 36d10 damage** card appears (condition-bearing spectra use three fewer dice). The path stays fixed even if Blaster moves. Each creature is affected once across all seven legs; HP, saves, and riders remain manual. It costs no further action when firing.
 
 - **Fire Grand Finale** fires the saved path manually, including outside combat or as a GM timing override.
 - **Clear Grand Finale** cancels the saved blast and removes only that Blaster's finale Regions.
@@ -44,19 +70,19 @@ At the **start of the following global round**, the active GM resolves the saved
 - Out-of-combat marking is manual-only; it does not silently arm itself when a later encounter starts.
 - Reconnecting and duplicate combat hooks must not produce another firing card for an already resolved plan.
 
-Fresh imports include the new free action. Existing world Blasters need **Grand Finale** copied from the updated compendium actor; Refresh Sheet Descriptions updates existing abilities only. Import the three new macros from **Blaster — Encounter Macros**.
+Fresh imports include Grand Finale. On an existing Blaster, **Upgrade Existing Sheet** adds missing homebrew abilities; Refresh Sheet Descriptions does not. Import Mark / Fire / Clear Grand Finale from **Blaster — Encounter Macros**.
 
 ### Flash Mob
 
 Enable [PF2e Summons Assistant](https://github.com/ChasarooniZ/pf2e-summons-assistant) and its dependencies. **Blaster — Flash Mob** calls its public thrall summoning API, using this module's three custom thrall actors, the canonical Create Thrall identifier, summoner linkage, and compatible expiration effect. It does not impersonate a spell chat card or trigger a second summon. No independent fallback summon is created when the helper is missing.
 
-The macro first opens a portrait-card picker for **Hype Fan**, **Ego Guard**, or **Paparazzo**, plus **Surprise Me** for a random choice. Each has its own themed NPC sheet and bundled transparent token/portrait. Pick a card, click **Place Thrall**, then select its map position through Summons Assistant. Cancel either step without spending the use. Their signature routines highlight Inspire, Guard, and Bolster respectively, but all three retain all three support choices; no bonus is granted just by summoning.
+The macro opens a portrait-card picker for **Hype Fan**, **Ego Guard**, or **Paparazzo**, plus **Surprise Me**. Each has its own NPC sheet and bundled transparent token/portrait. Choose a card, click **Place Thrall**, then choose its map position through Summons Assistant. Its signature aura starts automatically: Hype Fan **Inspire**, Ego Guard **Guard**, Paparazzo **Bolster**. All variants can switch to another mode through Command Flash Mob.
 
-**Flash Mob and Command Flash Mob are GM tools usable at any time**, including outside combat, on another creature's turn, or repeatedly in the same round. They do not enforce the sheet's one-action/once-per-round rules; the GM adjudicates those. Flash Mob places one 1-HP add within 30 feet, up to three living owned thralls, with a one-minute lifetime and no independent turn. Command Flash Mob chooses a live owned add within 60 feet to Inspire (+1 status to attacks, damage, and fear saves), Guard (+1 status AC), or Bolster (10 non-stacking temporary HP). Support expires at Blaster's next turn, including later in the same round after an off-turn command; without an active encounter containing Blaster it lasts six world-time seconds. Reapplying the same support refreshes that module-owned effect without stacking copies or deleting unrelated temporary HP. Use unlinked NPC tokens if multiple Blasters are on the scene, since the helper selects an actor's first active token.
+**Flash Mob and Command Flash Mob are GM tools usable at any time**, outside combat, off-turn, and repeatedly in a round. The GM adjudicates action economy. Flash Mob places one 1-HP add within 30 feet, lasting one minute, without an independent turn or a living-thrall cap. Command Flash Mob changes one live owned add within 60 feet to another mode for its remaining lifetime. Other thralls are unaffected. Use unlinked NPC tokens if multiple Blasters are on the scene; the helper selects an actor's first active token.
 
-Support now uses **PF2e's native 60-foot auras**, centered on the commanded thrall. Only its summoning Blaster receives the linked benefit—not players, other thralls, or another Blaster. Inspire (green) and Guard (violet) apply while he remains in the area and disappear on exit. Bolster (magenta) grants temporary HP once; those HP remain after leaving, until the aura ends, and re-entry does not refill them. Removing, destroying, or expiring the thrall ends its support. No Advanced Macros or separate aura module is required.
+Support uses **PF2e's native 60-foot auras**, centered on each thrall, for its summoning Blaster only. Inspire grants +1 to attacks, damage, and fear saves; Guard grants +1 AC. These untyped modifiers stack across distinct emitters and end on leaving the aura. Bolster adds +10 to a shared temporary-HP pool once per thrall lifetime; spent HP never refill on re-entry, mode change, revival, or link repair. Unspent Bolster survives mode changes until that thrall dies or expires. The pool takes the maximum against unrelated temporary HP, with damage spending retained pools too; the native ceiling is 999. No Advanced Macros or separate aura module is required.
 
-Use **Command Thrall** for automatic placement of the aura effect, or drag **Aura: Flash Mob — Inspire / Guard / Bolster** from **Blaster — Support Effects** onto a living thrall created with Flash Mob. These aura items go on the **thrall**, not Blaster; PF2e applies the corresponding **Effect** item to Blaster. Fresh summons include clickable links in their routines. Existing Blasters can use **Refresh Sheet Descriptions**; existing world actors are not replaced. Reload clients after updating. Inactive/hidden scenes and native aura rendering still require the live-world checks in [Blaster acceptance](docs/blaster-acceptance.md).
+Use **Command Thrall** to replace one thrall's active aura. Aura items belong on thralls; their receiver templates are intentionally inert until PF2e creates validated native aura copies on Blaster. Do not drag receiver templates directly to Blaster. Summon new adds after updating rather than expecting old world copies to change. Reload clients; inactive-scene and multiplayer checks remain in [Blaster acceptance](docs/blaster-acceptance.md).
 
 ### Signature spells
 
@@ -85,9 +111,9 @@ During the clash, `jb2a.static_electricity.02.dark_purple` surrounds the **selec
 
 Each pair of unmodified d20 rolls moves the shared score one point toward the higher roller; ties do not move it. Red wins at +3, blue at −3. From a red lead of +2, blue needs five net wins. **Small circular indicators above each token** show the latest d20, its round, three lead pips, and pushes remaining to win. The completed pair stays visible until someone rolls the next round; then an unrolled opponent clearly shows “waiting.” Roll buttons remain underneath the tokens.
 
-Beam Clash creates **no chat messages**—not for requests, dice, starting, stopping, or winning. The active GM rolls and adjudicates authenticated native User-flag updates, with three bounded request slots per user. Duplicate clicks, stale rounds, forged sender IDs, and claimed client totals cannot advance the contest. Scene flags restore the indicators after reconnecting. At victory the beams/electricity end, roll buttons hide, and the indicators plus the named winner remain visible. **Beam Clash — End** clears the result (or cancels an active clash); starting another clash replaces it. Removing a participant or leaving the scene also removes the local overlay. Existing chat history from older releases is not deleted. Reload all connected clients after upgrading so everybody uses the new chat-free request protocol.
+Beam Clash creates **no chat chatter** for requests, dice, start, stop, or victory. Authenticated native User flags carry requests to the active GM; Scene flags restore indicators after reconnecting. At victory the beams/electricity end and the named result remains. A winning Blaster gets a GM-only **Resolve counterblast** button: that explicit operation creates one clickable damage card, guarded against repeated publication. **Beam Clash — End** clears the result or cancels an active contest. Reload all clients after updating.
 
-The NPC reaction suspends a triggering line/beam attack: a red win negates that attack against Blaster only; a blue win resolves it normally. This reaction's trigger, reaction expenditure, and final damage are GM adjudication, not automatic interception of other modules' attacks. The macro is also usable as a general cinematic contest between other tokens. Animation keys can be changed under Module Settings; unavailable assets produce a setup warning before starting.
+The reaction is a gamble: losing makes the incoming effect a **critical hit or critically failed save** against Blaster. Winning negates it against Blaster only and grants a **free out-of-turn normal hit at two-action strength** against the opponent: 14d8 raw or 11d8 with a rider, with no further attack/save roll or action cost. Riders use failure, except Hypno-Beam against a higher-level foe uses success. Other targets resolve normally. Trigger legality and incoming damage remain GM-adjudicated; the macro does not intercept other modules' attacks. General cinematic contests between non-Blaster tokens remain available without Blaster's counterblast controls.
 
 See [Blaster's design and balance notes](docs/blaster-design.md) and the [live-world acceptance checks](docs/blaster-acceptance.md). Automated tests use simulated Foundry documents and DOM; they do not constitute a multiplayer live-world acceptance test.
 
@@ -137,6 +163,10 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse, Preview, and placement controls do not submit the dialog; Save reads that specific editor and updates art, placement, color, and sound together. Two actor editors can be open without mixing drafts or moving each other's preview. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.16 updates Blaster's active contract to Foundry 14.370 / PF2e 8.7.1 (`d507983d7611aad7bee01b473ba918436c6ea380`), including the 700-HP chassis with current-HP resistance thresholds, updated blast/finale damage values, condition-mode behavior, Blastback bank flow, Beam Clash counterblast/loss grading, Flash Mob no-cap lifetime-mode rules, and the **Upgrade Existing Sheet** macro for existing actors while keeping **Refresh Sheet Descriptions** description-only.
+
+Entries below 0.10.16 are preserved historical release notes and may conflict with the current Blaster mechanics.
 
 Version 0.10.15 updates the held preview's backing and highlight colors on continuous color-picker input, without waiting for picker dismissal or another Preview click. Updates are draft-only, retain the same card/audio, honor editor ownership, and preserve the latest choice during portrait loading. Reload clients after updating. Automated tests and browser-fixture input/render checks pass; actual OS-picker dragging in live Foundry remains a manual acceptance check.
 

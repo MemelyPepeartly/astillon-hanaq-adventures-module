@@ -1,16 +1,21 @@
 import type { ModuleFeature } from "./feature.js";
-import { BLAST_MODES, BLAST_TIERS, isBlastRooted, lineShapes, type BlastMode, type Charge, type RootState } from "./blaster-model.js";
+import { BLAST_MODES, BLAST_TIERS, blastDamage, blastTraits, blastRiderLinks, lineShapes, type BlastMode, type Charge } from "./blaster-model.js";
+import { blastChoiceContent, bindBlastChoices } from "./blaster-controls.js";
 import { createBlasterSummons } from "./blaster-summons.js";
 import { createBlastPicker } from "./blaster-placement.js";
 import { createBlasterFinale } from "./blaster-finale.js";
+import { createBlasterBlastback } from "./blaster-blastback.js";
+import { createBlasterResolution } from "./blaster-resolution.js";
 
-type BlastUse = { combatId: string | null; round: number; rechargeCombatId?: string | null; readyRound?: number; readyTime?: number };
+type BlastUse = { combatId: string | null; round: number; mode?: BlastMode; rechargeCombatId?: string | null; readyRound?: number; readyTime?: number };
 
 export function createBlasterFeature(moduleId: string): ModuleFeature {
   const summons = createBlasterSummons(moduleId);
   let busy = false;
   const picker = createBlastPicker();
   const finale = createBlasterFinale(moduleId, { selectToken: selected, picker });
+  const blastback = createBlasterBlastback(moduleId, { selectToken: selected });
+  const resolution = createBlasterResolution(moduleId, { selectToken: selected });
   const escape = (s: string) => foundry.utils.escapeHTML(s);
   const combatFor = (scene: any) => game.combat?.scene?.id === scene.id ? game.combat : null;
   const notifyError = (error: unknown) => {
@@ -32,12 +37,16 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
     return tokens[0];
   }
 
-  async function blast() {
+  async function blast(preset: { charge?: Charge; mode?: BlastMode } = {}) {
     if (busy || picker.busy) return ui.notifications.warn("Finish or cancel the current blast first.");
     busy = true;
     try {
       const token = selected();
       const scene = canvas.scene;
+      const defaultCharge = preset.charge ?? 1;
+      const savedMode = token.actor.getFlag(moduleId, "blastUse")?.mode;
+      const defaultMode = preset.mode ?? (Object.prototype.hasOwnProperty.call(BLAST_MODES, savedMode) ? savedMode : "fire");
+      if (![1, 2, 3].includes(defaultCharge) || !Object.prototype.hasOwnProperty.call(BLAST_MODES, defaultMode)) throw new Error("Invalid blast preset.");
       const snapshot = { x: token.document.x, y: token.document.y };
       const validateToken = () => {
         if (selected() !== token || canvas.scene !== scene || token.document.parent !== scene || scene.tokens.get(token.id) !== token.document || token.document.x !== snapshot.x || token.document.y !== snapshot.y) {
@@ -46,7 +55,8 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       };
       const chosen = await foundry.applications.api.DialogV2.prompt({
         window: { title: "Blaster · Charged Blast" },
-        content: `<p>Choose the charge and Curated Spectrum. One click chooses the direction of a straight 120-foot line from Blaster. The line always extends its full length; each creature saves once.</p><div class="form-group"><label>Charge</label><select name="charge">${Object.entries(BLAST_TIERS).map(([key, t]) => `<option value="${key}">${key} action${key === "1" ? "" : "s"}: ${t.name} — ${t.dice}d6, ${t.range} ft line, ${t.width} square wide</option>`).join("")}</select></div><div class="form-group"><label>Spectrum</label><select name="mode">${Object.entries(BLAST_MODES).map(([key, m]) => `<option value="${key}">${m.label}${m.penalty ? " (−2 dice; condition on failed save)" : ""}</option>`).join("")}</select></div><p>Three actions roots Blaster until his next turn and rolls a 1d4-round recharge for reference. Adjudicate action costs, frequency, and recharge from the sheet; the macro can be used at any time. Saves, damage and condition application are adjudicated normally.</p>`,
+        content: blastChoiceContent(defaultCharge, defaultMode),
+        render: (_event: any, dialog: any) => bindBlastChoices(dialog?.element),
         ok: { label: "Aim blast", callback: (_event: Event, button: any) => ({ charge: Number(button.form.elements.charge.value), mode: button.form.elements.mode.value }) },
         rejectClose: false,
       });
@@ -57,13 +67,13 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       validateToken();
       const tier = BLAST_TIERS[charge];
       const spectrum = BLAST_MODES[mode];
-      const points = await picker.pick(token, { title: tier.name, pointCount: 2, range: tier.range, width: tier.width, color: spectrum.color, fixedLength: tier.range });
+      const points = await picker.pick(token, { title: `${tier.name} · ${spectrum.label}`, pointCount: 2, range: tier.range, width: tier.width, color: spectrum.color, fixedLength: tier.range });
       validateToken();
       if (!points) return;
-      const traits = ["magical", spectrum.damage, ...(mode === "dazzling" ? ["light"] : [])].join(",");
+      const traits = blastTraits(mode).join(",");
       const blastId = foundry.utils.randomID();
       const data = lineShapes(points, canvas.grid.size, tier.width).map(shape => ({
-        name: `${token.name} — ${tier.name}`, shapes: [shape],
+        name: `${token.name} — ${tier.name} · ${spectrum.label}`, shapes: [shape],
         levels: canvas.level ? [canvas.level.id] : [], color: spectrum.color,
         highlightMode: "coverage", displayMeasurements: true,
         visibility: (globalThis as any).CONST.REGION_VISIBILITY.ALWAYS,
@@ -74,29 +84,22 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
       validateToken();
       // Combat timing is bookkeeping only; use the current combat after every placement await.
       const currentCombat = combatFor(scene);
-      const combat = currentCombat?.started ? { id: currentCombat.id, round: currentCombat.round, turn: currentCombat.turn } : null;
+      const combat = currentCombat?.started ? { id: currentCombat.id, round: currentCombat.round } : null;
       const previous = token.actor.getFlag(moduleId, "blastUse") as BlastUse | undefined;
-      const use: BlastUse = { ...previous, combatId: combat?.id ?? null, round: combat?.round ?? 0 };
+      const use: BlastUse = { ...previous, combatId: combat?.id ?? null, round: combat?.round ?? 0, mode };
       if (recharge) {
         use.rechargeCombatId = combat?.id ?? null;
         use.readyRound = (combat?.round ?? 0) + recharge.total + 1;
         use.readyTime = game.time.worldTime + (recharge.total + 1) * 6;
       }
-      const root: RootState = { combatId: combat?.id ?? null, round: combat?.round ?? 0, turn: combat?.turn ?? 0, expires: game.time.worldTime + 6 };
-      const previousRoot = token.document.getFlag(moduleId, "blastRoot") as RootState | undefined;
       const created = await scene.createEmbeddedDocuments("Region", data);
       try {
-        if (charge === 3) await token.document.setFlag(moduleId, "blastRoot", root);
         await token.actor.setFlag(moduleId, "blastUse", use);
       } catch (error) {
         await scene.deleteEmbeddedDocuments("Region", created.map((r: any) => r.id));
-        if (charge === 3) {
-          if (previousRoot) await token.document.setFlag(moduleId, "blastRoot", previousRoot);
-          else await token.document.unsetFlag(moduleId, "blastRoot");
-        }
         throw error;
       }
-      const card = `<h3>${escape(token.name)} · ${tier.name}</h3><p>${charge} action${charge === 1 ? "" : "s"} · ${spectrum.label} · DC 40 · ${tier.range} ft line, ${tier.width} square${tier.width === 1 ? "" : "s"} wide</p><p>@Check[${spectrum.save}|dc:40|basic|traits:${traits}] @Damage[${tier.dice - spectrum.penalty}d6[${spectrum.damage}]|traits:${traits}|options:area-damage]</p><p>One save and one damage application per creature in the 120-foot line. Blaster is excluded. Resolve cover and line of effect normally.</p>${spectrum.rider ? `<p>${spectrum.rider}</p>` : ""}${recharge ? `<p>Rooted until the start of Blaster's next turn (6 seconds outside combat). Standing Ovation recharge (reference): ${recharge.total} full rounds${combat ? `; available round ${use.readyRound} in this combat` : ""}. Adjudicate recharge from the sheet.</p>` : ""}`;
+      const card = `<h3>${escape(token.name)} · ${tier.name} · ${spectrum.label}</h3><p>${charge} action${charge === 1 ? "" : "s"} · DC 40 · ${tier.range} ft line, ${tier.width} square${tier.width === 1 ? "" : "s"} wide</p><p>@Check[${spectrum.save}|dc:40|basic|traits:${traits}] @Damage[${blastDamage(tier.dice, tier.die, mode)}[${spectrum.damage}]|traits:${traits}|options:area-damage]</p><p>One save and one damage application per creature in the 120-foot line. Blaster is excluded. Resolve cover and line of effect normally. The map area is a visual guide, not automatic damage.</p><p>No automatic movement lock is applied; the GM adjudicates movement costs manually.</p>${blastRiderLinks(moduleId, mode)}${spectrum.rider ? `<p>After applying damage, target creatures with the same final save outcome and use @UUID[Compendium.${moduleId}.astillon-blaster-macros.Macro.BlasterResolve01]{Apply Blast Effect}. Use the degree after incapacitation adjustments.</p>` : ""}${recharge ? `<p>Standing Ovation recharge (reference): ${recharge.total} full rounds${combat ? `; available round ${use.readyRound} in this combat` : ""}. Adjudicate recharge from the sheet.</p>` : ""}`;
       const action = token.actor.items?.find?.((item: any) => item.slug === `blaster-charged-blast-${charge}`);
       const content = await game.pf2e.TextEditor.enrichHTML(card, { rollData: action?.getRollData() ?? token.actor.getRollData() });
       await foundry.documents.ChatMessage.implementation.create({
@@ -141,35 +144,19 @@ export function createBlasterFeature(moduleId: string): ModuleFeature {
   }
 
   async function releaseRoot() {
+    // Keep existing Release Blast Root macros compatible with legacy token flags.
     try { await selected().document.unsetFlag(moduleId, "blastRoot"); }
     catch (error) { notifyError(error); }
   }
 
-  function preventMovement(token: any, options: any) {
-    if (options?.blasterForcedMovement && game.user.isGM) return;
-    if (isBlastRooted(token.getFlag(moduleId, "blastRoot"), combatFor(token.parent), token.id, game.time.worldTime)) {
-      ui.notifications.warn("Standing Ovation: Blaster cannot move until the start of his next turn. Use Release Blast Root for GM adjudication of forced movement.");
-      return false;
-    }
-  }
-
   return {
-    id: "blaster", api: { blast, clearBlast, releaseRoot, refreshDescriptions, markFinale: finale.mark, fireFinale: finale.fire, clearFinale: finale.clear, flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => picker.cancel() },
+    id: "blaster", api: { blast, clearBlast, releaseRoot, refreshDescriptions,
+      markFinale: finale.mark, fireFinale: finale.fire, clearFinale: finale.clear,
+      blastback: blastback.start, fireBlastback: blastback.fire, clearBlastback: blastback.clear,
+      applyBlastEffect: resolution.applyEffect, counterblast: resolution.counterblast, upgradeSheet: resolution.upgradeSheet,
+      flashMob: summons.flashMob, commandMob: summons.commandMob, cancelPlacement: () => picker.cancel() },
     async ready() {
-      const summonsReady = summons.ready();
-      Hooks.on("preMoveToken", (token: any, _movement: any, options: any) => preventMovement(token, options));
-      Hooks.on("preUpdateToken", (token: any, changed: any, options: any) => {
-        if (["x", "y", "elevation", "level"].some(k => k in changed && changed[k] !== token[k])) return preventMovement(token, options);
-      });
-      const expire = async () => {
-        if (!game.user.isGM || game.users.activeGM?.id !== game.user.id) return;
-        for (const scene of game.scenes) for (const token of scene.tokens) {
-          const root = token.getFlag(moduleId, "blastRoot");
-          if (root && !isBlastRooted(root, combatFor(scene), token.id, game.time.worldTime)) await token.unsetFlag(moduleId, "blastRoot");
-        }
-      };
-      for (const event of ["updateCombat", "deleteCombat", "updateWorldTime", "canvasReady"]) Hooks.on(event, () => void expire().catch(notifyError));
-      await Promise.all([summonsReady, finale.ready()]);
+      await Promise.all([summons.ready(), finale.ready(), blastback.ready()]);
     },
   };
 }

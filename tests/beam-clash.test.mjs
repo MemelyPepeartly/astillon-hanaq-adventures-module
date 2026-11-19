@@ -151,7 +151,8 @@ function setup(t, { initial = null, userId = "gm", activeGM = "gm", dependencies
   ]);
   users.activeGM = users.get(activeGM) ?? null;
   const blueActor = { id: "blue-actor", testUserPermission: (user, permission) => permission === "OWNER" && ["owner", "gm", "gm-two"].includes(user.id) };
-  const redActor = { id: "red-actor", testUserPermission: (user) => user.isGM };
+  const redActor = { id: "red-actor", testUserPermission: (user) => user.isGM,
+    getFlag: (scope, key) => scope === MODULE && key === "blasterRole" ? "blaster" : null };
   let flag = initial ? structuredClone(initial) : null;
   const scene = {
     id: "scene-1", grid: { size: 100 }, dimensions: { width: 2000, height: 1200 },
@@ -995,6 +996,56 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.getState().red, null);
   });
 
+  test("Blaster's gamble is visible without chat; the counterblast button follows authority and durable claims", async t => {
+    const env = setup(t, { initial: state({ score: 2 }) });
+    const root = env.roots()[0];
+    const stakes = root.querySelector(".astillon-beam-clash__stakes");
+    const counter = root.querySelector(".astillon-beam-clash__counter");
+    assert.equal(stakes.hidden, false);
+    assert.match(stakes.textContent, /lose = incoming critical; win = negate it/);
+    assert.equal(counter.hidden, true);
+    let invoked = 0;
+    env.game.astillonHanaqAdventures = { blaster: { counterblast: async () => { invoked++; } } };
+    env.totals.push(20, 1);
+    env.request("red", "gm"); env.request("blue", "owner"); await flush();
+    assert.equal(counter.hidden, false);
+    assert.equal(counter.disabled, false);
+    assert.equal(counter.tagName, "BUTTON");
+    assert.match(stakes.textContent, /14d8 counterhit against Blue/);
+    counter.click(); await flush();
+    assert.equal(invoked, 1);
+    assert.equal(env.messages.size, 0, "only the separately tested resolution tool may create a damage card");
+    env.game.user = env.game.users.get("gm-two");
+    env.emit("updateScene", env.scene);
+    assert.equal(counter.disabled, true);
+    env.game.user = env.game.users.get("owner");
+    env.emit("updateScene", env.scene);
+    assert.equal(counter.hidden, true);
+    env.game.user = env.game.users.get("gm");
+    const original = env.scene.getFlag.bind(env.scene);
+    env.scene.getFlag = (scope, key) => key === "beamClashCounter" ? { clashId: "clash-1", status: "publishing" } : original(scope, key);
+    env.emit("updateScene", env.scene);
+    assert.equal(counter.hidden, false);
+    assert.equal(counter.disabled, true);
+    assert.match(counter.textContent, /resolved \/ pending/);
+    counter.click();
+    assert.equal(invoked, 1);
+  });
+
+  test("a lost gamble calls for the incoming critical, while non-Blaster contests retain generic controls", async t => {
+    const env = setup(t, { initial: state({ score: -2 }) });
+    env.totals.push(1, 20);
+    env.request("red", "gm"); env.request("blue", "owner"); await flush();
+    const root = env.roots()[0];
+    assert.match(root.querySelector(".astillon-beam-clash__stakes").textContent, /incoming critical hit \/ critical-failed save/);
+    assert.equal(root.querySelector(".astillon-beam-clash__counter").hidden, true);
+    env.red.actor.getFlag = () => null;
+    env.emit("updateActor", env.red.actor);
+    assert.equal(root.querySelector(".astillon-beam-clash__stakes").hidden, true);
+    assert.equal(root.querySelector(".astillon-beam-clash__counter").hidden, true);
+    assert.match(root.querySelector(".astillon-beam-clash__result").textContent, /Blue wins/);
+  });
+
   test("a winning round ends beams but retains the token result until GM End", async (t) => {
     const env = setup(t, { initial: state({ score: 2 }) });
     await flush();
@@ -1028,7 +1079,7 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
       env.request("red", "gm"); env.request("blue", "owner"); await flush();
       assert.equal(env.results.length, 0);
       const fragment = env.roots()[0];
-      assert.equal(fragment.querySelector(".astillon-beam-clash__score").textContent, `${env[winner].document.name} wins the clash!`);
+      assert.equal(fragment.querySelector(".astillon-beam-clash__result").textContent, `${env[winner].document.name} wins the clash!`);
       assert.equal(fragment.querySelector("img, b, script"), null);
       assert.ok(env.indicator("red").getAttribute("aria-label").includes(env.red.document.name));
       assert.equal(env.indicator("blue").querySelector(".astillon-beam-clash__die").textContent, String(totals[1]));
@@ -1080,13 +1131,13 @@ describe("beam clash document and canvas lifecycle", { concurrency: 1 }, () => {
     assert.equal(env.indicator("red").style.top, "150px");
     const score = env.roots()[0].querySelector(".astillon-beam-clash__score");
     assert.equal(score.style.left, "345px");
-    assert.equal(score.style.top, "145px");
+    assert.equal(score.style.top, "310px");
     env.canvas.stage.toGlobal = ({ x, y }) => ({ x: x * 2 + 20, y: y * 2 + 10 });
     env.emit("canvasPan", env.canvas);
     assert.equal(env.button("red").style.left, "280px");
     assert.equal(env.button("red").style.top, "377px");
     assert.equal(score.style.left, "580px");
-    assert.equal(score.style.top, "275px");
+    assert.equal(score.style.top, "465px");
     assert.equal(env.getState().revision, 0, "viewport movement must not mutate shared state");
   });
 
