@@ -4,6 +4,7 @@ import { createSarsaparillaFeature } from "./sarsaparilla-surprise.js";
 import { createYourTurnFeature } from "./your-turn.js";
 import { createBlasterFeature } from "./blaster.js";
 import { createBeamClashFeature } from "./beam-clash.js";
+import { createDarkTriadCutsceneFeature } from "./dark-triad-cutscene.js";
 
 export type { ModuleFeature } from "./feature";
 
@@ -14,5 +15,6 @@ export function createModuleFeatures(moduleId: string): ModuleFeature[] {
     createYourTurnFeature(moduleId),
     createBlasterFeature(moduleId),
     createBeamClashFeature(moduleId),
+    createDarkTriadCutsceneFeature(moduleId),
   ];
 }

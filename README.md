@@ -12,7 +12,7 @@ Blaster's portrait and prototype token both use the world asset `common/portrait
 
 **Updating an existing Blaster:** module updates refresh compendia, not actors already imported into a world. Use **Blaster — Upgrade Existing Sheet** (`upgradeSheet`) for mechanics/content upgrades on existing world actors; by default it preserves wounds and leaves art/custom/native spell uses untouched. **Blaster — Refresh Sheet Descriptions** remains description-only and replaces matching shipped description text without changing HP, statistics, effects, notes, or other items. Fresh imports already include the updated data.
 
-### Blaster 0.10.18
+### Blaster 0.10.19
 
 The current encounter kit deliberately increases boss endurance and damage beyond the original level-18 baseline; live encounter balance still needs playtesting.
 
@@ -28,7 +28,7 @@ The current encounter kit deliberately increases boss endurance and damage beyon
 - **Beam Clash:** loss takes incoming critical-hit/critical-failed-save grade; win negates only against Blaster and enables the normal 2-action counterblast hit (14d8 or 11d8 rider). GM resolves via one explicit counterblast damage card; otherwise keep zero chat chatter. Rider grade follows failure grade unless higher-level hypnotic incapacitation downgrades it to success.
 - **Flash Mob:** no 3-thrall runtime cap; each thrall remains 1 HP/1 minute with 30-foot helper placement and default 60-foot native owner-only aura support.
 - **Command behavior:** one thrall mode for that thrall's remaining lifetime. Inspire/Guard are +1 untyped, unique per emitter, and can stack across emitters.
-- **Bolster behavior:** aggregate +10 once per thrall lifetime using FIFO spent-ledger accounting, no re-entry refill, persists through mode changes until thrall death/expiry, maxes against external temporary HP, and respects native 999 ceiling.
+- **Bolster behavior:** +10 per active source, accumulated into one pool. Damage spends sources FIFO; leaving/re-entry never regenerates spent HP. Inactive sources preserve only their unspent balance.
 - **Existing actors:** use **NEW Upgrade Existing Sheet** (`upgradeSheet`) to upgrade known module content while preserving wounds by default (optional full-heal). Art/custom/native spell uses stay untouched. New imports are already correct.
 - **Descriptions only:** **Refresh Sheet Descriptions** remains description-only.
 
@@ -96,9 +96,9 @@ The macro opens a portrait-card picker for **Hype Fan**, **Ego Guard**, or **Pap
 
 **Flash Mob and Command Flash Mob are GM tools usable at any time**, outside combat, off-turn, and repeatedly in a round. The GM adjudicates action economy. Flash Mob places one 1-HP add within 30 feet, lasting one minute, without an independent turn or a living-thrall cap. Command Flash Mob changes one live owned add within 60 feet to another mode for its remaining lifetime. Other thralls are unaffected. Use unlinked NPC tokens if multiple Blasters are on the scene; the helper selects an actor's first active token.
 
-Support uses **PF2e's native 60-foot auras**, centered on each thrall, for its summoning Blaster only. Inspire grants +1 to attacks, damage, and fear saves; Guard grants +1 AC. These untyped modifiers stack across distinct emitters and end on leaving the aura. Bolster adds +10 to a shared temporary-HP pool once per thrall lifetime; spent HP never refill on re-entry, mode change, revival, or link repair. Unspent Bolster survives mode changes until that thrall dies or expires. The pool takes the maximum against unrelated temporary HP, with damage spending retained pools too; the native ceiling is 999. No Advanced Macros or separate aura module is required.
+Support uses **native 60-foot aura containment** and one **Aura Totals** effect on the recipient. Every active qualifying source counts: three Inspire auras give **+3 attacks/damage/fear saves**, three Guards give **+3 AC**, and three fresh Bolsters give **30 temporary HP**. Values update on movement, mode change, death, and removal. Bolster tracks spending per source: leaving suspends its unspent contribution; re-entry restores only that remainder, never spent HP. No shared receiver UUID can suppress additional aura sources. Unexpired older marked adds have their default aura repaired on reload.
 
-Use **Command Thrall** to change an automatically summoned add's support. The support compendium's **Aura** and **Effect** items are freely draggable onto any actor by the GM, including Blaster, players, or unrelated NPCs. Manual auras default to the bearer and allies; manual Inspire/Guard effects activate immediately and stack as separate copies. Manual Bolster uses ordinary PF2e temporary HP. Edit the radius, targeting, duration, or values freely; module summon cleanup does not remove manual placements. Automatic adds keep their owner-only stacking support and one-minute lifetime.
+Use **Command Thrall** to change an automatically summoned add's support. The support compendium's **Aura** and **Effect** items are freely draggable onto any actor by the GM, including Blaster, players, or unrelated NPCs. Manual auras default to the bearer and allies; manual Inspire/Guard effects activate immediately and stack as separate copies. A manually placed Bolster **aura** participates in the same cumulative pool; a directly dropped Bolster **effect** uses ordinary PF2e temporary HP. Edit the radius, targeting, duration, or values freely; module summon cleanup does not remove manual placements. Automatic adds keep their owner-only stacking support and one-minute lifetime.
 
 ### Signature spells
 
@@ -132,6 +132,12 @@ Beam Clash creates **no chat chatter** for requests, dice, start, stop, or victo
 The reaction is a gamble: losing makes the incoming effect a **critical hit or critically failed save** against Blaster. Winning negates it against Blaster only and grants a **free out-of-turn normal hit at two-action strength** against the opponent: 14d8 raw or 11d8 with a rider, with no further attack/save roll or action cost. Riders use failure, except Hypno-Beam against a higher-level foe uses success. Other targets resolve normally. Trigger legality and incoming damage remain GM-adjudicated; the macro does not intercept other modules' attacks. General cinematic contests between non-Blaster tokens remain available with the same compact controls.
 
 See [Blaster's design and balance notes](docs/blaster-design.md) and the [live-world acceptance checks](docs/blaster-acceptance.md). Automated tests use simulated Foundry documents and DOM; they do not constitute a multiplayer live-world acceptance test.
+
+## Dark Triad cutscene
+
+Import **Dark Triad — Start Cutscene** and **Dark Triad — End Cutscene** from the encounter macros pack. As GM, Start fades the map and Foundry UI to black over **eight seconds**, revealing `common/monsters/dark_triad.png` rotating once per minute over `jb2a.call_lightning.low_res.red`. It stays on screen until End (or GM Escape), then fades back to the unchanged map. Player Escape is a local-only escape hatch.
+
+The cutscene is shared through a GM-owned world setting and rendered locally with Sequencer screen-space effects above the UI; it creates no map tiles or camera changes. Sequencer, the lightning asset, and the image path must be available to clients. No private JB2A assets are bundled.
 
 ## Menacing
 
@@ -179,6 +185,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse, Preview, and placement controls do not submit the dialog; Save reads that specific editor and updates art, placement, color, and sound together. Two actor editors can be open without mixing drafts or moving each other's preview. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.19 repairs default aura activation, totals all overlapping support sources (including cumulative temporary HP), and adds the Dark Triad Start/End cutscene macros. Existing marked adds are repaired on reload. No tests or simulated previews were run; functional confirmation requires a real Foundry instance.
 
 Version 0.10.18 adds permanent Quickened, the arm-next-move Recoil Stride macro, Fragile Ego and its off-guard effect, live-swappable Blastback charging visuals, and the six-loop blue explosion. Update/reload, import Recoil Stride, and run Upgrade Existing Sheet to add the new abilities to a world copy. Packaging only; functionality has not been tested in a real Foundry instance.
 

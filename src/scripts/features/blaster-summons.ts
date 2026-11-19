@@ -1,5 +1,5 @@
 import { BLASTER_THRALLS, thrallArtwork, thrallPickerContent } from "./blaster-thralls.js";
-import { reconcileMobPool } from "./blaster-mob-pool.js";
+import { createBlasterAuraTotals } from "./blaster-aura-totals.js";
 
 const ASSISTANT = "pf2e-summons-assistant";
 const CREATE_THRALL = "Compendium.pf2e.spells-srd.Item.1JaRoJvlf8EPvnnD";
@@ -23,7 +23,7 @@ export function createBlasterSummons(moduleId: string) {
   let supportCleanup = Promise.resolve();
   let registered = false;
   let cleaning = false;
-  const poolSource = `${moduleId}.blasterMobPool`;
+  const totals = createBlasterAuraTotals(moduleId, token => pending.has(token.getFlag(moduleId, "blasterSummon")?.ownerTokenUuid));
   const warn = (message: string) => { ui.notifications.warn(message); return false; };
   const flag = (document: any, key: string) => document?.getFlag(moduleId, key);
   const isManual = (item: any) => flag(item, "blasterManualSupport") === true;
@@ -37,11 +37,6 @@ export function createBlasterSummons(moduleId: string) {
     const kind = flag(item, "blasterAura");
     return item?.type === "effect" && Object.prototype.hasOwnProperty.call(AURA_IDS, kind) ? kind : null;
   };
-  const actors = () => new Map<string, any>([
-    ...contents(game.actors).map((actor) => [actor.uuid, actor] as const),
-    ...allTokens().filter((token) => token.actor).map((token) => [token.actor.uuid, token.actor] as const),
-  ]);
-
   /** Resolve the actual summoning token, not a similarly named Blaster or a friendly token. */
   function auraOwner(actor: any): { ctx: Context; thrall: any } | null {
     const tokens = allTokens().filter((token) => token.actor?.uuid === actor?.uuid);
@@ -71,44 +66,24 @@ export function createBlasterSummons(moduleId: string) {
     } };
   }
 
-  function auraEmitter(item: any) {
-    const aura = item?.flags?.pf2e?.aura;
-    if (!aura || !Object.values(AURA_SLUGS).includes(aura.slug)) return null;
-    const origin = actors().get(aura.origin);
-    const expected = flag(item, "commandMobSource")?.auraEmitterUuid;
-    return contents(origin?.items).find((entry) => {
-      const kind = auraKind(entry);
-      return kind && (!expected || entry.uuid === expected) && AURA_SLUGS[kind] === aura.slug &&
-        !entry.isExpired && !entry.system.expired;
-    }) ?? null;
-  }
-
-  function nativeContains(thrall: any, owner: any, kind: Support): boolean {
-    return thrall.auras?.get(AURA_SLUGS[kind])?.containsToken(owner) === true;
-  }
-
   function makeManagedAura(source: any, kind: Support) {
     source.flags[moduleId].blasterManualSupport = false;
-    source.system.rules = source.system.rules.map((rule: any) => rule.key !== "Aura" ? rule : ({ ...rule,
-      slug: AURA_SLUGS[kind], predicate: ["self:trait:thrall"],
-      effects: rule.effects.map((effect: any) => ({ ...effect, uuid: `{actor|uuid}.Item.${SUPPORT_IDS[kind]}`,
-        affects: "all", includesSelf: false,
-        predicate: ["target:signature:{actor|flags.pf2e-summons-assistant.summoner.signature}"],
-      })),
+    source.flags[moduleId].blasterAuraVersion = 2;
+    source.system.rules = source.system.rules.map((rule: any) => rule.key !== "Aura" ? rule : ({
+      ...rule, slug: AURA_SLUGS[kind], ignored: false, predicate: [], effects: [],
     }));
   }
 
   function allowManualSupport(item: any) {
     const kind = auraKind(item), support = flag(item, "blasterSupport") as Support;
     const source = item.toObject();
-    source.flags[moduleId] = { ...source.flags[moduleId], blasterManualSupport: true };
+    source.flags[moduleId] = { ...source.flags[moduleId], blasterManualSupport: true, blasterManualDrop: true };
     delete source.flags[moduleId].commandMobSource;
     if (source.flags.pf2e) delete source.flags.pf2e.aura;
     if (kind) {
       source.system.rules = source.system.rules.map((rule: any) => rule.key !== "Aura" ? rule : ({ ...rule,
         slug: `blaster-manual-${kind}-${item.id}`, predicate: [],
-        effects: rule.effects.map((effect: any) => ({ ...effect, uuid: itemUuid(SUPPORT_IDS[kind]),
-          affects: "allies", includesSelf: true, predicate: [] })),
+        effects: [],
       }));
     } else {
       source.system.rules = support === "tempHP" ? [{ key: "TempHP", value: 10 }] : source.system.rules.map((rule: any) => ({
@@ -123,9 +98,13 @@ export function createBlasterSummons(moduleId: string) {
   /** Manual GM drops are unrestricted; automatic summon recipients retain their own lifecycle. */
   function prepareAura(item: any, _data: any, options: any = {}) {
     if (!item.actor || item.type !== "effect") return;
+    if (flag(item, "blasterAuraTotals") && !options.blasterManaged) {
+      item.updateSource({ [`flags.${moduleId}.blasterManualSupport`]: true });
+      return;
+    }
     if (isManual(item)) {
       // Standard native effects: no module owner, actor-role, or lifetime restrictions.
-      item.updateSource({ "system.rules": item.system.rules.map((rule: any) =>
+      item.updateSource({ [`flags.${moduleId}.blasterManualDrop`]: true, "system.rules": item.system.rules.map((rule: any) =>
         ["FlatModifier", "Aura"].includes(rule.key) ? { ...rule, slug: `${rule.slug}-${item.id}` } : rule) });
       return;
     }
@@ -143,28 +122,6 @@ export function createBlasterSummons(moduleId: string) {
       const source = item.toObject();
       stampSupport(source, owner.ctx, owner.thrall);
       item.updateSource({ system: source.system, flags: source.flags });
-    } else if (Object.values(AURA_SLUGS).includes(item.flags?.pf2e?.aura?.slug)) {
-      const emitter = auraEmitter(item);
-      const owner = emitter && auraOwner(emitter.actor);
-      // Recheck after PF2e's asynchronous compendium lookup, including stale entry events.
-      const kind = emitter ? auraKind(emitter) : null;
-      if (!owner || !kind || owner.ctx.actor.uuid !== item.actor.uuid ||
-          item.sourceId !== `${emitter.actor.uuid}.Item.${SUPPORT_IDS[kind]}` ||
-          !nativeContains(owner.thrall, owner.ctx.token, kind)) {
-        if (game.user?.isGM) allowManualSupport(item);
-        return;
-      }
-      const source = emitter.toObject();
-      stampSupport(source, owner.ctx, owner.thrall);
-      const marker = source.flags[moduleId].commandMobSource;
-      const suffix = `${owner.thrall.id}-${marker.nonce}`;
-      item.updateSource({
-        [`flags.${moduleId}.commandMobSource`]: { ...marker, auraEmitterUuid: emitter.uuid },
-        [`flags.${moduleId}.blasterReceiverSignature`]: owner.ctx.actor.signature,
-        "system.rules": item.system.rules.map((rule: any) => rule.key === "FlatModifier"
-          ? { ...rule, ignored: false, type: "untyped", slug: `${rule.slug}-${suffix}` } : rule),
-        "system.duration": source.system.duration,
-      });
     }
   }
 
@@ -245,25 +202,6 @@ export function createBlasterSummons(moduleId: string) {
     };
     source.system.start = { value: game.time.worldTime, initiative: supportTiming(ctx).initiative };
     return source;
-  }
-
-  async function ensureReceivers(thrall: any, ctx: Context) {
-    for (const id of Object.values(SUPPORT_IDS)) {
-      if (thrall.actor.items.get(id)) continue;
-      const source = await effectSource(id, ctx);
-      source._id = id;
-      source.flags[moduleId].blasterManualSupport = false;
-      source.system.rules = source.system.rules.filter((rule: any) => rule.key !== "TempHP").map((rule: any) => ({
-        ...rule, ignored: true, predicate: [...(rule.predicate ?? []), "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"],
-      }));
-      await thrall.actor.createEmbeddedDocuments("Item", [source], { keepId: true, blasterManaged: true });
-    }
-  }
-
-  async function notifyAura(thrall: any) {
-    for (const kind of Object.keys(AURA_IDS) as Support[]) {
-      await thrall.auras?.get(AURA_SLUGS[kind])?.notifyActors?.();
-    }
   }
 
   async function run(action: Action, input: any, perform: (ctx: Context) => Promise<boolean>) {
@@ -395,13 +333,7 @@ export function createBlasterSummons(moduleId: string) {
           catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall expiration repair`, error); }
         }
         try {
-          await ensureReceivers(token, ctx);
-          if (!contents(token.actor.items).some((item) => auraKind(item) && !isManual(item))) {
-            const source = await effectSource(AURA_IDS[variant.support], ctx);
-            makeManagedAura(source, variant.support);
-            await token.actor.createEmbeddedDocuments("Item", [source], { blasterManaged: true });
-          }
-          await notifyAura(token);
+          await totals.ensureDefault(token);
         } catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall default aura repair`, error); }
       }
       if (failure) console.warn(`${moduleId} | Thrall placed; helper post-processing reported an error`, failure);
@@ -444,7 +376,6 @@ export function createBlasterSummons(moduleId: string) {
         const thrall = liveThralls(ctx).find((token) => token.uuid === choice.thrallUuid && inRange(token, ctx));
         if (!stillCurrent(ctx) || !thrall) return warn("The selected Blaster, thrall, scene, or GM authority changed.");
         if (!auraOwner(thrall.actor)) return warn("The thrall's summoner link is missing or ambiguous. Summon it again with Flash Mob.");
-        await ensureReceivers(thrall, ctx);
         const old = contents(thrall.actor.items).filter((item) => auraKind(item) && !isManual(item));
         if (old.length === 1 && auraKind(old[0]) === kind) return true;
         if (!stillCurrent(ctx) || !isOwnedThrall(thrall, ctx) || !isLive(thrall) || !inRange(thrall, ctx)) return warn("The selected thrall or GM authority changed before applying support.");
@@ -463,7 +394,6 @@ export function createBlasterSummons(moduleId: string) {
           }
           throw error;
         }
-        await notifyAura(thrall);
         ui.notifications.info("Command Flash Mob: this thrall's mode changed for its remaining lifetime.");
         return true;
       });
@@ -473,125 +403,6 @@ export function createBlasterSummons(moduleId: string) {
   }
 
   const isCleanupGM = () => game.user?.isGM && game.users?.activeGM?.id === game.user.id;
-
-  const lifetimeKey = (thrall: any) => `${thrall.uuid}-${flag(thrall, "blasterSummon")?.nonce}`.replace(/[^a-zA-Z0-9_-]/g, "-");
-
-  function receivedOwner(item: any) {
-    const marker = flag(item, "commandMobSource");
-    const thrall = allTokens().find((token) => token.uuid === marker?.thrallUuid);
-    const owner = thrall && auraOwner(thrall.actor);
-    return owner && owner.ctx.actor.uuid === item.actor.uuid &&
-      marker.ownerTokenUuid === owner.ctx.token.uuid && marker.nonce === flag(thrall, "blasterSummon")?.nonce
-      ? owner : null;
-  }
-
-  function hpObservation(actor: any) {
-    const hp = actor._source?.system?.attributes?.hp ?? actor.system.attributes.hp;
-    const ledger = flag(actor, "blasterMobPool");
-    const externalId = ledger?.external?.tempSource;
-    const external = externalId && actor.items.get(externalId);
-    return { temp: hp.temp ?? 0, tempSource: hp.tempSource ?? hp.tempsource ?? null,
-      externalSourceActive: externalId ? !!external && !external.isExpired && !external.system.expired : true };
-  }
-
-  function poolChanges(actor: any, result: ReturnType<typeof reconcileMobPool>) {
-    return {
-      // Foundry 14 recursively merges flags unless a replacement operator is explicit.
-      [`flags.${moduleId}.blasterMobPool`]: foundry.data.operators.ForcedReplacement.create(result.ledger),
-      "system.attributes.hp.temp": result.temp,
-      // Empty string is a source-less pool; avoids colliding with native deletion sentinels.
-      "system.attributes.hp.tempSource": result.tempSource ?? "",
-    };
-  }
-
-  /** Damage and source replacement persist the spent ledger in the SAME actor update. */
-  function observePool(actor: any, changed: any, options: any) {
-    const previous = flag(actor, "blasterMobPool");
-    if (!previous && !options?.blasterMobPoolUpdate) return;
-    const read = (path: string) => Object.prototype.hasOwnProperty.call(changed, path)
-      ? changed[path] : foundry.utils.getProperty(changed, path);
-    const temp = read("system.attributes.hp.temp");
-    const source = read("system.attributes.hp.tempSource");
-    if (temp === undefined && source === undefined) return;
-    const current = hpObservation(actor);
-    // A native TempHP source expiring is not damage. Its remaining competitor may survive.
-    const externalExpired = previous?.external?.tempSource && current.externalSourceActive === false &&
-      previous.displayed.tempSource === previous.external.tempSource && Number(temp) === 0 &&
-      source !== undefined && (typeof source !== "string" || !source) && !(options?.damageTaken > 0);
-    const inputs = options?.blasterMobPoolUpdate ? poolInputs(actor) : null;
-    const result = reconcileMobPool(previous, {
-      ...current,
-      temp: inputs ? current.temp : externalExpired ? previous.displayed.temp : temp === undefined ? current.temp : Number(temp),
-      tempSource: inputs ? current.tempSource : externalExpired ? previous.displayed.tempSource :
-        source === undefined ? current.tempSource : typeof source === "string" ? source : null,
-    }, inputs?.live ?? Object.keys(previous.contributions), inputs?.grants ?? [], poolSource,
-    inputs?.lifetimes ?? Object.keys(previous?.contributions ?? {}));
-    for (const [path, value] of Object.entries(poolChanges(actor, result))) {
-      delete changed[path];
-      foundry.utils.setProperty(changed, path, value);
-    }
-  }
-
-  function poolInputs(actor: any) {
-    const received = contents(actor.items).filter((item) => item.flags?.pf2e?.aura &&
-      flag(item, "blasterSupport") === "tempHP" && receivedOwner(item));
-    const live = allTokens().filter((token) => {
-      const owner = isHype(token) && auraOwner(token.actor);
-      return owner && owner.ctx.actor.uuid === actor.uuid;
-    }).map(lifetimeKey);
-    const grants = received.map((item) => lifetimeKey(receivedOwner(item)!.thrall));
-    // Death or a temporarily broken owner link forfeits remaining HP, never the spent tombstone.
-    const lifetimes = allTokens().filter((token) => {
-      const marker = flag(token, "blasterSummon");
-      return isHype(token) && marker?.nonce && marker.ownerActorUuid === actor.uuid &&
-        marker.expiresAt > game.time.worldTime;
-    }).map(lifetimeKey);
-    return { live, grants, lifetimes };
-  }
-
-  async function reconcilePools() {
-    for (const actor of actors().values()) {
-      if (!isCleanupGM()) return;
-      const previous = flag(actor, "blasterMobPool");
-      const { live, grants, lifetimes } = poolInputs(actor);
-      if (!previous && !grants.length) continue;
-      const current = hpObservation(actor);
-      const result = reconcileMobPool(previous, current, live, grants, poolSource, lifetimes);
-      if (JSON.stringify(previous) !== JSON.stringify(result.ledger) || current.temp !== result.temp ||
-          (current.tempSource || null) !== result.tempSource) {
-        await actor.update(poolChanges(actor, result), { blasterMobPoolUpdate: true });
-      }
-    }
-  }
-
-  async function expireSupport() {
-    if (!isCleanupGM()) return;
-    // Default embedded emitters need no creation hook; token linkage defines their lifetime.
-    for (const actor of actors().values()) {
-      const managed = allTokens().find((token) => token.actor?.uuid === actor.uuid && flag(token, "blasterSummon"));
-      if (managed && pending.has(flag(managed, "blasterSummon").ownerTokenUuid)) continue;
-      const ids = contents(actor.items).filter((item) => {
-        if (isManual(item)) return false;
-        const kind = auraKind(item);
-        const marker = flag(item, "commandMobSource");
-        if (kind) return (managed || marker) && (!auraOwner(actor) || item.isExpired || item.system.expired);
-        if (!marker) return false; // Inert embedded receiver templates are never received benefits.
-        const owner = receivedOwner(item);
-        if (!owner) return true;
-        if (pending.has(owner.ctx.token.uuid)) return false;
-        // An awarded Bolster contribution lasts through this thrall's lifetime, even after switching modes.
-        if (flag(item, "blasterSupport") === "tempHP") return false;
-        const emitter = auraEmitter(item);
-        const support = emitter && auraKind(emitter);
-        if (!emitter || !support) return true;
-        return canvas.ready && owner.ctx.token.parent?.id === canvas.scene?.id &&
-          !nativeContains(owner.thrall, owner.ctx.token, support);
-      }).map((item) => item.id);
-      if (!isCleanupGM()) return;
-      if (ids.length) await actor.deleteEmbeddedDocuments("Item", ids);
-    }
-    await reconcilePools();
-  }
 
   async function expireThralls() {
     if (!isCleanupGM() || cleaning) return;
@@ -616,8 +427,14 @@ export function createBlasterSummons(moduleId: string) {
     return job;
   }
 
+  let cleanupQueued = false;
   function queueSupportCleanup() {
-    supportCleanup = supportCleanup.catch(() => {}).then(() => expireSupport());
+    if (cleanupQueued) return supportCleanup;
+    cleanupQueued = true;
+    supportCleanup = supportCleanup.catch(() => {}).then(async () => {
+      cleanupQueued = false;
+      await totals.sync();
+    });
     return background(supportCleanup);
   }
 
@@ -634,7 +451,7 @@ export function createBlasterSummons(moduleId: string) {
       });
       Hooks.on("deleteCombat", () => queueSupportCleanup());
       Hooks.on("preCreateItem", prepareAura);
-      Hooks.on("preUpdateActor", observePool);
+      Hooks.on("preUpdateActor", totals.observeHP);
       // Hook callbacks deliberately do not return our queue: embedded deletion can
       // fire these while the queue is already running. Foundry hooks are synchronous.
       const itemChanged = (item: any) => {
@@ -650,8 +467,9 @@ export function createBlasterSummons(moduleId: string) {
       };
       Hooks.on("updateActor", actorChanged);
       Hooks.on("deleteActor", actorChanged);
-      Hooks.on("deleteToken", (token: any) => actorChanged(token.actor));
-      Hooks.on("updateToken", (token: any) => actorChanged(token.actor));
+      Hooks.on("deleteToken", () => { void queueSupportCleanup(); });
+      Hooks.on("updateToken", () => { void queueSupportCleanup(); });
+      Hooks.on("drawToken", () => { void queueSupportCleanup(); });
       Hooks.on("userConnected", () => { void queueSupportCleanup(); });
       Hooks.on("updateUser", () => { void queueSupportCleanup(); });
       const expireTimed = () => Promise.all([background(expireThralls()), queueSupportCleanup()]);

@@ -137,211 +137,6 @@
       }
     },
     {
-      "_id": "BlasterInspire01",
-      "name": "Effect: Flash Mob — Inspire",
-      "type": "effect",
-      "img": "icons/svg/sound.svg",
-      "system": {
-        "description": {
-          "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraIns01]{Inspire Aura}</p>\n<p>Its summoning Blaster gains a +1 untyped bonus to attack rolls, damage rolls, and saves against fear while inside this thrall's 60-foot aura. Bonuses from distinct thralls stack; one thrall never supplies multiple copies of its own benefit.</p>\n<p>The benefit ends on leaving the aura, changing this thrall's mode, or the thrall's destruction, removal, or expiration.</p>",
-          "gm": ""
-        },
-        "publication": {
-          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
-          "authors": "",
-          "license": "ORC",
-          "remaster": true
-        },
-        "rules": [
-          {
-            "key": "FlatModifier",
-            "selector": [
-              "attack-roll",
-              "damage"
-            ],
-            "type": "untyped",
-            "value": 1,
-            "slug": "blaster-inspire-attack-damage",
-            "predicate": [
-              "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"
-            ],
-            "ignored": true
-          },
-          {
-            "key": "FlatModifier",
-            "selector": [
-              "saving-throw"
-            ],
-            "predicate": [
-              "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}",
-              "fear"
-            ],
-            "type": "untyped",
-            "value": 1,
-            "slug": "blaster-inspire-fear",
-            "ignored": true
-          }
-        ],
-        "slug": "blaster-inspire",
-        "_migration": {
-          "version": 0.961,
-          "previous": null
-        },
-        "traits": {
-          "value": [],
-          "otherTags": []
-        },
-        "level": {
-          "value": 18
-        },
-        "duration": {
-          "value": -1,
-          "unit": "unlimited",
-          "expiry": null,
-          "sustained": false
-        },
-        "start": {
-          "value": 0,
-          "initiative": null
-        },
-        "tokenIcon": {
-          "show": true
-        },
-        "unidentified": false,
-        "badge": null,
-        "context": null,
-        "fromSpell": false
-      },
-      "flags": {
-        "astillon-hanaq-adventures-module": {
-          "blasterSupport": "inspire",
-          "blasterReceiverSignature": "unassigned-flash-mob-receiver"
-        }
-      }
-    },
-    {
-      "_id": "BlasterGuard0001",
-      "name": "Effect: Flash Mob — Guard",
-      "type": "effect",
-      "img": "icons/svg/shield.svg",
-      "system": {
-        "description": {
-          "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraGrd01]{Guard Aura}</p>\n<p>Its summoning Blaster gains a +1 untyped bonus to AC while inside this thrall's 60-foot aura. Bonuses from distinct thralls stack; one thrall never supplies multiple copies of its own benefit.</p>\n<p>The benefit ends on leaving the aura, changing this thrall's mode, or the thrall's destruction, removal, or expiration.</p>",
-          "gm": ""
-        },
-        "publication": {
-          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
-          "authors": "",
-          "license": "ORC",
-          "remaster": true
-        },
-        "rules": [
-          {
-            "key": "FlatModifier",
-            "selector": [
-              "ac"
-            ],
-            "type": "untyped",
-            "value": 1,
-            "slug": "blaster-guard-ac",
-            "predicate": [
-              "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"
-            ],
-            "ignored": true
-          }
-        ],
-        "slug": "blaster-guard",
-        "_migration": {
-          "version": 0.961,
-          "previous": null
-        },
-        "traits": {
-          "value": [],
-          "otherTags": []
-        },
-        "level": {
-          "value": 18
-        },
-        "duration": {
-          "value": -1,
-          "unit": "unlimited",
-          "expiry": null,
-          "sustained": false
-        },
-        "start": {
-          "value": 0,
-          "initiative": null
-        },
-        "tokenIcon": {
-          "show": true
-        },
-        "unidentified": false,
-        "badge": null,
-        "context": null,
-        "fromSpell": false
-      },
-      "flags": {
-        "astillon-hanaq-adventures-module": {
-          "blasterSupport": "guard",
-          "blasterReceiverSignature": "unassigned-flash-mob-receiver"
-        }
-      }
-    },
-    {
-      "_id": "BlasterTempHP001",
-      "name": "Effect: Flash Mob — Bolster",
-      "type": "effect",
-      "img": "icons/svg/upgrade.svg",
-      "system": {
-        "description": {
-          "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraBol01]{Bolster Aura}</p>\n<p>This thrall contributes 10 temporary HP to its summoning Blaster's Flash Mob pool once during its lifetime. Contributions from distinct thralls add together. Leaving the aura retains the remaining HP; re-entry, another command, and returning to Bolster never refill spent HP.</p>\n<p>The module tracks each contribution and removes only its unspent HP when the thrall is destroyed, removed, or expires. Changing its mode retains already-granted HP until then. Flash Mob does not add to temporary HP from unrelated sources; higher existing temporary HP retain their source and duration.</p>",
-          "gm": ""
-        },
-        "publication": {
-          "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
-          "authors": "",
-          "license": "ORC",
-          "remaster": true
-        },
-        "rules": [],
-        "slug": "blaster-temp-hp",
-        "_migration": {
-          "version": 0.961,
-          "previous": null
-        },
-        "traits": {
-          "value": [],
-          "otherTags": []
-        },
-        "level": {
-          "value": 18
-        },
-        "duration": {
-          "value": -1,
-          "unit": "unlimited",
-          "expiry": null,
-          "sustained": false
-        },
-        "start": {
-          "value": 0,
-          "initiative": null
-        },
-        "tokenIcon": {
-          "show": true
-        },
-        "unidentified": false,
-        "badge": null,
-        "context": null,
-        "fromSpell": false
-      },
-      "flags": {
-        "astillon-hanaq-adventures-module": {
-          "blasterSupport": "tempHP",
-          "blasterReceiverSignature": "unassigned-flash-mob-receiver"
-        }
-      }
-    },
-    {
       "_id": "BlasterAuraBol01",
       "name": "Aura: Flash Mob — Bolster",
       "type": "effect",
@@ -362,24 +157,9 @@
             "key": "Aura",
             "radius": 60,
             "slug": "blaster-aura-bolster",
-            "predicate": [
-              "self:trait:thrall"
-            ],
+            "predicate": [],
             "traits": [],
-            "effects": [
-              {
-                "uuid": "{actor|uuid}.Item.BlasterTempHP001",
-                "affects": "all",
-                "includesSelf": false,
-                "events": [
-                  "enter"
-                ],
-                "predicate": [
-                  "target:signature:{actor|flags.pf2e-summons-assistant.summoner.signature}"
-                ],
-                "removeOnExit": false
-              }
-            ],
+            "effects": [],
             "appearance": {
               "border": {
                 "color": "#F35BCB",
@@ -389,7 +169,8 @@
                 "color": "#F35BCB",
                 "alpha": 0.1
               }
-            }
+            },
+            "ignored": false
           }
         ],
         "slug": "blaster-aura-bolster",
@@ -424,7 +205,9 @@
       },
       "flags": {
         "astillon-hanaq-adventures-module": {
-          "blasterAura": "tempHP"
+          "blasterAura": "tempHP",
+          "blasterAuraVersion": 2,
+          "blasterManualSupport": false
         }
       }
     }
@@ -509,7 +292,7 @@
       },
       "blurb": "An obsessive photographer whose flashing camera feeds Blaster's vanity.",
       "publicNotes": "<p>An obsessive photographer whose flashing camera feeds Blaster's vanity. The photographer captures Blaster's good side in a burst of magenta light.</p>\n<p>A 1-HP Flash Mob thrall with no independent turns or attacks. It lasts 1 minute and grants no separate XP.</p>\n<p>Its @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraBol01]{Bolster Aura} is active from the moment it is summoned.</p>",
-      "privateNotes": "<p>Derived from PF2e Summons Assistant's built-in Thrall. Preserve the thrall trait and summoner linkage. Runtime adds owner actor/token UUIDs, a creation nonce, and the one-minute expiration marker without generating Strikes or adding an independent combatant.</p>\n<hr />\n<h2>Foundry Operating Notes</h2>\n<h3>Support Shell</h3>\n<p>This is a 1-HP support minion with no independent actions, reactions, Strikes, spells, or XP. Level 18 is the summoning integration's scaling shell; AC and saving-throw values are placeholders. At 0 HP, it immediately ceases to support Blaster. It disappears after 1 minute. Any number of Flash Mob thralls can exist at once.</p>\n<h3>Yield the Stage</h3>\n<p>Forced displacement grants no independent movement or support command.</p>\n<h3>Native Support Auras</h3>\n<p>This thrall starts with @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraBol01]{Bolster Aura} embedded and active. Hype Fans start with Inspire, Ego Guards with Guard, and Paparazzi with Bolster. Each native 60-foot aura affects only its summoning Blaster; it never affects allies or the emitter. Native area containment determines whether Blaster is inside.</p>\n<p>Select Blaster and use @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-macros.Macro.BlasterMobCmd001]{Command Thrall} to replace one chosen living thrall's mode while it is within 60 feet. Other thralls keep their modes. The chosen mode lasts for that thrall's remaining lifetime. Commands have no frequency or combat requirement and grant no movement.</p>\n<p>Each thrall embeds Inspire, Guard, and Bolster receiver templates. Its aura references its own receiver UUID. Receiver templates keep their modifiers ignored and use an unmatched signature predicate. Only after validating a native received copy does runtime enable its modifiers, stamp the owner signature, and give untyped modifiers a unique emitter slug, so identical benefits from distinct thralls stack without applying receiver templates to the emitting thrall. Keep the templates and exactly one active aura; duplicating an aura on one thrall grants no additional benefit.</p>\n<p>Inspire and Guard end when Blaster leaves their native area. Bolster contributes 10 temporary HP once per thrall lifetime to one aggregate Flash Mob pool with a spent ledger. It retains unspent HP after exit; movement, re-entry, ordinary reconciliation, and repeated commands never refill spent contributions. Changing the thrall's mode retains its already-granted HP until its lifetime ends. Destruction, removal, or expiration removes only that thrall's unspent contribution. Higher unrelated temporary HP keep their normal source and duration; Flash Mob does not add to unrelated pools.</p>\n<p>Destroying, removing, or expiring a thrall ends its support. Preserve owner linkage, summoner signature, nonce, receiver IDs, and expiration data when repairing a summon. Manually placed, unlinked thralls cannot grant these benefits.</p>",
+      "privateNotes": "<h2>Native Support Auras</h2><p>This add starts with its signature 60-foot aura active. Flash Mob finalizes the aura after placement; no Command action is needed to enable it. Hype Fan uses Inspire, Ego Guard uses Guard, Paparazzo uses Bolster. Command changes one add's mode for its remaining lifetime.</p><p>Native aura containment determines who is inside. Blaster's Aura Totals effect sums every qualifying source: three Inspire sources give +3 attacks/damage/fear saves, three Guards give +3 AC, and three fresh Bolsters give 30 temporary HP. A source contributes once. Temporary HP spent on damage do not refill on exit/re-entry; unspent contributions are available only while inside their Bolster aura.</p><p>Automatic adds support their summoning Blaster. Manual compendium auras and effects remain freely usable on any actor; manual auras default to their bearer and allies. These templates do not require embedded receiver-effect UUIDs. At 0 HP this add is destroyed; its lifetime ends after one minute.</p>",
       "publication": {
         "title": "Astillon and Hanaq Adventures: Blaster (homebrew)",
         "authors": "",

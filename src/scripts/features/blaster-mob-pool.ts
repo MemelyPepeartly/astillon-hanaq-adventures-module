@@ -14,6 +14,7 @@ export interface BlasterMobPoolLedger {
   external: BlasterMobPoolHP | null;
   /** The last result committed together with this ledger, never an independently sampled value. */
   displayed: BlasterMobPoolHP;
+  active?: string[];
 }
 
 export interface BlasterMobPoolObservation {
@@ -45,6 +46,8 @@ function sourceId(value: unknown): string | null {
  * their contributions are removed, but revival/link repair cannot grant them again. Omit a key
  * from lifetimeKeys only after its token/lifetime ends. Ordinary HP pre-updates should pass the
  * existing contribution keys and no grants. Commit the returned HP and ledger atomically.
+ * activeKeys limits display/spending to Bolster auras currently covering the recipient;
+ * inactive living sources retain their unspent balance without refilling it on re-entry.
  *
  * The mob and unrelated pool compete by maximum. Every observed decrease spends BOTH pools,
  * so a hidden pool cannot refill damage when it becomes the higher one. A new unrelated source
@@ -57,6 +60,7 @@ export function reconcileMobPool(
   grantKeys: Iterable<string>,
   poolSourceId: string,
   lifetimeKeys: Iterable<string> = liveKeys,
+  activeKeys: Iterable<string> = liveKeys,
 ): BlasterMobPoolResult {
   const observed = { temp: hpValue(current.temp), tempSource: sourceId(current.tempSource) };
   const prior = previous?.version === 1 ? previous : null;
@@ -66,6 +70,7 @@ export function reconcileMobPool(
   const live = new Set(liveKeys);
   // The default may be a one-shot iterator already consumed while constructing live.
   const lifetimes = lifetimeKeys === liveKeys ? live : new Set(lifetimeKeys);
+  const active = activeKeys === liveKeys ? live : new Set(activeKeys);
   const contributions = new Map<string, number>();
   let capacity = MAX_TEMP_HP;
   for (const [key, value] of Object.entries(prior?.contributions ?? {})) {
@@ -80,6 +85,7 @@ export function reconcileMobPool(
   const spent = Math.max(0, priorDisplayed.temp - observed.temp);
   let unassigned = spent;
   for (const [key, remaining] of contributions) {
+    if (!active.has(key)) continue;
     const debit = Math.min(remaining, unassigned);
     contributions.set(key, remaining - debit);
     unassigned -= debit;
@@ -104,9 +110,9 @@ export function reconcileMobPool(
     if (!lifetimes.has(key)) contributions.delete(key);
     else if (!live.has(key)) contributions.set(key, 0);
   }
-  let mobRemaining = [...contributions.values()].reduce((total, value) => total + value, 0);
+  let mobRemaining = [...contributions].reduce((total, [key, value]) => total + (active.has(key) ? value : 0), 0);
   for (const key of grantKeys) {
-    if (!live.has(key) || !lifetimes.has(key) || contributions.has(key)) continue;
+    if (!live.has(key) || !lifetimes.has(key) || !active.has(key) || contributions.has(key)) continue;
     const grant = Math.min(CONTRIBUTION_HP, MAX_TEMP_HP - mobRemaining);
     contributions.set(key, grant);
     mobRemaining += grant;
@@ -120,6 +126,6 @@ export function reconcileMobPool(
     : { temp: externalRemaining, tempSource: externalRemaining > 0 ? external!.tempSource : null };
   return {
     ...displayed,
-    ledger: { version: 1, contributions: Object.fromEntries(contributions), external, displayed },
+    ledger: { version: 1, contributions: Object.fromEntries(contributions), external, displayed, active: [...active] },
   };
 }

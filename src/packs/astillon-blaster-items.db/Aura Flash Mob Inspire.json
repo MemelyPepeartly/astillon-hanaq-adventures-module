@@ -5,7 +5,7 @@
   "img": "icons/svg/sound.svg",
   "system": {
     "description": {
-      "value": "<p><strong>Area</strong> 60-foot aura</p><hr /><p><strong>Effect</strong> The bearer and allies in the aura receive @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01]{Inspire}.</p><p>Drag onto any actor. The GM can edit the radius, targets, benefit, and duration freely. This manually placed aura is not subject to the module's summoned-thrall restrictions or cleanup.</p>",
+      "value": "<p><strong>Area</strong> 60-foot aura</p><hr /><p><strong>Effect</strong> The bearer and allies in the aura receive @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01]{Inspire}.</p><p>Drag onto any actor. The GM can edit the radius, targets, benefit, and duration freely. This manually placed aura is not subject to the module's summoned-thrall restrictions or cleanup.</p><p>The module totals overlapping Flash Mob auras on each recipient. Distinct auras stack, including 10 temporary HP per Bolster source (less damage already spent). Leaving a Bolster aura hides its remaining contribution; re-entry restores only the unspent remainder.</p>",
       "gm": ""
     },
     "publication": {
@@ -21,18 +21,7 @@
         "slug": "blaster-manual-inspire",
         "predicate": [],
         "traits": [],
-        "effects": [
-          {
-            "uuid": "Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterInspire01",
-            "affects": "allies",
-            "includesSelf": true,
-            "events": [
-              "enter"
-            ],
-            "predicate": [],
-            "removeOnExit": true
-          }
-        ],
+        "effects": [],
         "appearance": {
           "border": {
             "color": "#66E56A",
@@ -78,7 +67,8 @@
   "flags": {
     "astillon-hanaq-adventures-module": {
       "blasterAura": "inspire",
-      "blasterManualSupport": true
+      "blasterManualSupport": true,
+      "blasterAuraVersion": 2
     }
   }
 }

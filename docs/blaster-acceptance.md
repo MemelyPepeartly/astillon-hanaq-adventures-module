@@ -60,6 +60,15 @@ Target inspected: Foundry **14.370**, PF2e **8.7.1** at `d507983d7611aad7bee01b4
 - Confirm only the compact score/winner remains at the beam midpoint, with existing dice buttons and token indicators. No gamble panel, counterblast button, or replacement UI should appear.
 - Confirm rider grade follows failure grade unless higher-level hypnotic incapacitation downgrades it to success.
 
+## 0.10.19 — real Foundry only
+
+- Spawn each variant without commanding it. Its signature native aura should already be active. Reload with old unexpired marked adds and confirm default-aura repair.
+- Place Blaster inside three Inspire sources, then three Guard sources: Aura Totals should show +3 attacks/damage/fear saves and +3 AC respectively.
+- Place him inside three fresh Bolster sources: 30 temporary HP. Spend 7, leave and re-enter: do not refill that damage. Remove a source and confirm only its remaining contribution disappears.
+- Start Dark Triad as GM with a player connected: map/UI fade to black, transparent art spins slowly, red lightning plays behind it. GM Escape/End restores every client's view; player Escape only restores their own.
+
+No real Foundry instance was available; these checks were not performed.
+
 ## Validation boundary
 
 ### 0.10.18 — real Foundry only

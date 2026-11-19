@@ -1,0 +1,12 @@
+{
+  "_id": "DarkTriadEnd0001",
+  "name": "Dark Triad — End Cutscene",
+  "type": "script",
+  "img": "icons/magic/lightning/bolt-strike-red.webp",
+  "scope": "global",
+  "command": "const feature = game.astillonHanaqAdventures?.darkTriadCutscene;\nif (!feature?.end) {\n  ui.notifications.warn(\"Enable Astillon Hanaq Adventures and reload the world.\");\n  return;\n}\nawait feature.end();",
+  "ownership": {
+    "default": 2
+  },
+  "flags": {}
+}
