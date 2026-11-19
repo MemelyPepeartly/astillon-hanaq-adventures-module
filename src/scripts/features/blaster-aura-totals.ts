@@ -10,12 +10,19 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
   const values = (collection: any): any[] => collection?.contents ?? [...(collection?.values?.() ?? [])];
   const flag = (doc: any, key: string) => doc?.getFlag(moduleId, key);
   const primary = () => game.user?.isGM && game.users.activeGM?.id === game.user.id;
-  const allTokens = () => values(game.scenes).flatMap(scene => values(scene.tokens));
+  const activeScenes = new Set<string>();
+  const knownOwners = new Map<string, Set<string>>();
   const manual = (item: any) => flag(item, "blasterManualSupport") === true;
   const kind = (item: any): Kind | null => Object.prototype.hasOwnProperty.call(AURAS, flag(item, "blasterAura")) ? flag(item, "blasterAura") : null;
   const poolSource = `${moduleId}.blasterMobPool`;
   const lifetime = (token: any) => `${token.uuid}-${flag(token, "blasterSummon")?.nonce}`.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const live = (token: any) => token.actor?.system?.attributes?.hp?.value > 0 && flag(token, "blasterSummon")?.expiresAt > game.time.worldTime;
+  const live = (token: any) => flag(token, "blasterSummon")?.expiresAt > game.time.worldTime && token.actor?.system?.attributes?.hp?.value > 0;
+  function rememberOwner(token: any) {
+    const owner = flag(token, "blasterSummon")?.ownerTokenUuid;
+    if (!owner || !token.parent?.id) return;
+    const owners = knownOwners.get(token.parent.id) ?? new Set<string>();
+    owners.add(owner); knownOwners.set(token.parent.id, owners);
+  }
   let template: any;
   async function effectTemplate() {
     template ??= (await foundry.utils.fromUuid(`Compendium.${moduleId}.astillon-blaster-items.Item.BlasterGuard0001`))?.toObject();
@@ -45,10 +52,12 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
     await token.setFlag(moduleId, "blasterAuraVersion", 2);
   }
 
-  function providers() {
-    return allTokens().flatMap(token => values(token.actor?.items).flatMap(item => {
-      const mode = kind(item), rule = item.rules?.find((r: any) => r.key === "Aura")
-        ?? item.system.rules.find((r: any) => r.key === "Aura");
+  function providers(tokens: any[]) {
+    return tokens.flatMap(token => values(token.actor?.items).flatMap(item => {
+      const mode = kind(item);
+      if (!mode) return [];
+      const rule = item.rules?.find((r: any) => r.key === "Aura")
+        ?? item.system.rules?.find((r: any) => r.key === "Aura");
       if (!mode || !rule || item.isExpired || item.system.expired) return [];
       const isManual = manual(item), marker = flag(token, "blasterSummon");
       if (!isManual && (!marker?.nonce || marker.expiresAt <= game.time.worldTime)) return [];
@@ -66,14 +75,44 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
     return eligible && provider.token.auras?.get(provider.slug)?.containsToken(target) === true;
   }
 
-  function inputs(actor: any) {
-    const sources = providers();
-    const tokens = allTokens().filter(t => t.actor?.uuid === actor.uuid);
+  function snapshot(sceneIds: ReadonlySet<string>) {
+    const rawTokens = [...sceneIds].flatMap(id => values(game.scenes.get(id)?.tokens));
+    for (const token of rawTokens) rememberOwner(token);
+    // Never materialize every synthetic actor on inactive maps just to check an aura.
+    const tokens = rawTokens.filter(t => t.parent.id === canvas.scene?.id || flag(t, "blasterSummon")?.nonce || knownOwners.get(t.parent.id)?.has(t.uuid));
+    const byActor = new Map<string, any[]>(), ownedByActor = new Map<string, any[]>();
+    const append = (index: Map<string, any[]>, key: string, token: any) => {
+      let entries = index.get(key);
+      if (!entries) index.set(key, entries = []);
+      entries.push(token);
+    };
+    for (const token of tokens) {
+      const actor = token.actor;
+      if (actor) append(byActor, actor.uuid, token);
+      const owner = flag(token, "blasterSummon")?.ownerActorUuid;
+      if (owner) append(ownedByActor, owner, token);
+    }
+    const sources = providers(tokens);
+    for (const id of sceneIds) {
+      if (sources.some(s => s.token.parent.id === id)) activeScenes.add(id);
+      else activeScenes.delete(id);
+    }
+    return { tokens, sources, byActor, ownedByActor, sceneIds };
+  }
+  function inputs(actor: any, context = snapshot(new Set([actor.token?.parent?.id ?? canvas.scene?.id].filter(Boolean)))) {
+    const { sources, sceneIds } = context;
+    const tokens = context.byActor.get(actor.uuid) ?? [];
     const viewed = canvas.ready && tokens.some(t => t.parent.id === canvas.scene?.id);
-    const owned = allTokens().filter(t => flag(t, "blasterSummon")?.ownerActorUuid === actor.uuid);
+    const owned = context.ownedByActor.get(actor.uuid) ?? [];
     const lifetimes = new Set(owned.filter(t => flag(t, "blasterSummon").expiresAt > game.time.worldTime).map(lifetime));
     const living = new Set(owned.filter(live).map(lifetime));
     for (const source of sources.filter(s => s.isManual)) { lifetimes.add(source.key); living.add(source.key); }
+    // A scoped pass must not erase spent balances belonging to another map.
+    for (const key of Object.keys(flag(actor, "blasterMobPool")?.contributions ?? {})) {
+      if (![...sceneIds].some(id => key.startsWith(`Scene-${id}-Token-`))) {
+        lifetimes.add(key); living.add(key);
+      }
+    }
     const inside = viewed ? sources.filter(source => tokens.some(target => inAura(source, target))) : [];
     const active = viewed ? inside.filter(s => s.mode === "tempHP").map(s => s.key)
       : (flag(actor, "blasterMobPool")?.active ?? Object.keys(flag(actor, "blasterMobPool")?.contributions ?? {})).filter((key: string) => living.has(key));
@@ -108,12 +147,15 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
     }
   }
 
-  async function sync() {
+  async function sync(sceneIds: ReadonlySet<string> = new Set([canvas.scene?.id].filter(Boolean))) {
     if (!primary()) return;
-    for (const token of allTokens()) if (!isPlacing(token)) await ensureDefault(token);
+    const rawTokens = [...sceneIds].flatMap(id => values(game.scenes.get(id)?.tokens));
+    for (const token of rawTokens) if (flag(token, "blasterSummon")?.nonce && !isPlacing(token)) await ensureDefault(token);
+    let context = snapshot(sceneIds);
     // Existing manual auras keep their appearance, radius, and unrestricted placement.
     // Remove only legacy built-in receiver links; their bonuses now come from totals.
-    const actors = new Map<string, any>([...values(game.actors), ...allTokens().map(t => t.actor)].filter(Boolean).map(a => [a.uuid, a]));
+    const actors = new Map<string, any>(context.tokens.map(t => t.actor).filter(Boolean).map(a => [a.uuid, a]));
+    let migrated = false;
     for (const actor of actors.values()) {
       if (!primary()) return;
       if (!actor.system.attributes?.hp) continue;
@@ -123,11 +165,21 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
           effects: (rule.effects ?? []).filter((effect: any) => !RECEIVERS.some(id => effect.uuid?.endsWith(`.Item.${id}`))) })),
           [`flags.${moduleId}.blasterAuraVersion`]: 2 }];
       });
-      if (edits.length) await actor.updateEmbeddedDocuments("Item", edits);
+      if (edits.length) { await actor.updateEmbeddedDocuments("Item", edits); migrated = true; }
       const old = values(actor.items).filter(item => !flag(item, "blasterManualDrop") &&
         (flag(item, "commandMobSource")?.auraEmitterUuid || item.flags?.pf2e?.aura && flag(item, "blasterSupport")));
-      if (old.length) await actor.deleteEmbeddedDocuments("Item", old.map(item => item.id));
-      const data = inputs(actor), previous = flag(actor, "blasterMobPool");
+      if (old.length) { await actor.deleteEmbeddedDocuments("Item", old.map(item => item.id)); migrated = true; }
+    }
+    if (migrated) context = snapshot(sceneIds);
+    const manualRecipients = context.sources.some(s => s.isManual);
+    const ownerActors = new Set(context.sources.map(s => s.marker?.ownerActorUuid).filter(Boolean));
+    for (const actor of actors.values()) {
+      if (!primary()) return;
+      if (!actor.system.attributes?.hp) continue;
+      const previous = flag(actor, "blasterMobPool");
+      if (!manualRecipients && !previous && !ownerActors.has(actor.uuid)
+        && !values(actor.items).some(item => flag(item, "blasterAuraTotals") && !manual(item))) continue;
+      const data = inputs(actor, context);
       if (data.viewed) {
         const counts = { inspire: data.inside.filter(s => s.mode === "inspire").length,
           guard: data.inside.filter(s => s.mode === "guard").length, tempHP: data.active.size };
@@ -163,5 +215,5 @@ export function createBlasterAuraTotals(moduleId: string, isPlacing: (token: any
       }
     }
   }
-  return { sync, observeHP, ensureDefault };
+  return { sync, observeHP, ensureDefault, rememberOwner, hasScene: (id: string) => activeScenes.has(id) };
 }

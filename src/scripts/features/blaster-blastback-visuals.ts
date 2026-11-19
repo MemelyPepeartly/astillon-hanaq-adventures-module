@@ -11,8 +11,10 @@ export function createBlastbackVisuals(moduleId: string) {
   const names = new Set<string>();
   const exploded = new Set<string>();
   const warnings = new Set<string>();
+  const watchedTokens = new Set<string>();
   let registered = false;
   let serial = 0;
+  let syncFrame: number | null = null;
   const prefix = () => `${moduleId}.blastback.${game.user.id}.`;
   const available = (file: string) => {
     try {
@@ -34,17 +36,32 @@ export function createBlastbackVisuals(moduleId: string) {
     if (effect) { active.delete(id); end(effect.name, effect.sceneId); }
   }
   function clear() {
+    if (syncFrame !== null) { cancelAnimationFrame(syncFrame); syncFrame = null; }
+    watchedTokens.clear();
     for (const id of [...active.keys()]) stop(id);
     for (const name of [...names]) end(name);
+  }
+  function scheduleSync() {
+    if (syncFrame !== null) return;
+    syncFrame = requestAnimationFrame(() => { syncFrame = null; sync(); });
+  }
+  function syncToken(token: any) {
+    if (!watchedTokens.size) return;
+    const document = token?.document ?? token;
+    if (document?.parent?.id !== canvas.scene?.id || !watchedTokens.has(document.id)) return;
+    scheduleSync();
   }
   function sync() {
     if (!canvas.ready || !canvas.scene) { clear(); return; }
     const scene = canvas.scene, plans = scene.getFlag(moduleId, "blasterBlastbackPlans") ?? {};
     const wanted = new Set<string>();
+    watchedTokens.clear();
     for (const plan of Object.values(plans) as any[]) {
+      if (!plan?.id || !["charging", "recovery", "publishing"].includes(plan.status) || exploded.has(plan.id)) continue;
+      // Invisible charges still need a refresh when their token becomes visible.
+      watchedTokens.add(plan.tokenId);
       const token = scene.tokens.get(plan?.tokenId);
-      if (!plan?.id || !["charging", "recovery", "publishing"].includes(plan.status) || exploded.has(plan.id) ||
-          token?.actor?.uuid !== plan.actorUuid || !visible(token)) continue;
+      if (token?.actor?.uuid !== plan.actorUuid || !visible(token)) continue;
       const visual = plan.visual === "complete" ? "complete" : "inward";
       const file = BLASTBACK_VISUALS[visual];
       if (!available(file)) continue;
@@ -88,12 +105,12 @@ export function createBlastbackVisuals(moduleId: string) {
   function ready() {
     if (registered) return;
     registered = true;
-    Hooks.on("updateScene", (scene: any) => { if (scene.id === canvas.scene?.id) sync(); });
+    Hooks.on("updateScene", (scene: any) => { if (scene.id === canvas.scene?.id) scheduleSync(); });
     Hooks.on("createChatMessage", detonate);
-    Hooks.on("updateToken", sync);
-    Hooks.on("deleteToken", sync);
-    Hooks.on("refreshToken", sync);
-    Hooks.on("canvasReady", sync);
+    Hooks.on("updateToken", syncToken);
+    Hooks.on("deleteToken", syncToken);
+    Hooks.on("refreshToken", syncToken);
+    Hooks.on("canvasReady", scheduleSync);
     Hooks.on("canvasTearDown", clear);
     Hooks.on("preCreateSequencerEffect", (data: any) => {
       if (data?.name?.startsWith(prefix()) && (!names.has(data.name) || !canvas.ready || data.sceneId !== canvas.scene?.id)) return false;

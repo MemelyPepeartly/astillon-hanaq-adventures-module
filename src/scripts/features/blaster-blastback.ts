@@ -15,6 +15,10 @@ type Plan = {
   visual?: "inward" | "complete";
 };
 type Session = { scene: any; token: any; actorUuid: string; cancelled: boolean };
+type ReconcileTarget = { scene: any; tokenId: string; planId: string };
+type ReconcileBatch = {
+  all: boolean; recovery: boolean; targets: Map<string, ReconcileTarget>; job?: Promise<unknown>;
+};
 
 /**
  * Foundry 14.370 / PF2e 8.7.1 (d507983d): updateActor.damageTaken is the
@@ -30,6 +34,7 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
   const visuals = createBlastbackVisuals(moduleId);
   let registered = false;
   let queue: Promise<unknown> = Promise.resolve();
+  let pendingReconcile: ReconcileBatch | null = null;
   const jobs = new Set<Promise<unknown>>();
   const sessions = new Set<Session>();
   const cancellations = new Map<string, number>();
@@ -55,6 +60,9 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
     if (!notices.has(id)) { notices.add(id); ui.notifications.warn(message); }
   }
   function serial<T>(work: () => Promise<T>): Promise<T | false> {
+    // Native damage and explicit actions are ordering barriers: never merge a
+    // later release event into reconciliation queued before those writes.
+    pendingReconcile = null;
     const job = queue.then(work).catch(report);
     queue = job; jobs.add(job);
     void job.then(() => jobs.delete(job));
@@ -196,17 +204,18 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
   async function syncRegion(scene: any, plan: Plan, center?: Point, active = false) {
     assertAuthority();
     const token = owner(scene, plan);
-    const regions = markedRegions(scene, plan.tokenId, plan.id);
-    if (!token || regions.length !== 1 || regions[0].id !== plan.regionIDs[0]
-        || flag(regions[0], MARK_FLAG).actorUuid !== plan.actorUuid) {
+    const region = scene.regions.get(plan.regionIDs[0]);
+    const mark = flag(region, MARK_FLAG);
+    if (!token || !region || mark?.id !== plan.id || mark.tokenId !== plan.tokenId
+        || mark.actorUuid !== plan.actorUuid) {
       throw new Error("Blastback warning is incomplete or its owner changed. Clear and rearm the charge.");
     }
     const shape = circle(scene, token, center);
     const name = `${token.name} — Blastback ${active ? "resolved" : "charging"} (100 ft radius)`;
     const status = active ? "active" : "warning";
-    if (regions[0].shapes?.length === 1 && Object.entries(shape).every(([key, value]) => regions[0].shapes[0][key] === value)
-        && regions[0].name === name && flag(regions[0], MARK_FLAG).status === status) return;
-    await scene.updateEmbeddedDocuments("Region", [{ _id: regions[0].id, shapes: [shape],
+    if (region.shapes?.length === 1 && Object.entries(shape).every(([key, value]) => region.shapes[0][key] === value)
+        && region.name === name && mark.status === status) return;
+    await scene.updateEmbeddedDocuments("Region", [{ _id: region.id, shapes: [shape],
       name, color: active ? "#aa55ff" : AMBER, [`flags.${moduleId}.${MARK_FLAG}.status`]: status }]);
   }
   async function arm(session: Session, previous: Plan | null): Promise<boolean> {
@@ -464,42 +473,69 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
       }
     });
   }
-  async function reconcile() {
+  function requestReconcile(target?: ReconcileTarget, recovery = false) {
     if (!primaryGM()) return;
+    const batch = pendingReconcile ?? { all: false, recovery: false, targets: new Map() } as ReconcileBatch;
+    batch.all ||= !target;
+    batch.recovery ||= recovery;
+    if (target) batch.targets.set(`${target.scene.id}:${target.tokenId}:${target.planId}`, target);
+    if (pendingReconcile) return batch.job;
+    batch.job = serial(async () => {
+      // Events arriving during an awaited write get one trailing batch, which
+      // reads the latest position without starving intervening native damage.
+      if (pendingReconcile === batch) pendingReconcile = null;
+      await reconcile(batch);
+    });
+    pendingReconcile = batch;
+    return batch.job;
+  }
+  async function reconcilePlan(scene: any, tokenId: string, planId?: string) {
+    if (!primaryGM() || game.scenes?.get(scene.id) !== scene) return;
+    const raw = planMap(scene)[tokenId];
+    if (planId && (raw as Partial<Plan> | undefined)?.id !== planId) return;
+    if (!validPlan(raw, tokenId)) {
+      notice(`${scene.id}:${tokenId}`, "Ignored malformed Blastback state. Select its token and use Clear Blastback.");
+      return;
+    }
+    try {
+      let plan = clone(raw);
+      if (!owner(scene, plan) || plan.status === "clearing") { await erase(scene, tokenId); return; }
+      if (cancelled(scene, tokenId)) return;
+      if (plan.status === "publishing") { await firePlan(scene, plan, false); return; }
+      if (!collecting(plan)) return;
+      const when = timing(scene, plan);
+      if (when === "lost") { await erase(scene, tokenId); return; }
+      if (when === "missed" && plan.status === "charging") {
+        plan = { ...plan, status: "recovery" };
+        await save(scene, plan);
+        notice(plan.id, "Blastback's scheduled turn was missed or rewound. The bank remains armed; fire manually or clear it.");
+      }
+      if (plan.status === "charging" && when === "due") await firePlan(scene, plan, true);
+      else await syncRegion(scene, plan);
+    } catch (error) { report(error); }
+  }
+  async function reconcile(batch: ReconcileBatch) {
+    if (!primaryGM()) return;
+    if (!batch.all) {
+      for (const { scene, tokenId, planId } of batch.targets.values()) await reconcilePlan(scene, tokenId, planId);
+      return;
+    }
     for (const scene of contents(game.scenes)) {
       // A disconnected GM can leave a successfully created Region before its
-      // plan commit. Reconcile only our tagged or superseded orphan warnings.
-      const orphans = contents(scene.regions).filter(region => {
-        const mark = flag(region, MARK_FLAG);
-        if (!safeId(mark?.id) || !safeId(mark?.tokenId) || typeof mark?.actorUuid !== "string") return false;
-        const raw = planMap(scene)[mark.tokenId] as Partial<Plan> | undefined;
-        return !raw || raw.id !== mark.id;
-      });
-      if (orphans.length) {
-        try { assertAuthority(); await scene.deleteEmbeddedDocuments("Region", orphans.map(region => region.id)); }
-        catch (error) { report(error); }
+      // plan commit. Global orphan discovery is startup/recovery work only.
+      if (batch.recovery) {
+        const orphans = contents(scene.regions).filter(region => {
+          const mark = flag(region, MARK_FLAG);
+          if (!safeId(mark?.id) || !safeId(mark?.tokenId) || typeof mark?.actorUuid !== "string") return false;
+          const raw = planMap(scene)[mark.tokenId] as Partial<Plan> | undefined;
+          return !raw || raw.id !== mark.id;
+        });
+        if (orphans.length) {
+          try { assertAuthority(); await scene.deleteEmbeddedDocuments("Region", orphans.map(region => region.id)); }
+          catch (error) { report(error); }
+        }
       }
-      for (const [tokenId, raw] of Object.entries(planMap(scene))) {
-        if (!primaryGM()) return;
-        if (!validPlan(raw, tokenId)) { notice(`${scene.id}:${tokenId}`, "Ignored malformed Blastback state. Select its token and use Clear Blastback."); continue; }
-        try {
-          let plan = read(scene, tokenId);
-          if (!plan) continue;
-          if (!owner(scene, plan) || plan.status === "clearing") { await erase(scene, tokenId); continue; }
-          if (cancelled(scene, tokenId)) continue;
-          if (plan.status === "publishing") { await firePlan(scene, plan, false); continue; }
-          if (!collecting(plan)) continue;
-          const when = timing(scene, plan);
-          if (when === "lost") { await erase(scene, tokenId); continue; }
-          if (when === "missed" && plan.status === "charging") {
-            plan = { ...plan, status: "recovery" };
-            await save(scene, plan);
-            notice(plan.id, "Blastback's scheduled turn was missed or rewound. The bank remains armed; fire manually or clear it.");
-          }
-          if (plan.status === "charging" && when === "due") await firePlan(scene, plan, true);
-          else await syncRegion(scene, plan);
-        } catch (error) { report(error); }
-      }
+      for (const tokenId of Object.keys(planMap(scene))) await reconcilePlan(scene, tokenId);
     }
   }
   async function ready(): Promise<void> {
@@ -508,17 +544,25 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
       registered = true;
       Hooks.on("updateActor", onDamage);
       Hooks.on("createRegion", (region: any) => {
-        if (flag(region, MARK_FLAG)) return serial(reconcile);
+        const mark = flag(region, MARK_FLAG);
+        if (safeId(mark?.id) && safeId(mark?.tokenId)) {
+          return requestReconcile({ scene: region.parent, tokenId: mark.tokenId, planId: mark.id });
+        }
       });
-      Hooks.on("combatTurnChange", () => serial(reconcile));
-      Hooks.on("updateCombat", () => serial(reconcile));
-      Hooks.on("updateCombatant", () => serial(reconcile));
-      Hooks.on("deleteCombatant", () => serial(reconcile));
-      Hooks.on("updateWorldTime", () => serial(reconcile));
-      Hooks.on("updateToken", (_token: any, changed: any) => {
-        if (["x", "y", "width", "height", "elevation", "actorId", "actorLink"].some(key => key in changed)) return serial(reconcile);
+      Hooks.on("combatTurnChange", () => requestReconcile());
+      Hooks.on("updateCombat", () => requestReconcile());
+      Hooks.on("updateCombatant", () => requestReconcile());
+      Hooks.on("deleteCombatant", () => requestReconcile());
+      Hooks.on("updateWorldTime", () => requestReconcile());
+      Hooks.on("updateToken", (token: any, changed: any) => {
+        if (!primaryGM() || !["x", "y", "width", "height", "elevation", "actorId", "actorLink"].some(key => key in changed)) return;
+        const plan = read(token.parent, token.id);
+        if (plan) return requestReconcile({ scene: token.parent, tokenId: token.id, planId: plan.id });
       });
       Hooks.on("deleteToken", (token: any) => {
+        if (!primaryGM() || (!Object.prototype.hasOwnProperty.call(planMap(token.parent), token.id)
+            && ![...sessions].some(session => session.scene === token.parent && session.token.id === token.id)
+            && !markedRegions(token.parent, token.id).length)) return;
         cancel(token.parent, token.id);
         return serial(async () => { if (primaryGM()) await erase(token.parent, token.id); });
       });
@@ -534,14 +578,20 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
         });
       });
       Hooks.on("deleteScene", (scene: any) => cancel(scene));
-      Hooks.on("deleteActor", () => serial(reconcile));
-      Hooks.on("userConnected", () => serial(reconcile));
-      Hooks.on("updateUser", () => serial(reconcile));
+      Hooks.on("deleteActor", () => requestReconcile());
+      let wasPrimaryGM = primaryGM();
+      const recoverAuthority = () => {
+        const now = primaryGM(), acquired = now && !wasPrimaryGM;
+        wasPrimaryGM = now;
+        if (acquired) return requestReconcile(undefined, true);
+      };
+      Hooks.on("userConnected", recoverAuthority);
+      Hooks.on("updateUser", recoverAuthority);
       Hooks.on("canvasReady", () => {
         for (const session of sessions) if (canvas.scene !== session.scene) session.cancelled = true;
-        return serial(reconcile);
+        return requestReconcile(undefined, true);
       });
-      void serial(reconcile);
+      void requestReconcile(undefined, true);
     }
     while (jobs.size) await Promise.all([...jobs]);
   }

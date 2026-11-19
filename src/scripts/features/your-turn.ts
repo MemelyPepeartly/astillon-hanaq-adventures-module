@@ -19,6 +19,7 @@ const OPAQUE_ALPHA = 250;
 const MAX_EDGE = 1024;
 const ART_LOAD_TIMEOUT_MS = 15000;
 const ART_RETRY_MS = 30000;
+const ART_CACHE_LIMIT = 64;
 
 type SliceSpec = {
   id: string;
@@ -165,11 +166,20 @@ export function saturatedPanelColor(hex: string): string {
  * Only contour ink is stamped; the nearest ink pixel is always on that contour.
  */
 export function renderOutlineMask(
+  pixels: Uint8ClampedArray, width: number, height: number, radius: number,
+): Uint8ClampedArray {
+  const rows = outlineRows(pixels, width, height, radius);
+  let next = rows.next();
+  while (!next.done) next = rows.next();
+  return next.value;
+}
+
+function* outlineRows(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
   radius: number,
-): Uint8ClampedArray {
+): Generator<void, Uint8ClampedArray> {
   const pad = Math.max(0, radius);
   const outWidth = width + pad * 2;
   const outHeight = height + pad * 2;
@@ -197,9 +207,24 @@ export function renderOutlineMask(
         }
       }
     }
+    yield;
   }
 
   return out;
+}
+
+async function renderOutlineAsync(pixels: Uint8ClampedArray, width: number, height: number, radius: number): Promise<Uint8ClampedArray> {
+  const rows = outlineRows(pixels, width, height, radius);
+  let deadline = performance.now() + 4;
+  let next = rows.next();
+  while (!next.done) {
+    if (performance.now() >= deadline) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      deadline = performance.now() + 4;
+    }
+    next = rows.next();
+  }
+  return next.value;
 }
 
 export function normalizeHexColor(value: unknown): string | null {
@@ -377,6 +402,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   const failedArt = new Map<string, number>();
   let pendingSlices: Promise<void> | undefined;
   let pendingPreload: Promise<void> | undefined;
+  const artQueue = new Map<string, { art: string[]; background: boolean }>();
+  let preloadEpoch = 0;
   const boundEditors = new WeakSet<HTMLElement>();
   const liveBlobs = new Set<string>();
   const motions = new Map<HTMLElement, Animation[]>();
@@ -396,8 +423,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   function rememberArt(src: string, result: ArtResult): ArtResult {
     const previous = artCache.get(src);
+    artCache.delete(src);
     artCache.set(src, result);
     if (previous && previous.url !== result.url) revokeIfUnused(previous.url);
+    while (artCache.size > ART_CACHE_LIMIT) {
+      const oldest = artCache.entries().next().value as [string, ArtResult];
+      artCache.delete(oldest[0]);
+      revokeIfUnused(oldest[1].url); // An on-screen portrait keeps its blob until removed.
+    }
     return result;
   }
 
@@ -963,7 +996,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
 
     const radius = outlineRadius(drawn.width, drawn.height);
-    const mask = renderOutlineMask(pixels.data, drawn.width, drawn.height, radius);
+    const mask = await renderOutlineAsync(pixels.data, drawn.width, drawn.height, radius);
     const outlined = document.createElement("canvas");
     outlined.width = drawn.width + radius * 2;
     outlined.height = drawn.height + radius * 2;
@@ -980,7 +1013,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   function prepareArt(src: string): Promise<ArtResult> {
     const cached = artCache.get(src);
-    if (cached) return Promise.resolve(cached);
+    if (cached) { artCache.delete(src); artCache.set(src, cached); return Promise.resolve(cached); }
     const pending = pendingArt.get(src);
     if (pending) return pending;
     if ((failedArt.get(src) ?? 0) > Date.now()) return Promise.reject(new Error("Your Turn image retry deferred"));
@@ -1041,32 +1074,70 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   const documents = (collection: any): any[] => Array.from(collection?.values?.() ?? collection ?? []);
 
-  async function preload(): Promise<void> {
+  function stopPreload(): void {
+    preloadEpoch++;
+    artQueue.clear();
+  }
+
+  function enqueueArt(art: string[], background = false): void {
+    if (!art.length || (background && artQueue.size >= ART_CACHE_LIMIT * 2)) return;
+    const key = JSON.stringify(art);
+    const previous = artQueue.get(key);
+    artQueue.set(key, { art, background: previous ? previous.background && background : background });
+  }
+
+  function drainArtQueue(): Promise<void> {
     if (pendingPreload) return pendingPreload;
     pendingPreload = (async () => {
-      const chains = new Map<string, string[]>();
-      const add = (subject: Subject) => chains.set(JSON.stringify(subject.art), subject.art);
-      for (const actor of documents(game.actors)) {
-        add({ ...subjectFromActor(actor), art: artChainFrom(actor, null, actor.img, actor.prototypeToken?.texture?.src, null) });
+      while (isEnabled() && artQueue.size) {
+        const [key, entry] = [...artQueue].find(([, value]) => !value.background) ?? artQueue.entries().next().value!;
+        artQueue.delete(key);
+        // Background warming must not evict the scene/combat portraits just prepared.
+        if (entry.background && artCache.size >= ART_CACHE_LIMIT) continue;
+        const epoch = preloadEpoch;
+        await new Promise<void>(resolve => {
+          const idle = (globalThis as any).requestIdleCallback;
+          if (typeof idle === "function") idle(() => resolve(), { timeout: 250 });
+          else setTimeout(resolve, 25);
+        });
+        if (epoch !== preloadEpoch || !isEnabled()) continue;
+        await firstArt(entry.art);
       }
-      for (const scene of documents(game.scenes)) for (const token of documents(scene.tokens)) {
-        add(subjectFromCombatant({ actor: token.actor, token, name: token.name }));
-      }
-      for (const combat of documents(game.combats)) for (const combatant of documents(combat.combatants)) add(subjectFromCombatant(combatant));
-      const work = [...chains.values()];
-      // Keep downloads and outline work bounded even in worlds with hundreds of NPCs.
-      const worker = async () => { while (work.length) await firstArt(work.shift()!); };
-      await Promise.all([preloadSlices(), ...Array.from({ length: Math.min(4, work.length) }, worker)]);
     })().finally(() => { pendingPreload = undefined; });
     return pendingPreload;
   }
 
+  async function preload(): Promise<void> {
+    if (!isEnabled()) return;
+    stopPreload();
+    // Only the current combat and viewed map need synthetic actors prepared now.
+    for (const combatant of documents(game.combat?.combatants)) enqueueArt(subjectFromCombatant(combatant).art);
+    if (canvas.ready) for (const token of documents(canvas.scene?.tokens)) {
+      enqueueArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art);
+    }
+    // World actors are already instantiated; never walk inactive maps' token.actor getters.
+    for (const actor of documents(game.actors)) {
+      if (artQueue.size >= ART_CACHE_LIMIT * 2) break;
+      enqueueArt(artChainFrom(actor, null, actor.img, actor.prototypeToken?.texture?.src, null), true);
+    }
+    await Promise.all([preloadSlices(), drainArtQueue()]);
+  }
+
+  const artChanged = (changed: any) => Object.keys(changed ?? {}).some(key => ["img", "texture", "prototypeToken", "delta"].includes(key)
+    || key.startsWith("texture.") || key.startsWith("prototypeToken.") || key.startsWith("delta.")
+    || key === `flags.${moduleId}.${ART_FLAG}` || changed.flags?.[moduleId]?.[ART_FLAG] !== undefined
+    || changed.flags?.[moduleId]?.[`-=${ART_FLAG}`] !== undefined);
+
   function warmActor(actor: any): void {
-    void firstArt(artChainFrom(actor, actor?.token?.baseActor, actor?.img, actor?.prototypeToken?.texture?.src, null)).catch(() => {});
+    if (!isEnabled()) return;
+    enqueueArt(artChainFrom(actor, actor?.token?.baseActor, actor?.img, actor?.prototypeToken?.texture?.src, null));
+    void drainArtQueue().catch(() => {});
   }
 
   function warmToken(token: any): void {
-    void firstArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art).catch(() => {});
+    if (!isEnabled() || token.parent?.id !== canvas.scene?.id) return;
+    enqueueArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art);
+    void drainArtQueue().catch(() => {});
   }
 
   async function present(subject: Subject, owner?: EditorSession, automatic = false): Promise<void> {
@@ -1530,7 +1601,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         default: false,
         // Old user-scoped Setting documents can still emit this callback after upgrade.
         // Only the authoritative world value may stop playback.
-        onChange: () => { if (!isEnabled()) cancel(); },
+        onChange: () => {
+          if (!isEnabled()) { stopPreload(); cancel(); }
+          else void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error));
+        },
       });
       game.settings.register(moduleId, SETTING_SCALE, {
         name: localize("ASTILLON.YourTurn.Scale"),
@@ -1563,13 +1637,17 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       Hooks.on("getHeaderControlsApplicationV2", onHeaderControls);
       Hooks.on("renderApplicationV2", onRenderApplicationV2);
       Hooks.on("createActor", warmActor);
-      Hooks.on("updateActor", warmActor);
+      Hooks.on("updateActor", (actor: any, changed: any) => { if (artChanged(changed)) warmActor(actor); });
       Hooks.on("createToken", warmToken);
-      Hooks.on("updateToken", warmToken);
-      Hooks.on("createCombatant", (combatant: any) => { void firstArt(subjectFromCombatant(combatant).art).catch(() => {}); });
-      Hooks.on("updateCombatant", (combatant: any) => { void firstArt(subjectFromCombatant(combatant).art).catch(() => {}); });
+      Hooks.on("updateToken", (token: any, changed: any) => { if (artChanged(changed)) warmToken(token); });
+      const warmCombatant = (combatant: any) => {
+        if (!isEnabled() || combatant.parent?.id !== game.combat?.id) return;
+        enqueueArt(subjectFromCombatant(combatant).art); void drainArtQueue().catch(() => {});
+      };
+      Hooks.on("createCombatant", warmCombatant);
+      Hooks.on("updateCombatant", (combatant: any, changed: any) => { if (artChanged(changed) || changed.actorId || changed.tokenId) warmCombatant(combatant); });
       Hooks.on("canvasReady", () => { void preload().catch(error => console.warn(`${moduleId} | Your Turn preload`, error)); });
-      Hooks.on("canvasTearDown", cancel);
+      Hooks.on("canvasTearDown", () => { stopPreload(); cancel(); });
       Hooks.on("userConnected", () => { void migrateWorldSettings(); });
       Hooks.on("updateUser", () => { void migrateWorldSettings(); });
 

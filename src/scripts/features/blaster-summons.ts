@@ -412,8 +412,8 @@ export function createBlasterSummons(moduleId: string) {
         const owner = flag(token, "blasterSummon");
         // Normally PF2e removes the expiration effect and the helper deletes the token.
         // Enforce the one-minute lifetime even with PF2e automatic effect removal disabled.
-        if (isHype(token) && owner?.nonce && Number.isFinite(owner.expiresAt) &&
-            owner.expiresAt <= game.time.worldTime && token.actor.getFlag(ASSISTANT, "summoner")?.uuid === owner.ownerActorUuid) {
+        if (owner?.nonce && Number.isFinite(owner.expiresAt) && owner.expiresAt <= game.time.worldTime &&
+            isHype(token) && token.actor.getFlag(ASSISTANT, "summoner")?.uuid === owner.ownerActorUuid) {
           await token.delete();
         }
       }
@@ -428,14 +428,48 @@ export function createBlasterSummons(moduleId: string) {
   }
 
   let cleanupQueued = false;
-  function queueSupportCleanup() {
+  const dirtyScenes = new Set<string>();
+  function queueSupportCleanup(sceneId?: string) {
+    if (!isCleanupGM()) return Promise.resolve();
+    if (sceneId) dirtyScenes.add(sceneId);
+    else {
+      if (canvas.scene?.id) dirtyScenes.add(canvas.scene.id);
+      // Inspect token flags only: never instantiate unrelated inactive-map actors.
+      for (const scene of contents(game.scenes)) {
+        if (contents(scene.tokens).some(token => flag(token, "blasterSummon")?.nonce)) dirtyScenes.add(scene.id);
+      }
+    }
     if (cleanupQueued) return supportCleanup;
     cleanupQueued = true;
     supportCleanup = supportCleanup.catch(() => {}).then(async () => {
+      // Collapse token drawing/deletion bursts and let Foundry finish native aura preparation.
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const scenes = new Set(dirtyScenes);
+      dirtyScenes.clear();
       cleanupQueued = false;
-      await totals.sync();
+      await totals.sync(scenes);
     });
     return background(supportCleanup);
+  }
+  function queueActorScenes(actor: any) {
+    if (!isCleanupGM() || !actor) return;
+    if (actor.token?.parent?.id) { void queueSupportCleanup(actor.token.parent.id); return; }
+    for (const scene of contents(game.scenes)) {
+      if (contents(scene.tokens).some(token => token.actorId === actor.id)) void queueSupportCleanup(scene.id);
+    }
+  }
+  function tokenChanged(value: any, changed?: any, options?: any) {
+    if (!isCleanupGM() || options?.blasterMobPoolUpdate) return;
+    const token = tokenDocument(value);
+    if (!token?.parent) return;
+    if (changed && !Object.keys(changed).some(key => ["x", "y", "elevation", "width", "height", "depth", "level", "actorId", "actorLink", "disposition", "hidden", "delta"].includes(key)
+      || (key === "flags" && (changed.flags?.[moduleId] || changed.flags?.[ASSISTANT]))
+      || key.startsWith("delta.") || key.startsWith(`flags.${moduleId}.`) || key.startsWith(`flags.${ASSISTANT}.`))) return;
+    if (totals.hasScene(token.parent.id) || flag(token, "blasterSummon")?.nonce
+      || contents(token.baseActor?.items).some(item => auraKind(item))
+      || (token._source?.delta?.items ?? []).some((item: any) => item?.flags?.[moduleId]?.blasterAura)) {
+      void queueSupportCleanup(token.parent.id);
+    }
   }
 
   async function ready(): Promise<void> {
@@ -455,21 +489,27 @@ export function createBlasterSummons(moduleId: string) {
       // Hook callbacks deliberately do not return our queue: embedded deletion can
       // fire these while the queue is already running. Foundry hooks are synchronous.
       const itemChanged = (item: any) => {
+        if (!isCleanupGM() || flag(item, "blasterAuraTotals")) return;
         if (auraKind(item) || flag(item, "commandMobSource")?.auraEmitterUuid ||
-            flag(item.actor, "blasterMobPool")) void queueSupportCleanup();
+            (item.type === "effect" && flag(item.actor, "blasterMobPool"))) queueActorScenes(item.actor);
       };
       Hooks.on("createItem", itemChanged);
       Hooks.on("updateItem", itemChanged);
       Hooks.on("deleteItem", itemChanged);
-      const actorChanged = (actor: any) => {
+      const actorChanged = (actor: any, changed?: any, options?: any) => {
+        if (!isCleanupGM() || options?.blasterMobPoolUpdate) return;
+        if (changed && !Object.keys(changed).some(key => ["system", "flags", "ownership"].includes(key)
+          || key.startsWith("system.") || key.startsWith(`flags.${moduleId}.`))) return;
         if (["blaster", "hype-thrall"].includes(flag(actor, "blasterRole")) ||
-            contents(actor?.items).some((item) => auraKind(item) || flag(item, "commandMobSource"))) void queueSupportCleanup();
+            flag(actor, "blasterMobPool") || contents(actor?.items).some((item) => auraKind(item) || flag(item, "commandMobSource"))
+            || totals.hasScene(actor.token?.parent?.id ?? canvas.scene?.id)) queueActorScenes(actor);
       };
       Hooks.on("updateActor", actorChanged);
-      Hooks.on("deleteActor", actorChanged);
-      Hooks.on("deleteToken", () => { void queueSupportCleanup(); });
-      Hooks.on("updateToken", () => { void queueSupportCleanup(); });
-      Hooks.on("drawToken", () => { void queueSupportCleanup(); });
+      Hooks.on("deleteActor", (actor: any) => actorChanged(actor));
+      Hooks.on("deleteToken", (token: any) => { totals.rememberOwner(token); tokenChanged(token); });
+      Hooks.on("updateToken", tokenChanged);
+      Hooks.on("drawToken", (token: any) => tokenChanged(token));
+      Hooks.on("createToken", (token: any) => tokenChanged(token));
       Hooks.on("userConnected", () => { void queueSupportCleanup(); });
       Hooks.on("updateUser", () => { void queueSupportCleanup(); });
       const expireTimed = () => Promise.all([background(expireThralls()), queueSupportCleanup()]);
