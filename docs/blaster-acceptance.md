@@ -2,7 +2,7 @@
 
 Target inspected: Foundry **14.370**, PF2e **8.7.1** at `d507983d7611aad7bee01b473ba918436c6ea380`, Summons Assistant source at `c99406b145280751898d315556252ea0d53c33db`.
 
-Build with `npm.cmd test` for contract/mocked checks only. The installable output is in `dist/`. No release, remote publish, or copy into a live Foundry installation is performed by the ordinary build. Passing tests is not proof of live-world behavior.
+**User policy:** Only exercise module functionality inside a real Foundry instance. Do not run unit/mock/content suites or synthetic browser previews. `npm.cmd run build` only packages the release; it is not proof of functionality. No real instance was available for 0.10.17.
 
 ## NPC and upgrade workflow
 
@@ -13,7 +13,7 @@ Build with `npm.cmd test` for contract/mocked checks only. The installable outpu
 
 ## Charged Blast and mode outcomes
 
-- Use each tier and confirm one-click 120-foot line placement with width 1/1/3 and base damage 6d8 / 14d8 / 27d10.
+- Use each tier and confirm one-click 120-foot line placement with width 1/1/3 and base damage 10d10 / 14d8 / 27d10.
 - Verify condition modes roll three fewer dice than the matching base tier.
 - Validate **Slowing Beam**: basic Fortitude with one-round slowed by degree (success 1, failure 2, critical failure 3).
 - Validate **Hypno-Beam**: mental basic Will + incapacitation, with outcomes success fascinated 1 round / failure controlled 1 round / critical failure permanent.
@@ -23,7 +23,7 @@ Build with `npm.cmd test` for contract/mocked checks only. The installable outpu
 
 ## Blastback bank
 
-- Arm **Blastback** (1 action) and verify bank capture uses native `damageTaken` after IWR, including temporary HP interactions.
+- Confirm Blastback has native once-per-day frequency, with GM override available. Arm **Blastback** (1 action) and verify bank capture uses native `damageTaken` after IWR, including temporary HP interactions.
 - Confirm area is 100-foot radius, force, flat bank with DC 40 basic Reflex, and Blaster is excluded.
 - In combat, verify release occurs once at Blaster's next own turn; out of combat verify six-world-second release.
 - Re-run Start Blastback to inspect/adjust the bank; verify Fire Now and Clear, native ordinary-HP undo, and manual correction for temporary-HP-only undo. Move while charging: the warning follows without blocking movement.
@@ -36,6 +36,12 @@ Build with `npm.cmd test` for contract/mocked checks only. The installable outpu
 - On next global round boundary, verify one explicit card resolves at DC 40 basic save with 36d10 base damage (condition modes three fewer dice).
 - Confirm each creature is resolved once across overlaps and Blaster is excluded.
 - Validate **Fire Grand Finale** manual trigger, **Clear Grand Finale** cancellation, and that ordinary blast cleanup does not cancel pending Finale.
+
+## Manual effects, healing, and sound
+
+- Drag support effects/auras onto Blaster, a player, and an unrelated NPC as GM. Confirm they activate without role/owner-link/combat restrictions and survive module summon cleanup.
+- Verify Feed the Ego's two-action entry and 40/80/120 HP links; destroy the corresponding adds manually.
+- Use Upgrade Existing Sheet and confirm the requested Your Turn stinger is configured without changing other portrait options.
 
 ## Flash Mob and command auras
 
@@ -51,13 +57,12 @@ Build with `npm.cmd test` for contract/mocked checks only. The installable outpu
 
 - Confirm clash remains zero-chatter except explicit GM-resolved damage cards.
 - On clash loss, verify incoming effect resolves as critical-hit/critical-failed-save grade against Blaster.
-- On clash win, verify **Resolve counterblast** produces one explicit card for a free out-of-turn normal hit at two-action strength (14d8 or 11d8 rider), no further attack/save/action. Other targets still resolve normally. Repeated clicks, reconnects, and GM handover must not produce duplicate cards.
+- Confirm only the compact score/winner remains at the beam midpoint, with existing dice buttons and token indicators. No gamble panel, counterblast button, or replacement UI should appear.
 - Confirm rider grade follows failure grade unless higher-level hypnotic incapacitation downgrades it to success.
 
 ## Validation boundary
 
-- Release 0.10.16: fresh build and typecheck passed; all 727 automated tests passed. Packaging audit confirmed 4 actors, 16 items, and 18 macros, valid UTF-8/macro syntax, and unchanged native spells and Strikes. An isolated browser fixture exercised live chooser changes and the Beam Clash counter button; it was not a live Foundry world.
-- Automated tests are mock/contract coverage and are not live-world proof.
+- Release 0.10.17 was packaged only. No tests or simulated previews were run. Only functional checks in a real Foundry instance are permitted by the project policy.
 - Live-world acceptance still requires manual GM/client verification for placement, ownership, timing, aura rendering, and multiplayer authority transfer.
 
 ## Evidence sources

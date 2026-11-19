@@ -5,7 +5,7 @@
   "img": "icons/svg/shield.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraGrd01]{Guard Aura}</p>\n<p>Its summoning Blaster gains a +1 untyped bonus to AC while inside this thrall's 60-foot aura. Bonuses from distinct thralls stack; one thrall never supplies multiple copies of its own benefit.</p>\n<p>The benefit ends on leaving the aura, changing this thrall's mode, or the thrall's destruction, removal, or expiration.</p>",
+      "value": "<p><strong>Effect</strong> The bearer gains +1 untyped bonus to AC. Separate manually placed copies stack.</p><p>The GM can drag this effect onto any actor. No Blaster role, summon link, combat, or module lifetime requirement applies. Remove or edit it whenever desired.</p>",
       "gm": ""
     },
     "publication": {
@@ -23,10 +23,7 @@
         "type": "untyped",
         "value": 1,
         "slug": "blaster-guard-ac",
-        "predicate": [
-          "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"
-        ],
-        "ignored": true
+        "predicate": []
       }
     ],
     "slug": "blaster-guard",
@@ -62,7 +59,7 @@
   "flags": {
     "astillon-hanaq-adventures-module": {
       "blasterSupport": "guard",
-      "blasterReceiverSignature": "unassigned-flash-mob-receiver"
+      "blasterManualSupport": true
     }
   }
 }

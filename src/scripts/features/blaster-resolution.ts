@@ -5,7 +5,7 @@ import { readBeamClash } from "./beam-clash-model.js";
 const OUTCOMES = { criticalSuccess: "Critical success", success: "Success", failure: "Failure", criticalFailure: "Critical failure" };
 const HOME_ITEMS = new Set(["BlasterShell0001", "BlasterSpectrum1", "BlasterBlastAct1", "BlasterBlastAct2",
   "BlasterBlastAct3", "BlasterFinaleAct", "BlasterFlashAct1", "BlasterCommand01", "BlasterClashAct1",
-  "BlasterBackAct01", "BlasterRange0001", "BlasterMelee0001"]);
+  "BlasterBackAct01", "BlasterHealAct01", "BlasterRange0001", "BlasterMelee0001"]);
 const COUNTER_FLAG = "beamClashCounter";
 // Module-scoped, not factory-scoped: repeated feature instances share one local
 // writer while the durable Scene claim protects reloads and other GM clients.
@@ -214,7 +214,7 @@ export function createBlasterResolution(moduleId: string, { selectToken }: { sel
       const preview = upgradePlan(source, context.actor);
       const answer = await foundry.applications.api.DialogV2.wait({
         window: { title: "Blaster · Upgrade Existing Sheet" }, rejectClose: false,
-        content: `<p>Update ${preview.updates.length} known Blaster abilities and add ${preview.creates.length} missing abilities. Set maximum HP to <strong>700</strong> and replace human/humanoid traits with dream.</p><p>Preserve actor artwork, Notes, custom items, native spell uses, and ability GM notes. Known homebrew ability mechanics are replaced with the new sheet.</p><label><input type="checkbox" name="fullHeal"> Fully heal to 700 HP</label><p>Unchecked: preserve existing wounds.</p>`,
+        content: `<p>Update ${preview.updates.length} known Blaster abilities and add ${preview.creates.length} missing abilities. Set maximum HP to <strong>700</strong> and replace human/humanoid traits with dream.</p><p>Preserve actor artwork, Notes, custom items, native spell uses, and ability GM notes. Apply Blaster's configured Your Turn sound stinger. Known homebrew ability mechanics are replaced with the new sheet.</p><label><input type="checkbox" name="fullHeal"> Fully heal to 700 HP</label><p>Unchecked: preserve existing wounds.</p>`,
         buttons: [
           { action: "confirm", label: "Upgrade sheet", default: true, callback: (_event: Event, button: any) => ({ fullHeal: button.form.elements.fullHeal.checked }) },
           { action: "cancel", label: "Cancel", callback: () => null },
@@ -245,7 +245,8 @@ export function createBlasterResolution(moduleId: string, { selectToken }: { sel
         const traits = [...new Set<string>((raw.traits.value as string[]).filter(trait => !["human", "humanoid"].includes(trait)))];
         if (!traits.includes("dream")) traits.push("dream");
         await context.actor.update({ "system.attributes.hp.max": 700,
-          "system.attributes.hp.value": answer.fullHeal ? 700 : Math.max(0, 700 - wounds), "system.traits.value": traits });
+          "system.attributes.hp.value": answer.fullHeal ? 700 : Math.max(0, 700 - wounds), "system.traits.value": traits,
+          [`flags.${moduleId}.yourTurnSound`]: source.getFlag(moduleId, "yourTurnSound") ?? "" });
       } catch (error) {
         ui.notifications.warn(`Blaster upgrade may be partial (${updated} abilities updated, ${added} added). Inspect the actor before retrying.`);
         throw error;

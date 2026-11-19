@@ -1,5 +1,4 @@
 import type { ModuleFeature } from "./feature.js";
-import { BLAST_TIERS } from "./blaster-model.js";
 import {
   acceptBeamRoll, beamMeetingPoint, canSubmitBeamRoll, isBeamSide, readBeamClash,
   type BeamClashState, type BeamSide,
@@ -396,17 +395,7 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
     const midpoint = beamMeetingPoint(center(pair[0]), center(pair[1]), state!.status === "finished" ? 0 : state!.score);
     const screen = screenPoint(midpoint);
     const score = root.querySelector<HTMLElement>(".astillon-beam-clash__score");
-    if (score) {
-      const blaster = pair[0].actor?.getFlag?.(moduleId, "blasterRole") === "blaster";
-      const bottom = Math.max(...pair.map(token => {
-        const point = center(token);
-        point.y += (token.object?.h ?? token.height * scene.grid.size) / 2;
-        return screenPoint(point).y;
-      }));
-      // The expanded gamble/result card must not obscure either token or its roll button.
-      score.style.left = `${screen.x}px`;
-      score.style.top = `${blaster ? bottom + (state!.status === "finished" ? 18 : 100) : screen.y - 40}px`;
-    }
+    if (score) { score.style.left = `${screen.x}px`; score.style.top = `${screen.y - 40}px`; }
   }
 
   function renderControls(scene: any, state: BeamClashState | null): void {
@@ -459,20 +448,6 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
       const score = document.createElement("div");
       score.className = "astillon-beam-clash__score";
       score.setAttribute("role", "status");
-      const result = document.createElement("div");
-      result.className = "astillon-beam-clash__result";
-      const stakes = document.createElement("div");
-      stakes.className = "astillon-beam-clash__stakes";
-      const counter = document.createElement("button");
-      counter.type = "button";
-      counter.className = "astillon-beam-clash__counter";
-      counter.textContent = "Resolve counterblast";
-      counter.addEventListener("click", () => {
-        const api = (game as any).astillonHanaqAdventures?.blaster;
-        if (typeof api?.counterblast !== "function") { notify("Reload the module to enable the counterblast tool."); return; }
-        void Promise.resolve(api.counterblast()).catch(logError);
-      });
-      score.append(result, stakes, counter);
       root.append(score);
       document.body.append(root);
     }
@@ -515,21 +490,9 @@ export function createBeamClashFeature(moduleId: string): ModuleFeature {
         ? won ? "WINNER" : "DEFEATED" : `${remaining} ${remaining === 1 ? "push" : "pushes"} to win`;
       indicator.setAttribute("aria-label", `${pair[i].name}: ${result ? `rolled ${result.total}` : "waiting to roll"}, round ${round}. ${finished ? won ? "Winner" : "Defeated" : `${remaining} ${remaining === 1 ? "push" : "pushes"} to win`}.`);
     }
-    root.querySelector<HTMLElement>(".astillon-beam-clash__result")!.textContent =
+    root.querySelector<HTMLElement>(".astillon-beam-clash__score")!.textContent =
       state.status === "finished" ? `${pair[state.winner === "red" ? 0 : 1].name} wins the clash!`
         : `Round ${state.round} · ${state.score > 0 ? "+" : ""}${state.score} · First to ±3`;
-    const tier = BLAST_TIERS[2];
-    const isBlaster = pair[0].actor?.getFlag?.(moduleId, "blasterRole") === "blaster";
-    root.querySelector<HTMLElement>(".astillon-beam-clash__stakes")!.hidden = !isBlaster;
-    root.querySelector<HTMLElement>(".astillon-beam-clash__stakes")!.textContent = state.status === "finished"
-      ? state.winner === "red" ? `Negate the incoming effect against ${pair[0].name}. Free ${tier.dice}d${tier.die} counterhit against ${pair[1].name} (riders use fewer dice).`
-        : `${pair[0].name} accepts the incoming critical hit / critical-failed save. GM resolves damage.`
-      : `${pair[0].name}'s gamble: lose = incoming critical; win = negate it and a free two-action counterhit.`;
-    const counter = root.querySelector<HTMLButtonElement>(".astillon-beam-clash__counter")!;
-    const used = scene.getFlag(moduleId, "beamClashCounter");
-    counter.hidden = !isBlaster || state.status !== "finished" || state.winner !== "red" || !game.user.isGM;
-    counter.disabled = !isAuthority() || used?.clashId === state.id;
-    counter.textContent = used?.clashId === state.id ? "Counterblast already resolved / pending" : "Resolve counterblast";
     positionControls();
   }
 

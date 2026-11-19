@@ -26,6 +26,7 @@ export function createBlasterSummons(moduleId: string) {
   const poolSource = `${moduleId}.blasterMobPool`;
   const warn = (message: string) => { ui.notifications.warn(message); return false; };
   const flag = (document: any, key: string) => document?.getFlag(moduleId, key);
+  const isManual = (item: any) => flag(item, "blasterManualSupport") === true;
   const contents = (collection: any): any[] => Array.from(collection?.values?.() ?? collection ?? []);
   const tokenDocument = (value: any) => value?.document ?? value;
   const sceneTokens = () => contents(canvas.scene?.tokens);
@@ -86,15 +87,59 @@ export function createBlasterSummons(moduleId: string) {
     return thrall.auras?.get(AURA_SLUGS[kind])?.containsToken(owner) === true;
   }
 
-  /** Native Aura supplies geometry/entry/exit. Only validated received copies activate rules. */
-  function prepareAura(item: any) {
+  function makeManagedAura(source: any, kind: Support) {
+    source.flags[moduleId].blasterManualSupport = false;
+    source.system.rules = source.system.rules.map((rule: any) => rule.key !== "Aura" ? rule : ({ ...rule,
+      slug: AURA_SLUGS[kind], predicate: ["self:trait:thrall"],
+      effects: rule.effects.map((effect: any) => ({ ...effect, uuid: `{actor|uuid}.Item.${SUPPORT_IDS[kind]}`,
+        affects: "all", includesSelf: false,
+        predicate: ["target:signature:{actor|flags.pf2e-summons-assistant.summoner.signature}"],
+      })),
+    }));
+  }
+
+  function allowManualSupport(item: any) {
+    const kind = auraKind(item), support = flag(item, "blasterSupport") as Support;
+    const source = item.toObject();
+    source.flags[moduleId] = { ...source.flags[moduleId], blasterManualSupport: true };
+    delete source.flags[moduleId].commandMobSource;
+    if (source.flags.pf2e) delete source.flags.pf2e.aura;
+    if (kind) {
+      source.system.rules = source.system.rules.map((rule: any) => rule.key !== "Aura" ? rule : ({ ...rule,
+        slug: `blaster-manual-${kind}-${item.id}`, predicate: [],
+        effects: rule.effects.map((effect: any) => ({ ...effect, uuid: itemUuid(SUPPORT_IDS[kind]),
+          affects: "allies", includesSelf: true, predicate: [] })),
+      }));
+    } else {
+      source.system.rules = support === "tempHP" ? [{ key: "TempHP", value: 10 }] : source.system.rules.map((rule: any) => ({
+        ...rule, ignored: false, slug: `${rule.slug}-${item.id}`,
+        predicate: (rule.predicate ?? []).filter((entry: any) => typeof entry !== "string" || !entry.startsWith("self:signature:")),
+      }));
+    }
+    item.updateSource({ system: source.system, flags: source.flags,
+      [`flags.${moduleId}.-=commandMobSource`]: null, "flags.pf2e.-=aura": null });
+  }
+
+  /** Manual GM drops are unrestricted; automatic summon recipients retain their own lifecycle. */
+  function prepareAura(item: any, _data: any, options: any = {}) {
     if (!item.actor || item.type !== "effect") return;
+    if (isManual(item)) {
+      // Standard native effects: no module owner, actor-role, or lifetime restrictions.
+      item.updateSource({ "system.rules": item.system.rules.map((rule: any) =>
+        ["FlatModifier", "Aura"].includes(rule.key) ? { ...rule, slug: `${rule.slug}-${item.id}` } : rule) });
+      return;
+    }
+    const kind = auraKind(item);
+    const support = flag(item, "blasterSupport") as Support;
+    if (game.user?.isGM && !options.blasterManaged && !item.flags?.pf2e?.aura &&
+        (kind || Object.prototype.hasOwnProperty.call(SUPPORT_IDS, support))) {
+      // Also make older compendium/world copies usable when dragged manually.
+      allowManualSupport(item);
+      return;
+    }
     if (auraKind(item)) {
       const owner = auraOwner(item.actor);
-      if (!isCleanupGM() || !owner || contents(item.actor.items).some((entry) => auraKind(entry))) {
-        warn("Apply Flash Mob auras to a living thrall placed by this Blaster's Flash Mob macro.");
-        return false;
-      }
+      if (!owner) return;
       const source = item.toObject();
       stampSupport(source, owner.ctx, owner.thrall);
       item.updateSource({ system: source.system, flags: source.flags });
@@ -105,7 +150,10 @@ export function createBlasterSummons(moduleId: string) {
       const kind = emitter ? auraKind(emitter) : null;
       if (!owner || !kind || owner.ctx.actor.uuid !== item.actor.uuid ||
           item.sourceId !== `${emitter.actor.uuid}.Item.${SUPPORT_IDS[kind]}` ||
-          !nativeContains(owner.thrall, owner.ctx.token, kind)) return false;
+          !nativeContains(owner.thrall, owner.ctx.token, kind)) {
+        if (game.user?.isGM) allowManualSupport(item);
+        return;
+      }
       const source = emitter.toObject();
       stampSupport(source, owner.ctx, owner.thrall);
       const marker = source.flags[moduleId].commandMobSource;
@@ -204,7 +252,11 @@ export function createBlasterSummons(moduleId: string) {
       if (thrall.actor.items.get(id)) continue;
       const source = await effectSource(id, ctx);
       source._id = id;
-      await thrall.actor.createEmbeddedDocuments("Item", [source], { keepId: true });
+      source.flags[moduleId].blasterManualSupport = false;
+      source.system.rules = source.system.rules.filter((rule: any) => rule.key !== "TempHP").map((rule: any) => ({
+        ...rule, ignored: true, predicate: [...(rule.predicate ?? []), "self:signature:{item|flags.astillon-hanaq-adventures-module.blasterReceiverSignature}"],
+      }));
+      await thrall.actor.createEmbeddedDocuments("Item", [source], { keepId: true, blasterManaged: true });
     }
   }
 
@@ -344,9 +396,10 @@ export function createBlasterSummons(moduleId: string) {
         }
         try {
           await ensureReceivers(token, ctx);
-          if (!contents(token.actor.items).some((item) => auraKind(item))) {
+          if (!contents(token.actor.items).some((item) => auraKind(item) && !isManual(item))) {
             const source = await effectSource(AURA_IDS[variant.support], ctx);
-            await token.actor.createEmbeddedDocuments("Item", [source]);
+            makeManagedAura(source, variant.support);
+            await token.actor.createEmbeddedDocuments("Item", [source], { blasterManaged: true });
           }
           await notifyAura(token);
         } catch (error) { repairFailed = true; console.error(`${moduleId} | Thrall default aura repair`, error); }
@@ -385,13 +438,14 @@ export function createBlasterSummons(moduleId: string) {
       if (!Object.prototype.hasOwnProperty.call(SUPPORT_IDS, choice.support)) return warn("Choose a valid support option.");
       const kind = choice.support as Support;
       const source = await effectSource(AURA_IDS[kind], ctx);
+      makeManagedAura(source, kind);
       // Serialize mode changes and cleanup. Never remove/recreate a native TempHP rule.
       const apply = supportCleanup.catch(() => {}).then(async () => {
         const thrall = liveThralls(ctx).find((token) => token.uuid === choice.thrallUuid && inRange(token, ctx));
         if (!stillCurrent(ctx) || !thrall) return warn("The selected Blaster, thrall, scene, or GM authority changed.");
         if (!auraOwner(thrall.actor)) return warn("The thrall's summoner link is missing or ambiguous. Summon it again with Flash Mob.");
         await ensureReceivers(thrall, ctx);
-        const old = contents(thrall.actor.items).filter((item) => auraKind(item));
+        const old = contents(thrall.actor.items).filter((item) => auraKind(item) && !isManual(item));
         if (old.length === 1 && auraKind(old[0]) === kind) return true;
         if (!stillCurrent(ctx) || !isOwnedThrall(thrall, ctx) || !isLive(thrall) || !inRange(thrall, ctx)) return warn("The selected thrall or GM authority changed before applying support.");
         stampSupport(source, ctx, thrall);
@@ -401,11 +455,11 @@ export function createBlasterSummons(moduleId: string) {
           return warn("The selected thrall, scene, or GM authority changed while replacing its aura. Inspect the thrall before retrying.");
         }
         try {
-          const effects = await thrall.actor.createEmbeddedDocuments("Item", [source]);
+          const effects = await thrall.actor.createEmbeddedDocuments("Item", [source], { blasterManaged: true });
           if (!effects.length) throw new Error("The new aura was not created.");
         } catch (error) {
           if (stillCurrent(ctx) && isOwnedThrall(thrall, ctx) && isLive(thrall) && !contents(thrall.actor.items).some((item) => auraKind(item))) {
-            await thrall.actor.createEmbeddedDocuments("Item", previous, { keepId: true });
+            await thrall.actor.createEmbeddedDocuments("Item", previous, { keepId: true, blasterManaged: true });
           }
           throw error;
         }
@@ -517,6 +571,7 @@ export function createBlasterSummons(moduleId: string) {
       const managed = allTokens().find((token) => token.actor?.uuid === actor.uuid && flag(token, "blasterSummon"));
       if (managed && pending.has(flag(managed, "blasterSummon").ownerTokenUuid)) continue;
       const ids = contents(actor.items).filter((item) => {
+        if (isManual(item)) return false;
         const kind = auraKind(item);
         const marker = flag(item, "commandMobSource");
         if (kind) return (managed || marker) && (!auraOwner(actor) || item.isExpired || item.system.expired);

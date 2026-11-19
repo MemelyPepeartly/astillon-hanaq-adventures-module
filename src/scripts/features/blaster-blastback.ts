@@ -244,7 +244,7 @@ export function createBlasterBlastback(moduleId: string, { selectToken }: { sele
     assertAuthority();
     const oldIds = markedRegions(scene, token.id).filter(r => flag(r, MARK_FLAG).id !== id).map(r => r.id);
     if (oldIds.length) await scene.deleteEmbeddedDocuments("Region", oldIds);
-    ui.notifications.info("Blastback armed (1 action, GM adjudicated). Damage is taken normally; the bank will release on the next scheduled turn or after six world seconds outside combat.");
+    ui.notifications.info("Blastback armed (1 action, once per day; track the sheet's daily use). Damage is taken normally; the bank will release on the next scheduled turn or after six world seconds outside combat. GM overrides remain available.");
     return true;
   }
   async function start(): Promise<boolean> {

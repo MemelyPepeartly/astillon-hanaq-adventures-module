@@ -2,7 +2,7 @@ export type Point = { x: number; y: number };
 export type Charge = 1 | 2 | 3;
 /** Immediate blasts are straight lines of this fixed length. */
 export const BLAST_TIERS = {
-  1: { name: "Snapshot", dice: 6, die: 8, range: 120, width: 1 },
+  1: { name: "Snapshot", dice: 10, die: 10, range: 120, width: 1 },
   2: { name: "Spotlight", dice: 14, die: 8, range: 120, width: 1 },
   3: { name: "Standing Ovation", dice: 27, die: 10, range: 120, width: 3 },
 } as const;

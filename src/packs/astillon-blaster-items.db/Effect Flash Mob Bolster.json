@@ -5,7 +5,7 @@
   "img": "icons/svg/upgrade.svg",
   "system": {
     "description": {
-      "value": "<p>Granted by @UUID[Compendium.astillon-hanaq-adventures-module.astillon-blaster-items.Item.BlasterAuraBol01]{Bolster Aura}</p>\n<p>This thrall contributes 10 temporary HP to its summoning Blaster's Flash Mob pool once during its lifetime. Contributions from distinct thralls add together. Leaving the aura retains the remaining HP; re-entry, another command, and returning to Bolster never refill spent HP.</p>\n<p>The module tracks each contribution and removes only its unspent HP when the thrall is destroyed, removed, or expires. Changing its mode retains already-granted HP until then. Flash Mob does not add to temporary HP from unrelated sources; higher existing temporary HP retain their source and duration.</p>",
+      "value": "<p><strong>Effect</strong> The bearer gains 10 temporary HP, using normal PF2e temporary-HP rules. The GM can edit this amount freely.</p><p>The GM can drag this effect onto any actor. No Blaster role, summon link, combat, or module lifetime requirement applies. Remove or edit it whenever desired.</p>",
       "gm": ""
     },
     "publication": {
@@ -14,7 +14,12 @@
       "license": "ORC",
       "remaster": true
     },
-    "rules": [],
+    "rules": [
+      {
+        "key": "TempHP",
+        "value": 10
+      }
+    ],
     "slug": "blaster-temp-hp",
     "_migration": {
       "version": 0.961,
@@ -48,7 +53,7 @@
   "flags": {
     "astillon-hanaq-adventures-module": {
       "blasterSupport": "tempHP",
-      "blasterReceiverSignature": "unassigned-flash-mob-receiver"
+      "blasterManualSupport": true
     }
   }
 }
