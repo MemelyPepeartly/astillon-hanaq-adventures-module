@@ -3,12 +3,18 @@ import type { ModuleFeature } from "./feature.js";
 const SETTING = "darkTriadCutscene";
 const IMAGE = "common/monsters/dark_triad.png";
 const LIGHTNING = "jb2a.call_lightning.low_res.red";
+const THUNDER = "common/sound-effects/unsorted/Thunderstorm_SFX.mp3";
 const FADE = 8000;
+const FADE_OUT = 1500;
+
+type ThunderRun = { sound?: any; starting?: Promise<unknown>; stopping?: Promise<void> };
 
 /** GM-owned world setting synchronizes the cinematic; Sequencer renders locally per viewer. */
 export function createDarkTriadCutsceneFeature(moduleId: string): ModuleFeature {
   const globals = globalThis as any;
   let ready = false, current = "", dismissed = "", generation = 0;
+  let thunder: ThunderRun | undefined;
+  let thunderCleanup = Promise.resolve();
   const prefix = () => `${moduleId}.dark-triad.${game.user.id}.`;
   const report = (error: unknown) => {
     console.warn(`${moduleId} | Dark Triad cutscene`, error);
@@ -18,9 +24,52 @@ export function createDarkTriadCutsceneFeature(moduleId: string): ModuleFeature 
     if (!game.modules.get("sequencer")?.active || !globals.Sequence || !globals.Sequencer?.EffectManager) return false;
     try { return !!globals.Sequencer.Database.getEntry(LIGHTNING); } catch { return false; }
   }
+  function stopThunder(run: ThunderRun | undefined, fade = FADE_OUT): Promise<void> {
+    if (!run?.sound) return Promise.resolve();
+    return run.stopping ??= (async () => {
+      // Let an in-flight play settle before stopping its unique Sound.
+      await run.starting?.catch(() => {});
+      try { await run.sound.stop({ fade }); }
+      catch (error) { console.warn(`${moduleId} | Dark Triad thunder cleanup`, error); }
+    })();
+  }
+  async function playThunder(id: string, revision: number) {
+    const run: ThunderRun = {};
+    thunder = run;
+    const active = () => thunder === run && current === id && generation === revision;
+    try {
+      const audio = game.audio;
+      if (!audio?.environment || typeof audio.create !== "function") throw new Error("Foundry audio unavailable");
+      await audio.unlock;
+      if (!active()) return;
+      // The shared setting starts one local Sound per viewer, not another broadcast.
+      // Environment context preserves the viewer's own volume and mute controls.
+      run.sound = audio.create({ src: THUNDER, context: audio.environment, singleton: false, preload: false, autoplay: false });
+      await run.sound.load({ autoplay: false });
+      await thunderCleanup;
+      if (!active()) { await stopThunder(run, 0); return; }
+      if (run.sound.failed) throw new Error("Thunder audio failed to load");
+      const lowpass = globals.foundry.audio.Sound.createEffect(audio.environment, { type: "lowpass", intensity: 6 });
+      if (!lowpass) throw new Error("Foundry low-pass effect unavailable");
+      run.sound.applyEffects([lowpass]);
+      run.starting = Promise.resolve(run.sound.play({ loop: true, volume: 0.7, offset: 0, fade: FADE }));
+      await run.starting;
+      if (!active()) await stopThunder(run);
+    } catch (error) {
+      if (active()) {
+        console.warn(`${moduleId} | Dark Triad thunder`, error);
+        ui.notifications.warn("Dark Triad thunder could not play. Check common/sound-effects/unsorted/Thunderstorm_SFX.mp3. The cutscene will continue without audio.");
+        thunder = undefined;
+      }
+      await stopThunder(run, 0);
+    }
+  }
   async function stopLocal() {
     generation++;
     current = "";
+    const previous = thunder;
+    thunder = undefined;
+    thunderCleanup = Promise.all([thunderCleanup, stopThunder(previous)]).then(() => {});
     if (globals.Sequencer?.EffectManager) await globals.Sequencer.EffectManager.endEffects({ name: `${prefix()}*` }, false);
   }
   async function render() {
@@ -45,7 +94,7 @@ export function createDarkTriadCutsceneFeature(moduleId: string): ModuleFeature 
       const sequence = new globals.Sequence({ moduleName: moduleId });
       const screen = (file: string, layer: number) => sequence.effect().file(file)
         .screenSpace().screenSpaceAboveUI().screenSpaceAnchor(0.5).zIndex(layer)
-        .name(`${prefix()}${id}.${layer}`).persist().temporary().fadeIn(FADE).fadeOut(1500);
+        .name(`${prefix()}${id}.${layer}`).persist().temporary().fadeIn(FADE).fadeOut(FADE_OUT);
       screen(`modules/${moduleId}/assets/dark-triad/black.svg`, 100)
         .screenSpaceScale({ fitX: true, fitY: true });
       screen(LIGHTNING, 101).screenSpaceScale({ fitY: true, ratioX: true }).opacity(0.7).volume(0);
@@ -54,6 +103,7 @@ export function createDarkTriadCutsceneFeature(moduleId: string): ModuleFeature 
       void sequence.play({ local: true }).catch((error: unknown) => {
         if (current === id) { void stopLocal(); report(error); }
       });
+      void playThunder(id, revision);
     } catch (error) {
       if (current === id) { await stopLocal(); report(error); }
     }

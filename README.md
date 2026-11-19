@@ -137,7 +137,9 @@ See [Blaster's design and balance notes](docs/blaster-design.md) and the [live-w
 
 Import **Dark Triad — Start Cutscene** and **Dark Triad — End Cutscene** from the encounter macros pack. As GM, Start fades the map and Foundry UI to black over **eight seconds**, revealing `common/monsters/dark_triad.png` rotating once per minute over `jb2a.call_lightning.low_res.red`. It stays on screen until End (or GM Escape), then fades back to the unchanged map. Player Escape is a local-only escape hatch.
 
-The cutscene is shared through a GM-owned world setting and rendered locally with Sequencer screen-space effects above the UI; it creates no map tiles or camera changes. Sequencer, the lightning asset, and the image path must be available to clients. No private JB2A assets are bundled.
+The cutscene also loops `common/sound-effects/unsorted/Thunderstorm_SFX.mp3` beneath the visuals, with Foundry's native low-pass filter at intensity 6 for a muffled rumble. It fades in over eight seconds and out over 1.5 seconds when dismissed. Each viewer hears one local copy at 70% volume through their **Environment** channel, respecting their volume and mute controls. Browser audio must be unlocked by a user gesture; ending the cutscene cancels delayed playback. Other sounds and scene filters are unchanged. Missing audio does not interrupt the visuals.
+
+The cutscene is shared through a GM-owned world setting and rendered locally with Sequencer screen-space effects above the UI; it creates no map tiles or camera changes. Sequencer, the lightning asset, image, and thunder paths must be available to clients. No private JB2A assets or sound files are bundled.
 
 ## Menacing
 
@@ -185,6 +187,8 @@ At world startup, each client preloads the effective portraits for world actors,
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse, Preview, and placement controls do not submit the dialog; Save reads that specific editor and updates art, placement, color, and sound together. Two actor editors can be open without mixing drafts or moving each other's preview. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.20 adds globally triggered, locally filtered looping thunder to the Dark Triad cutscene. Update the module and reload; existing Start/End macros automatically use the sound. Release packaging only; audio and multiplayer functionality have not been tested in a real Foundry instance.
 
 Version 0.10.19 repairs default aura activation, totals all overlapping support sources (including cumulative temporary HP), and adds the Dark Triad Start/End cutscene macros. Existing marked adds are repaired on reload. No tests or simulated previews were run; functional confirmation requires a real Foundry instance.
 
