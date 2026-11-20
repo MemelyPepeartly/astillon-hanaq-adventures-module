@@ -1,4 +1,5 @@
 import type { ModuleFeature } from "./feature.js";
+import { createOutlinePainter, drawOutlineExclusions, normalizeOutlineMask, type OutlineMask } from "./your-turn-outline.js";
 
 const FEATURE_ID = "your-turn";
 const SETTING_ENABLED = "yourTurnEnabled";
@@ -10,6 +11,8 @@ const ART_FLAG = "yourTurnArt";
 const COLOR_FLAG = "yourTurnColor";
 const SOUND_FLAG = "yourTurnSound";
 const TRANSFORM_FLAG = "yourTurnPortraitTransform";
+const OUTLINE_FLAG = "yourTurnOpaqueOutline";
+const MASK_FLAG = "yourTurnOutlineMask";
 const DEFAULT_COLOR = "#2B8CFF";
 const ROOT_CLASS = "astillon-yt";
 const CONFIGURE_CLASS = "astillon-your-turn-configure";
@@ -66,11 +69,13 @@ type Subject = {
   color: string;
   sound: string;
   transform: PortraitTransform;
+  opaqueOnly: boolean;
+  outlineMask: OutlineMask | null;
 };
 
 type PortraitTransform = { x: number; y: number; scale: number };
-type ArtDraft = { art: string; color: string; sound?: string; transform?: PortraitTransform };
-type EditorSession = { closed: boolean; transform?: PortraitTransform; color?: string };
+type ArtDraft = { art: string; color: string; sound?: string; transform?: PortraitTransform; opaqueOnly?: boolean; outlineMask?: OutlineMask | null };
+type EditorSession = { closed: boolean; transform?: PortraitTransform; color?: string; opaqueOnly?: boolean; artRevision?: number; outlineMask?: OutlineMask | null; painting?: boolean };
 type Stinger = { sound?: any; starting?: Promise<unknown> };
 
 type Rgb = { r: number; g: number; b: number };
@@ -166,9 +171,9 @@ export function saturatedPanelColor(hex: string): string {
  * Only contour ink is stamped; the nearest ink pixel is always on that contour.
  */
 export function renderOutlineMask(
-  pixels: Uint8ClampedArray, width: number, height: number, radius: number,
+  pixels: Uint8ClampedArray, width: number, height: number, radius: number, opaqueOnly = false,
 ): Uint8ClampedArray {
-  const rows = outlineRows(pixels, width, height, radius);
+  const rows = outlineRows(pixels, width, height, radius, opaqueOnly);
   let next = rows.next();
   while (!next.done) next = rows.next();
   return next.value;
@@ -179,6 +184,7 @@ function* outlineRows(
   width: number,
   height: number,
   radius: number,
+  opaqueOnly = false,
 ): Generator<void, Uint8ClampedArray> {
   const pad = Math.max(0, radius);
   const outWidth = width + pad * 2;
@@ -188,7 +194,7 @@ function* outlineRows(
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      if (!isContourInk(pixels, width, height, x, y)) continue;
+      if (!isContourInk(pixels, width, height, x, y, opaqueOnly ? OPAQUE_ALPHA : INK_ALPHA)) continue;
       const centerX = x + pad;
       const centerY = y + pad;
       const y0 = Math.max(0, centerY - radius);
@@ -213,8 +219,8 @@ function* outlineRows(
   return out;
 }
 
-async function renderOutlineAsync(pixels: Uint8ClampedArray, width: number, height: number, radius: number): Promise<Uint8ClampedArray> {
-  const rows = outlineRows(pixels, width, height, radius);
+async function renderOutlineAsync(pixels: Uint8ClampedArray, width: number, height: number, radius: number, opaqueOnly = false): Promise<Uint8ClampedArray> {
+  const rows = outlineRows(pixels, width, height, radius, opaqueOnly);
   let deadline = performance.now() + 4;
   let next = rows.next();
   while (!next.done) {
@@ -287,17 +293,17 @@ function hslToRgb(h: number, s: number, l: number): Rgb {
   };
 }
 
-function isInk(pixels: Uint8ClampedArray, width: number, height: number, x: number, y: number): boolean {
+function isInk(pixels: Uint8ClampedArray, width: number, height: number, x: number, y: number, minimumAlpha: number): boolean {
   if (x < 0 || y < 0 || x >= width || y >= height) return false;
-  return pixels[(y * width + x) * 4 + 3] >= INK_ALPHA;
+  return pixels[(y * width + x) * 4 + 3] >= minimumAlpha;
 }
 
-function isContourInk(pixels: Uint8ClampedArray, width: number, height: number, x: number, y: number): boolean {
-  if (!isInk(pixels, width, height, x, y)) return false;
+function isContourInk(pixels: Uint8ClampedArray, width: number, height: number, x: number, y: number, minimumAlpha: number): boolean {
+  if (!isInk(pixels, width, height, x, y, minimumAlpha)) return false;
   for (let dy = -1; dy <= 1; dy += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
       if (dx === 0 && dy === 0) continue;
-      if (!isInk(pixels, width, height, x + dx, y + dy)) return true;
+      if (!isInk(pixels, width, height, x + dx, y + dy, minimumAlpha)) return true;
     }
   }
   return false;
@@ -402,7 +408,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   const failedArt = new Map<string, number>();
   let pendingSlices: Promise<void> | undefined;
   let pendingPreload: Promise<void> | undefined;
-  const artQueue = new Map<string, { art: string[]; background: boolean }>();
+  const artQueue = new Map<string, { art: string[]; background: boolean; opaqueOnly: boolean; outlineMask: OutlineMask | null }>();
   let preloadEpoch = 0;
   const boundEditors = new WeakSet<HTMLElement>();
   const liveBlobs = new Set<string>();
@@ -522,6 +528,16 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     return normalizePortraitTransform(flagRaw(actor, TRANSFORM_FLAG) ?? flagRaw(baseActor, TRANSFORM_FLAG));
   }
 
+  function opaqueOutlineFrom(actor: any, baseActor = actor?.token?.baseActor): boolean {
+    const value = flagRaw(actor, OUTLINE_FLAG);
+    return typeof value === "boolean" ? value : flagRaw(baseActor, OUTLINE_FLAG) === true;
+  }
+
+  function outlineMaskFrom(actor: any, baseActor = actor?.token?.baseActor): OutlineMask | null {
+    const value = flagRaw(actor, MASK_FLAG);
+    return normalizeOutlineMask(value !== undefined ? value : flagRaw(baseActor, MASK_FLAG));
+  }
+
   function subjectFromCombatant(combatant: any): Subject {
     const actor = combatant?.actor;
     const baseActor = combatant?.token?.baseActor;
@@ -534,6 +550,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       color: colorFrom(actor, baseActor, null),
       sound: trimmed(flagRaw(actor ?? baseActor, SOUND_FLAG)),
       transform: transformFrom(actor, baseActor),
+      opaqueOnly: opaqueOutlineFrom(actor, baseActor),
+      outlineMask: outlineMaskFrom(actor, baseActor),
     };
   }
 
@@ -545,6 +563,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       color: colorFrom(actor, null, draft ? draft.color : null),
       sound: draft?.sound !== undefined ? trimmed(draft.sound) : trimmed(flagRaw(actor, SOUND_FLAG)),
       transform: draft?.transform ? normalizePortraitTransform(draft.transform) : transformFrom(actor),
+      opaqueOnly: draft?.opaqueOnly ?? opaqueOutlineFrom(actor),
+      outlineMask: draft?.outlineMask !== undefined ? draft.outlineMask : outlineMaskFrom(actor),
     };
   }
 
@@ -973,7 +993,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     });
   }
 
-  async function rasterize(image: HTMLImageElement, src: string): Promise<ArtResult> {
+  async function rasterize(image: HTMLImageElement, src: string, opaqueOnly: boolean, outlineMask: OutlineMask | null): Promise<ArtResult> {
     const drawn = scaledEdge(image.naturalWidth || image.width, image.naturalHeight || image.height);
     if (!drawn.width || !drawn.height) throw new Error("your-turn art empty");
     const canvas = document.createElement("canvas");
@@ -996,13 +1016,15 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
 
     const radius = outlineRadius(drawn.width, drawn.height);
-    const mask = await renderOutlineAsync(pixels.data, drawn.width, drawn.height, radius);
+    // Only the outline mask changes. Composite the complete original RGBA art above it.
+    const mask = await renderOutlineAsync(pixels.data, drawn.width, drawn.height, radius, opaqueOnly);
     const outlined = document.createElement("canvas");
     outlined.width = drawn.width + radius * 2;
     outlined.height = drawn.height + radius * 2;
     const outContext = outlined.getContext("2d");
     if (!outContext) throw new Error("your-turn canvas unavailable");
     outContext.putImageData(imageDataFrom(mask, outlined.width, outlined.height), 0, 0);
+    drawOutlineExclusions(outContext, outlineMask, drawn.width, drawn.height, radius);
     outContext.drawImage(canvas, radius, radius);
 
     const blob = await canvasToBlob(outlined);
@@ -1011,24 +1033,26 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     return { mode: "sticker", url: create.call(URL, blob), width: outlined.width, height: outlined.height };
   }
 
-  function prepareArt(src: string): Promise<ArtResult> {
-    const cached = artCache.get(src);
-    if (cached) { artCache.delete(src); artCache.set(src, cached); return Promise.resolve(cached); }
-    const pending = pendingArt.get(src);
+  const artKey = (src: string, opaqueOnly: boolean, mask: OutlineMask | null = null) => JSON.stringify([src, opaqueOnly, mask?.image === src ? mask.strokes : []]);
+  function prepareArt(src: string, opaqueOnly: boolean, outlineMask: OutlineMask | null): Promise<ArtResult> {
+    const key = artKey(src, opaqueOnly, outlineMask);
+    const cached = artCache.get(key);
+    if (cached) { artCache.delete(key); artCache.set(key, cached); return Promise.resolve(cached); }
+    const pending = pendingArt.get(key);
     if (pending) return pending;
-    if ((failedArt.get(src) ?? 0) > Date.now()) return Promise.reject(new Error("Your Turn image retry deferred"));
-    const job = prepareUncachedArt(src).then(result => {
-      failedArt.delete(src);
-      return rememberArt(src, result);
+    if ((failedArt.get(key) ?? 0) > Date.now()) return Promise.reject(new Error("Your Turn image retry deferred"));
+    const job = prepareUncachedArt(src, opaqueOnly, outlineMask?.image === src ? outlineMask : null).then(result => {
+      failedArt.delete(key);
+      return rememberArt(key, result);
     }).catch(error => {
-      failedArt.set(src, Date.now() + ART_RETRY_MS);
+      failedArt.set(key, Date.now() + ART_RETRY_MS);
       throw error;
-    }).finally(() => pendingArt.delete(src));
-    pendingArt.set(src, job);
+    }).finally(() => pendingArt.delete(key));
+    pendingArt.set(key, job);
     return job;
   }
 
-  async function prepareUncachedArt(src: string): Promise<ArtResult> {
+  async function prepareUncachedArt(src: string, opaqueOnly: boolean, outlineMask: OutlineMask | null): Promise<ArtResult> {
     const resolved = resolveArtUrl(src);
     let image: HTMLImageElement;
     let loaded = resolved;
@@ -1040,7 +1064,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       loaded = src;
     }
     try {
-      const prepared = await rasterize(image, loaded);
+      const prepared = await rasterize(image, loaded, opaqueOnly, outlineMask);
       if (prepared.url !== loaded) {
         try { await loadImage(prepared.url); }
         catch (error) { URL.revokeObjectURL(prepared.url); throw error; }
@@ -1052,10 +1076,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  async function firstArt(art: string[]): Promise<ArtResult | null> {
+  async function firstArt(art: string[], opaqueOnly = false, outlineMask: OutlineMask | null = null): Promise<ArtResult | null> {
     for (const src of [...new Set([...art, "icons/svg/mystery-man.svg"])]) {
       try {
-        return await prepareArt(src);
+        return await prepareArt(src, opaqueOnly, outlineMask);
       } catch {
         // A failed custom path continues down the art chain.
       }
@@ -1079,11 +1103,11 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     artQueue.clear();
   }
 
-  function enqueueArt(art: string[], background = false): void {
+  function enqueueArt(art: string[], background = false, opaqueOnly = false, outlineMask: OutlineMask | null = null): void {
     if (!art.length || (background && artQueue.size >= ART_CACHE_LIMIT * 2)) return;
-    const key = JSON.stringify(art);
+    const key = JSON.stringify([art, opaqueOnly, outlineMask]);
     const previous = artQueue.get(key);
-    artQueue.set(key, { art, background: previous ? previous.background && background : background });
+    artQueue.set(key, { art, opaqueOnly, outlineMask, background: previous ? previous.background && background : background });
   }
 
   function drainArtQueue(): Promise<void> {
@@ -1101,7 +1125,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
           else setTimeout(resolve, 25);
         });
         if (epoch !== preloadEpoch || !isEnabled()) continue;
-        await firstArt(entry.art);
+        await firstArt(entry.art, entry.opaqueOnly, entry.outlineMask);
       }
     })().finally(() => { pendingPreload = undefined; });
     return pendingPreload;
@@ -1111,14 +1135,18 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (!isEnabled()) return;
     stopPreload();
     // Only the current combat and viewed map need synthetic actors prepared now.
-    for (const combatant of documents(game.combat?.combatants)) enqueueArt(subjectFromCombatant(combatant).art);
+    for (const combatant of documents(game.combat?.combatants)) {
+      const subject = subjectFromCombatant(combatant);
+      enqueueArt(subject.art, false, subject.opaqueOnly, subject.outlineMask);
+    }
     if (canvas.ready) for (const token of documents(canvas.scene?.tokens)) {
-      enqueueArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art);
+      const subject = subjectFromCombatant({ actor: token.actor, token, name: token.name });
+      enqueueArt(subject.art, false, subject.opaqueOnly, subject.outlineMask);
     }
     // World actors are already instantiated; never walk inactive maps' token.actor getters.
     for (const actor of documents(game.actors)) {
       if (artQueue.size >= ART_CACHE_LIMIT * 2) break;
-      enqueueArt(artChainFrom(actor, null, actor.img, actor.prototypeToken?.texture?.src, null), true);
+      enqueueArt(artChainFrom(actor, null, actor.img, actor.prototypeToken?.texture?.src, null), true, opaqueOutlineFrom(actor), outlineMaskFrom(actor));
     }
     await Promise.all([preloadSlices(), drainArtQueue()]);
   }
@@ -1127,16 +1155,20 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     || key.startsWith("texture.") || key.startsWith("prototypeToken.") || key.startsWith("delta.")
     || key === `flags.${moduleId}.${ART_FLAG}` || changed.flags?.[moduleId]?.[ART_FLAG] !== undefined
     || changed.flags?.[moduleId]?.[`-=${ART_FLAG}`] !== undefined);
+  const outlineChanged = (changed: any) => [OUTLINE_FLAG, MASK_FLAG].some(flag => changed?.flags?.[moduleId]?.[flag] !== undefined
+    || changed?.flags?.[moduleId]?.[`-=${flag}`] !== undefined
+    || Object.keys(changed ?? {}).some(key => key === `flags.${moduleId}.${flag}` || key === `flags.${moduleId}.-=${flag}`));
 
   function warmActor(actor: any): void {
     if (!isEnabled()) return;
-    enqueueArt(artChainFrom(actor, actor?.token?.baseActor, actor?.img, actor?.prototypeToken?.texture?.src, null));
+    enqueueArt(artChainFrom(actor, actor?.token?.baseActor, actor?.img, actor?.prototypeToken?.texture?.src, null), false, opaqueOutlineFrom(actor), outlineMaskFrom(actor));
     void drainArtQueue().catch(() => {});
   }
 
   function warmToken(token: any): void {
     if (!isEnabled() || token.parent?.id !== canvas.scene?.id) return;
-    enqueueArt(subjectFromCombatant({ actor: token.actor, token, name: token.name }).art);
+    const subject = subjectFromCombatant({ actor: token.actor, token, name: token.name });
+    enqueueArt(subject.art, false, subject.opaqueOnly, subject.outlineMask);
     void drainArtQueue().catch(() => {});
   }
 
@@ -1146,7 +1178,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const reduced = prefersReducedMotion();
     removeOverlay();
     presentationOwner = owner;
-    const [art] = await Promise.all([firstArt(subject.art), preloadSlices()]);
+    const opaqueOnly = owner?.opaqueOnly ?? subject.opaqueOnly;
+    const outlineMask = owner?.outlineMask !== undefined ? owner.outlineMask : subject.outlineMask;
+    const artRevision = owner?.artRevision;
+    const [art] = await Promise.all([firstArt(subject.art, opaqueOnly, outlineMask), preloadSlices()]);
     if (gen !== generation || (automatic && !isEnabled())) return;
     const root = buildOverlay(subject, gen, reduced);
     if (art) revealPortrait(root, art);
@@ -1156,6 +1191,10 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       catch { releaseOverlayBlob(root); return; }
     }
     if (gen !== generation || (automatic && !isEnabled())) { releaseOverlayBlob(root); return; }
+    if (owner && owner.artRevision !== artRevision) {
+      releaseOverlayBlob(root);
+      return present(subject, owner, automatic); // Draft changed during loading/decoding; no sound has started.
+    }
     document.body.append(root);
     overlay = root;
     if (owner) {
@@ -1188,7 +1227,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     try {
       if (owner?.closed) return;
       const subject = subjectFromActor(actor, draft);
-      if (owner) { owner.transform = subject.transform; owner.color = subject.color; }
+      if (owner) { owner.transform = subject.transform; owner.color = subject.color; owner.opaqueOnly = subject.opaqueOnly; owner.outlineMask = subject.outlineMask; owner.artRevision = (owner.artRevision ?? 0) + 1; }
       await present(subject, owner);
     } catch (error) {
       reportEditorError("preview", error);
@@ -1261,7 +1300,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     }
   }
 
-  async function writeFlags(actor: any, art: string, color: string, sound: string, transform: PortraitTransform): Promise<void> {
+  async function writeFlags(actor: any, art: string, color: string, sound: string, transform: PortraitTransform, opaqueOnly: boolean, outlineMask: OutlineMask | null): Promise<void> {
     if (actor?.isOwner === false || typeof actor?.update !== "function") throw new Error("You do not have permission to edit this actor.");
     const trimmedArt = art.trim();
     const trimmedSound = sound.trim();
@@ -1273,12 +1312,14 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       [`flags.${moduleId}.${COLOR_FLAG}`]: hex,
       [`flags.${moduleId}.${trimmedSound ? SOUND_FLAG : `-=${SOUND_FLAG}`}`]: trimmedSound || null,
       [`flags.${moduleId}.${TRANSFORM_FLAG}`]: normalizePortraitTransform(transform),
+      [`flags.${moduleId}.${OUTLINE_FLAG}`]: opaqueOnly === true,
+      [`flags.${moduleId}.${MASK_FLAG}`]: normalizeOutlineMask(outlineMask),
     });
-    if (trimmedArt) failedArt.delete(trimmedArt);
+    if (trimmedArt) failedArt.delete(artKey(trimmedArt, opaqueOnly, outlineMask));
     warmActor(actor);
   }
 
-  function editorDraft(element: HTMLElement): ArtDraft {
+  function editorDraft(element: HTMLElement, owner?: EditorSession): ArtDraft {
     const art = element.querySelector<HTMLInputElement>("[name=yourTurnArt]");
     const color = element.querySelector<HTMLInputElement>("[name=yourTurnColor]");
     const sound = element.querySelector<HTMLInputElement>("[name=yourTurnSound]");
@@ -1287,6 +1328,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     const y = element.querySelector<HTMLInputElement>("[name=yourTurnPortraitY]")?.valueAsNumber;
     const scale = element.querySelector<HTMLInputElement>("[name=yourTurnPortraitScale]")?.valueAsNumber;
     return { art: art.value, color: color.value, sound: sound.value,
+      opaqueOnly: element.querySelector<HTMLInputElement>("[name=yourTurnOpaqueOutline]")?.checked === true,
+      outlineMask: owner?.outlineMask,
       transform: normalizePortraitTransform({ x, y, scale: Number(scale) / 100 }) };
   }
 
@@ -1305,6 +1348,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
           <button type="button" data-action="browse">${escapeHtml(game.i18n.localize("ASTILLON.YourTurn.Browse"))}</button>
         </span>
       </label>
+      <label class="astillon-yt-outline-toggle">
+        <input type="checkbox" name="yourTurnOpaqueOutline" ${opaqueOutlineFrom(actor) ? "checked" : ""}>
+        <span>${label("OpaqueOutline")}</span>
+      </label>
+      <p class="hint">${label("OpaqueOutlineHint")}</p>
+      <button type="button" data-action="paint-outline">${label("PaintOutline")}</button>
+      <p class="hint">${label("PaintOutlineHint")}</p>
       <fieldset class="astillon-yt-placement">
         <legend>${label("Placement")}</legend>
         <div class="astillon-yt-placement-row">
@@ -1352,6 +1402,65 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     if (presentationOwner === owner) cancel();
   }
 
+  function refreshEditorArt(actor: any, form: HTMLElement, owner: EditorSession): void {
+    const revision = owner.artRevision = (owner.artRevision ?? 0) + 1;
+    const root = overlay, gen = generation;
+    if (owner.closed || presentationOwner !== owner || root?.dataset.preview !== "held") return;
+    const subject = subjectFromActor(actor, editorDraft(form, owner));
+    const current = () => !owner.closed && owner.artRevision === revision && generation === gen
+      && presentationOwner === owner && overlay === root;
+    void (async () => {
+      const art = await firstArt(subject.art, subject.opaqueOnly, subject.outlineMask);
+      if (!art || !current()) return;
+      await loadImage(art.url);
+      if (!current()) return;
+      releaseOverlayBlob(root); revealPortrait(root, art);
+    })().catch(error => { if (current()) reportEditorError("update the outline", error); });
+  }
+
+  async function paintOutline(actor: any, form: HTMLElement, owner: EditorSession): Promise<void> {
+    if (owner.closed || owner.painting) return;
+    owner.painting = true;
+    let painter: ReturnType<typeof createOutlinePainter> | undefined;
+    try {
+      const subject = subjectFromActor(actor, editorDraft(form, owner));
+      let loaded: { image: HTMLImageElement; src: string } | undefined;
+      for (const src of subject.art) {
+        try { loaded = { image: await loadImage(resolveArtUrl(src)), src }; break; } catch { /* Try the art fallback. */ }
+      }
+      if (!loaded) throw new Error("Choose a readable portrait before painting its outline.");
+      if (owner.closed) return;
+      const size = scaledEdge(loaded.image.naturalWidth, loaded.image.naturalHeight);
+      const source = document.createElement("canvas"); source.width = size.width; source.height = size.height;
+      const context = source.getContext("2d")!; context.drawImage(loaded.image, 0, 0, size.width, size.height);
+      const pixels = context.getImageData(0, 0, size.width, size.height);
+      if (isOpaqueAlpha(pixels.data, size.width * size.height)) throw new Error("This portrait uses the solid-image frame. Outline painting requires artwork with a transparent background.");
+      const radius = outlineRadius(size.width, size.height);
+      const white = await renderOutlineAsync(pixels.data, size.width, size.height, radius, subject.opaqueOnly);
+      if (owner.closed) return;
+      const label = (key: string) => game.i18n.localize(`ASTILLON.YourTurn.${key}`);
+      painter = createOutlinePainter(source, white, radius, subject.outlineMask, loaded.src, {
+        hint: label("MaskHint"), brush: label("MaskBrush"), undo: label("MaskUndo"), clear: label("MaskClear"),
+        show: label("MaskShow"), limit: label("MaskLimit"), strokeLimit: label("MaskStrokeLimit"),
+      });
+      const result = await foundry.applications.api.DialogV2.wait({
+        window: { title: label("PaintOutline") }, position: { width: 620 }, modal: true,
+        content: '<div data-outline-painter></div>', rejectClose: false,
+        buttons: [
+          { action: "apply", label: label("MaskApply"), callback: () => painter!.read() },
+          { action: "cancel", label: "Cancel" },
+        ],
+        render: (first: any, second: any) => { editorElement(first, second)?.querySelector("[data-outline-painter]")?.replaceChildren(painter!.element); },
+        close: () => painter?.destroy(),
+      });
+      if (result && typeof result === "object" && !owner.closed) {
+        owner.outlineMask = normalizeOutlineMask(result);
+        refreshEditorArt(actor, form, owner);
+      }
+    } catch (error) { if (!owner.closed) reportEditorError("paint the outline", error); }
+    finally { owner.painting = false; painter?.destroy(); }
+  }
+
   function bindEditor(element: HTMLElement, actor: any, owner: EditorSession): void {
     const form = element.querySelector<HTMLElement>(".astillon-yt-editor");
     if (!form || boundEditors.has(form)) return;
@@ -1371,7 +1480,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     form.querySelector<HTMLButtonElement>("[data-action=preview]")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      void preview(actor, editorDraft(form), owner);
+      void preview(actor, editorDraft(form, owner), owner);
     });
     form.querySelector<HTMLButtonElement>("[data-action=stop-preview]")?.addEventListener("click", (event) => {
       event.preventDefault();
@@ -1380,6 +1489,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
     });
     const sound = form.querySelector<HTMLInputElement>("[name=yourTurnSound]");
     for (const event of ["input", "change"]) sound?.addEventListener(event, () => stopEditorPreview(owner));
+    form.querySelector<HTMLInputElement>("[name=yourTurnOpaqueOutline]")?.addEventListener("change", () => {
+      owner.opaqueOnly = editorDraft(form).opaqueOnly;
+      refreshEditorArt(actor, form, owner);
+    });
+    form.querySelector<HTMLButtonElement>("[data-action=paint-outline]")?.addEventListener("click", event => {
+      event.preventDefault(); event.stopPropagation(); void paintOutline(actor, form, owner);
+    });
     const color = form.querySelector<HTMLInputElement>("[name=yourTurnColor]")!;
     const updateColor = () => {
       const hex = normalizeHexColor(color.value);
@@ -1440,7 +1556,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
 
   async function openEditor(actor: any): Promise<void> {
     if (!actor) return;
-    const owner: EditorSession = { closed: false };
+    const owner: EditorSession = { closed: false, outlineMask: outlineMaskFrom(actor) };
     try {
       const DialogV2 = foundry.applications?.api?.DialogV2;
       if (typeof DialogV2?.wait !== "function") {
@@ -1461,8 +1577,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
               // Read this dialog's form, never another actor's last-opened editor.
               const element = htmlRoot(dialog?.element) ?? button.form;
               if (!element) throw new Error("The editor form is unavailable.");
-              const { art, color, sound, transform } = editorDraft(element);
-              try { await writeFlags(actor, art, color, sound ?? "", transform!); }
+              const { art, color, sound, transform, opaqueOnly, outlineMask } = editorDraft(element, owner);
+              try { await writeFlags(actor, art, color, sound ?? "", transform!, opaqueOnly === true, outlineMask ?? null); }
               catch (error) { reportEditorError("save the portrait, color, and sound", error); throw error; }
             },
           },
@@ -1485,7 +1601,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
   }
 
   function openFallbackEditor(actor: any): void {
-    const owner: EditorSession = { closed: false };
+    const owner: EditorSession = { closed: false, outlineMask: outlineMaskFrom(actor) };
     const wrap = document.createElement("div");
     wrap.className = "astillon-yt-editor-fallback";
     wrap.innerHTML = editorContent(actor);
@@ -1500,6 +1616,8 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         wrap.querySelector<HTMLInputElement>("[name=yourTurnColor]")?.value ?? "",
         wrap.querySelector<HTMLInputElement>("[name=yourTurnSound]")?.value ?? "",
         editorDraft(wrap).transform!,
+        editorDraft(wrap).opaqueOnly === true,
+        owner.outlineMask ?? null,
       ).then(() => { owner.closed = true; stopEditorPreview(owner); wrap.remove(); })
         .catch(error => reportEditorError("save the portrait, color, and sound", error));
     });
@@ -1637,12 +1755,13 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
       Hooks.on("getHeaderControlsApplicationV2", onHeaderControls);
       Hooks.on("renderApplicationV2", onRenderApplicationV2);
       Hooks.on("createActor", warmActor);
-      Hooks.on("updateActor", (actor: any, changed: any) => { if (artChanged(changed)) warmActor(actor); });
+      Hooks.on("updateActor", (actor: any, changed: any) => { if (artChanged(changed) || outlineChanged(changed)) warmActor(actor); });
       Hooks.on("createToken", warmToken);
-      Hooks.on("updateToken", (token: any, changed: any) => { if (artChanged(changed)) warmToken(token); });
+      Hooks.on("updateToken", (token: any, changed: any) => { if (artChanged(changed) || outlineChanged(changed)) warmToken(token); });
       const warmCombatant = (combatant: any) => {
         if (!isEnabled() || combatant.parent?.id !== game.combat?.id) return;
-        enqueueArt(subjectFromCombatant(combatant).art); void drainArtQueue().catch(() => {});
+        const subject = subjectFromCombatant(combatant);
+        enqueueArt(subject.art, false, subject.opaqueOnly, subject.outlineMask); void drainArtQueue().catch(() => {});
       };
       Hooks.on("createCombatant", warmCombatant);
       Hooks.on("updateCombatant", (combatant: any, changed: any) => { if (artChanged(changed) || changed.actorId || changed.tokenId) warmCombatant(combatant); });

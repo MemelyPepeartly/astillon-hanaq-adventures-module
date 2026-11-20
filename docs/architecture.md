@@ -6,7 +6,7 @@
 | --- | --- |
 | [Sarsaparilla](../src/scripts/features/sarsaparilla-surprise.ts) | Player macro, dialogs/chat interactivity, socket-driven presentation. Treat socket input as untrusted. |
 | [Menacing](../src/scripts/features/menacing.ts) | Cosmetic token flag/status control and shared atlas animation; not a PF2e condition/custom ActiveEffect. |
-| [Your Turn](../src/scripts/features/your-turn.ts) | GM world settings; actor art/color/placement/sound; local overlay/audio, editor ownership, bounded media preparation. |
+| [Your Turn](../src/scripts/features/your-turn.ts) | GM world settings; actor art/color/placement/sound/outline preferences; local overlay/audio, editor ownership, bounded media preparation. [Outline painter](../src/scripts/features/your-turn-outline.ts) owns bounded normalized strokes and outline-only canvas compositing. |
 | [Blaster facade](../src/scripts/features/blaster.ts) | API composition and immediate blast commands. [Model](../src/scripts/features/blaster-model.ts) owns modes/tiers; [placement](../src/scripts/features/blaster-placement.ts) owns map interaction. |
 | [Grand Finale](../src/scripts/features/blaster-finale.ts) | Durable path warning, timing/recovery/publication, native scene Regions. |
 | [Blastback](../src/scripts/features/blaster-blastback.ts) | Native damage bank, charge editor, release/recovery; [visuals](../src/scripts/features/blaster-blastback-visuals.ts) owns local charge/explosion effects. |

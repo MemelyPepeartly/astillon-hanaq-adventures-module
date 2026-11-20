@@ -16,6 +16,7 @@ These are design requirements, not measured guarantees. The 0.10.21 changes were
 
 - Your Turn prepared-art cache: **64 entries**. World background queue filling stops at **128 entries**; foreground scene needs have priority. Eviction must not revoke a visible portrait's blob.
 - Outlining yields after approximately **4 ms of processing**, checked between rows. This is not a hard upper bound on a row or a measured frame budget.
+- Manual outline exclusions store at most **64 strokes × 128 points**, associated with an image path. Painter redraws use frame-coalesced canvas compositing, not repeated pixel-outline generation. Mode/mask variants share the existing 64-entry image cache.
 - Aura bursts use **100 ms batching**. Events during an awaited pass may require one trailing pass; ordered gameplay events stay ordered.
 - Blastback visual refresh is frame-coalesced and restricted to watched charge tokens. Native damage and explicit actions are ordering barriers.
 - Do not traverse inactive maps' `token.actor` getters. Raw token flags and already-loaded world actors avoid constructing unrelated synthetic actors.
