@@ -1,6 +1,6 @@
 # Plan: Spec Kit adoption
 
-Spec: [spec.md](spec.md) · Status: Implemented, pending final delivery.
+Spec: [spec.md](spec.md) · Status: Implemented and published in 0.10.22; live acceptance remains separate.
 
 ## Ownership and approach
 

@@ -13,7 +13,7 @@ Spec: [spec.md](spec.md) · Plan: [plan.md](plan.md)
 ## Delivery
 
 - [x] T006 Update version/context and package 0.10.22. Packaging completed; no functional testing performed.
-- [ ] T007 Commit scoped changes, merge/push/publish and confirm release assets.
+- [x] T007 Commit scoped changes, merge/push/publish and confirm release assets. Release [0.10.22](https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/tag/0.10.22), commit b10f504; both package-only CI workflows succeeded and the published manifest reports 0.10.22.
 
 ## Separate acceptance — not completed by packaging
 

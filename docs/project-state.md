@@ -6,6 +6,7 @@ Read this after [AGENTS.md](../AGENTS.md). Do not load the entire release histor
 
 - **Astillon Hanaq Adventures** (`astillon-hanaq-adventures-module`): PF2e campaign content plus six feature factories. See the [baseline contract](../specs/001-module-baseline/spec.md) and [ownership map](architecture.md).
 - Last substantial runtime change: **0.10.21**, commit `e295d5c`, performance hotfix. Adoption release **0.10.22** adds Spec Kit/governance, corrects stale packaging CI, and reverses the Dark Triad image spin at the user's request; no encounter mechanics change.
+- **Published:** [0.10.22](https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/tag/0.10.22), release commit `b10f504`; both packaging workflows succeeded. Real Foundry and new-session skill-discovery acceptance remain NOT RUN.
 - Manifest advertises Foundry 13–14; newer Blaster/cutscene paths target **14.370 / PF2e 8.7.1** from recorded implementation evidence. The manifest's older PF2e verified value is not live V14 evidence. Do not expand compatibility without evidence.
 - Spec Kit **1.4.3**, Codex skills, PowerShell scripts. [Setup/update](../.specify/README.md). No automatic agent lifecycle hooks, Git extension, or test extension is enabled.
 

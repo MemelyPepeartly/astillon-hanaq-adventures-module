@@ -1,6 +1,6 @@
 # Feature specification: Spec Kit adoption and reverse cutscene spin
 
-Status: Implemented; release packaging/publication tracked separately in [tasks](tasks.md).
+Status: Implemented, packaged, merged/pushed and published as 0.10.22. Live Foundry acceptance and new-session skill discovery remain NOT RUN; see [tasks](tasks.md).
 Requested: 2026-11-19. Baseline: e295d5c / 0.10.21. Target: 0.10.22.
 
 ## Outcome
