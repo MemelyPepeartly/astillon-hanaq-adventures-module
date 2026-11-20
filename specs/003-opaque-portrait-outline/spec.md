@@ -21,6 +21,8 @@ User reports painting works in their instance, but the expanded editor extends b
 
 The report is user evidence of working painting and a blocked Save control, not proof of persistence/multiplayer. The layout fix has not been exercised in a real Foundry instance; no new test/fixture is authorized or run for this correction.
 
+Layout correction implemented, packaged, merged/pushed and published as [0.10.24](https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/tag/0.10.24), commit `4d78778`; both packaging workflows succeeded and release assets/manifest were confirmed.
+
 `your-turn.ts`: alpha eligibility, subject/draft/flag propagation, keyed cache, editor/dialog integration. `your-turn-outline.ts`: normalized stroke data, outline-only compositing and DOM painter. `en.json`: labels. `module.css`: editor layout. Update baseline/context/release notes; no encounter changes.
 
 ## Evidence / explicit visual exception
