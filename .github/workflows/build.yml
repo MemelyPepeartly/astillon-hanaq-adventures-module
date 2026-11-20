@@ -2,10 +2,24 @@ name: Build
 
 on:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'build/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/build.yml'
   push:
     branches:
       - main
       - master
+    paths:
+      - 'src/**'
+      - 'build/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/build.yml'
 
 jobs:
   build:
@@ -23,8 +37,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build and test module
-        run: npm test
+      # Compilation is packaging, not real Foundry functional acceptance.
+      - name: Package module (no automated test suites)
+        run: npm run build

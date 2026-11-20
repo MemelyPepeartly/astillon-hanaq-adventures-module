@@ -99,7 +99,7 @@ export function createDarkTriadCutsceneFeature(moduleId: string): ModuleFeature 
         .screenSpaceScale({ fitX: true, fitY: true });
       screen(LIGHTNING, 101).screenSpaceScale({ fitY: true, ratioX: true }).opacity(0.7).volume(0);
       screen(IMAGE, 102).screenSpaceScale({ fitY: true, ratioX: true, y: 0.65 })
-        .loopProperty("sprite", "rotation", { from: 0, to: 360, duration: 60000, ease: "linear", pingPong: false });
+        .loopProperty("sprite", "rotation", { from: 0, to: -360, duration: 60000, ease: "linear", pingPong: false });
       void sequence.play({ local: true }).catch((error: unknown) => {
         if (current === id) { void stopLocal(); report(error); }
       });

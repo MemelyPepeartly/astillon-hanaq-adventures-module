@@ -1,3 +1,6 @@
 node_modules/
 dist/
 artifacts/
+.specify/.venv/
+.specify/**/__pycache__/
+.specify/**/.cache/

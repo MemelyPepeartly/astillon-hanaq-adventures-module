@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "astillon-foundry": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:ace6cfda0c5187e30aa301ad4b0017b03d5d15f544b5a1848953b07a711b9096",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "codex": [
+          "speckit.analyze",
+          "speckit.checklist",
+          "speckit.clarify",
+          "speckit.constitution",
+          "speckit.converge",
+          "speckit.implement",
+          "speckit.plan",
+          "speckit.specify",
+          "speckit.tasks"
+        ]
+      },
+      "registered_skills": {
+        "codex": [
+          "speckit-analyze",
+          "speckit-checklist",
+          "speckit-clarify",
+          "speckit-constitution",
+          "speckit-converge",
+          "speckit-implement",
+          "speckit-plan",
+          "speckit-specify",
+          "speckit-tasks"
+        ]
+      },
+      "installed_at": "2026-11-20T00:11:05.374023+00:00"
+    }
+  }
+}

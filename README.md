@@ -4,6 +4,8 @@
 
 Foundry VTT module content for Pathfinder 2e, including Astillon/Hanaq compendia and module-loaded utilities.
 
+For development, start with [current project context](docs/project-state.md), the [constitution](.specify/memory/constitution.md), and [Spec Kit workflow](docs/development-workflow.md). The [baseline specification](specs/001-module-baseline/spec.md) maps current features and preserves the distinction between shipped behavior and live verification.
+
 ## Blaster
 
 The **Blaster — NPCs**, **Blaster — Support Effects**, and **Blaster — Encounter Macros** compendia contain the complete level-18 encounter kit. Blaster is a theatrical, narcissistic artillery villain whose need for an audience is represented by fragile hype thralls. His NPC sheet includes strikes, charged blasts, Curated Spectrum, Flash Mob, and the Beam Clash reaction. Import Blaster as a **new NPC**, then drag the encounter macros to the hotbar. The new encounter tools target **Foundry V14 with PF2e 8.7**; existing module utilities retain their existing compatibility.
@@ -137,6 +139,8 @@ See [Blaster's design and balance notes](docs/blaster-design.md) and the [live-w
 
 Import **Dark Triad — Start Cutscene** and **Dark Triad — End Cutscene** from the encounter macros pack. As GM, Start fades the map and Foundry UI to black over **eight seconds**, revealing `common/monsters/dark_triad.png` rotating once per minute over `jb2a.call_lightning.low_res.red`. It stays on screen until End (or GM Escape), then fades back to the unchanged map. Player Escape is a local-only escape hatch.
 
+From 0.10.22, the image rotates in the opposite direction; its speed, fade, lightning, and thunder are unchanged.
+
 The cutscene also loops `common/sound-effects/unsorted/Thunderstorm_SFX.mp3` beneath the visuals, with Foundry's native low-pass filter at intensity 6 for a muffled rumble. It fades in over eight seconds and out over 1.5 seconds when dismissed. Each viewer hears one local copy at 70% volume through their **Environment** channel, respecting their volume and mute controls. Browser audio must be unlocked by a user gesture; ending the cutscene cancels delayed playback. Other sounds and scene filters are unchanged. Missing audio does not interrupt the visuals.
 
 The cutscene is shared through a GM-owned world setting and rendered locally with Sequencer screen-space effects above the UI; it creates no map tiles or camera changes. Sequencer, the lightning asset, image, and thunder paths must be available to clients. No private JB2A assets or sound files are bundled.
@@ -187,6 +191,8 @@ Automatic portrait preparation runs only while Your Turn is enabled, prioritizes
 The editor uses Foundry's native FilePicker and the existing DialogV2 form. Browse, Preview, and placement controls do not submit the dialog; Save reads that specific editor and updates art, placement, color, and sound together. Two actor editors can be open without mixing drafts or moving each other's preview. Browser/save failures are reported instead of silently doing nothing. The startup preload can also be awaited explicitly with `await game.astillonHanaqAdventures["your-turn"].preload()`.
 
 ## Compatibility
+
+Version 0.10.22 adopts pinned Spec Kit 1.4.3 with a module constitution, baseline/context/architecture/performance docs, and policy-specific workflow skills/templates. Both CI paths now package without automated tests. It also reverses the Dark Triad image spin. Reload clients for the visual change; no sheet reimport. No tests or simulated previews were run, and live functionality remains unverified.
 
 Version 0.10.21 addresses startup and token-operation performance: aura reconciliation is batched and scene-scoped with one provider snapshot per pass; unrelated token edits no longer trigger world-wide scans; portrait preparation is deferred and bounded; Blastback movement updates target only the affected charge. Aura stacking and manual GM effects remain supported. Update and reload every client. Release packaging only; no tests, simulated previews, or live Foundry performance measurements were run.
 
@@ -243,14 +249,14 @@ Previously imported racing macros are world copies: import the updated versions 
 ## Development
 
 - `npm ci` installs development dependencies.
-- `npm run typecheck` checks TypeScript.
+- Build/compile only for an authorized release; compilation is not functionality testing.
 - Automated test suites are not part of this workflow. Only test actual module functionality in a real Foundry instance; see [project rules](AGENTS.md).
 - `npm run build` builds the installable module into `dist/`, including its animation assets and compendia.
 - `npm run test:local` builds and copies the module into `%LOCALAPPDATA%\FoundryVTT\Data\modules\astillon-hanaq-adventures-module` on Windows.
 
 In PowerShell environments that block npm.ps1, use `npm.cmd` instead of `npm`.
 
-Automated tests exercise a simulated Foundry/PF2e environment; see [V14 acceptance checks](docs/v14-acceptance.md) for the checks that require a running world.
+The existing automated suites and older test-result notes are historical and must not be run or extended under the current policy. Use only relevant authorized [real Foundry acceptance scenarios](docs/v14-acceptance.md). See [Spec Kit setup](.specify/README.md) and [the development workflow](docs/development-workflow.md); no automated-testing or simulated-preview phase is part of that workflow.
 
 ## Sarsaparilla Surprise
 
