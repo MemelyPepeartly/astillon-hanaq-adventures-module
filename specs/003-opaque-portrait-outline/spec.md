@@ -15,6 +15,12 @@ Requested 2026-11-19; target 0.10.23. Small feature delta to baseline FR-006/007
 
 ## Scope
 
+### Follow-up: reachable actions (0.10.24)
+
+User reports painting works in their instance, but the expanded editor extends below the screen and cannot scroll to Save. Constrain both Your Turn dialog frames to the viewport, make their own content bodies scroll, and prevent fields from shrinking to fit. Native Save/Apply/Cancel footers remain outside the scrollable bodies. No data, paint, sound or preview behavior changes. This is a CSS/layout correction with scoped dialog classes and no additional hooks/listeners.
+
+The report is user evidence of working painting and a blocked Save control, not proof of persistence/multiplayer. The layout fix has not been exercised in a real Foundry instance; no new test/fixture is authorized or run for this correction.
+
 `your-turn.ts`: alpha eligibility, subject/draft/flag propagation, keyed cache, editor/dialog integration. `your-turn-outline.ts`: normalized stroke data, outline-only compositing and DOM painter. `en.json`: labels. `module.css`: editor layout. Update baseline/context/release notes; no encounter changes.
 
 ## Evidence / explicit visual exception

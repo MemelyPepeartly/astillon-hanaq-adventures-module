@@ -164,11 +164,32 @@
   transform: translate(-50%, -50%) rotate(-11deg);
 }
 
+/* Scroll our content, not the native footer: Save/Apply/Cancel stay outside it. */
+.application.astillon-your-turn-dialog {
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  max-width: calc(100vw - 2rem);
+}
+.application.astillon-your-turn-dialog .window-content,
+.application.astillon-your-turn-dialog .dialog-content { min-height: 0; }
+.application.astillon-your-turn-dialog .form-footer { flex-shrink: 0; }
+.astillon-yt-editor,
+.astillon-yt-mask-editor {
+  max-height: calc(100vh - 12rem);
+  max-height: calc(100dvh - 12rem);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-inline-end: 0.4rem;
+}
+.astillon-yt-editor > * { flex-shrink: 0; }
+
 .astillon-yt-editor {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  min-width: 18rem;
+  min-width: 0;
 }
 
 .astillon-yt-editor-label {

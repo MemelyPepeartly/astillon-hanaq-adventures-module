@@ -194,6 +194,8 @@ The editor uses Foundry's native FilePicker and the existing DialogV2 form. Brow
 
 ## Compatibility
 
+Version 0.10.24 bounds Your Turn and outline-painter dialogs to the viewport and scrolls their content while keeping native Save/Apply/Cancel actions outside the scroll area. Reload clients and reopen the editor. No data migration or sheet reimport; no new tests/fixtures ran, and the layout correction has not been exercised in live Foundry.
+
 Version 0.10.23 adds opaque-only outlines and a bounded outline-exclusion painter in Your Turn. Reload clients, then configure each portrait as desired; no sheet reimport. The requested WickerWind comparison was visually checked using the actual compiled renderer/painter in a local browser. No unit/mock/content suites ran; native Foundry save/multiplayer behavior remains unverified.
 
 Version 0.10.22 adopts pinned Spec Kit 1.4.3 with a module constitution, baseline/context/architecture/performance docs, and policy-specific workflow skills/templates. Both CI paths now package without automated tests. It also reverses the Dark Triad image spin. Reload clients for the visual change; no sheet reimport. No tests or simulated previews were run, and live functionality remains unverified.

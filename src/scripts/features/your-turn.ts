@@ -1444,6 +1444,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         show: label("MaskShow"), limit: label("MaskLimit"), strokeLimit: label("MaskStrokeLimit"),
       });
       const result = await foundry.applications.api.DialogV2.wait({
+        classes: ["dialog", "astillon-your-turn-dialog"],
         window: { title: label("PaintOutline") }, position: { width: 620 }, modal: true,
         content: '<div data-outline-painter></div>', rejectClose: false,
         buttons: [
@@ -1564,6 +1565,7 @@ export function createYourTurnFeature(moduleId: string): ModuleFeature {
         return;
       }
       await DialogV2.wait({
+        classes: ["dialog", "astillon-your-turn-dialog"],
         window: { title: game.i18n.localize("ASTILLON.YourTurn.EditorTitle") },
         position: { width: 480 },
         content: editorContent(actor),
