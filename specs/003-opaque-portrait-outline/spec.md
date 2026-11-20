@@ -25,4 +25,4 @@ Alpha inspection confirms translucent pixels in the attachment. The linked Downl
 
 Visual comparison: inspected the actual compiled outline renderer and DOM painter in the authorized local browser preview. Opaque-only mode retains the character's outline and translucent wind; painting three outer leaf regions removes their white halos while keeping the leaves and main silhouette visible. This is rendering/UI evidence only, not native Foundry document-save or multiplayer proof.
 
-Live Foundry editor/save/multiplayer: NOT RUN — no real Foundry instance. Unit/mock/content suites: not created or run. Packaging completed for 0.10.23; publication pending.
+Live Foundry editor/save/multiplayer: NOT RUN — no real Foundry instance. Unit/mock/content suites: not created or run. Implemented, packaged, merged/pushed and published as [0.10.23](https://github.com/MemelyPepeartly/astillon-hanaq-adventures-module/releases/tag/0.10.23), commit `02c6bfc`. Both packaging workflows succeeded and the published manifest/assets were confirmed.
